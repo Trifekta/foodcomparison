@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   ERROR_MESSAGES,
+  basketStepSchema,
+  cartItemsSchema,
   contactStepSchema,
   locationStepSchema,
   submissionFieldsSchema,
@@ -13,6 +15,7 @@ const VALID_AREA_ID = "3f7d6d1a-6d8b-4c2f-9d51-3c9e2b7f1a55";
 
 function baseSubmission(overrides: Record<string, unknown> = {}) {
   return {
+    restaurantName: "Al Safadi",
     areaId: VALID_AREA_ID,
     sourceApp: "Talabat",
     sourceAppOther: "",
@@ -136,6 +139,83 @@ describe("contact validation", () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.issues[0].message).toBe(ERROR_MESSAGES.contactMissing);
+  });
+});
+
+describe("basket step", () => {
+  it("accepts a restaurant name", () => {
+    expect(basketStepSchema.safeParse({ restaurantName: "Al Safadi" }).success).toBe(true);
+  });
+
+  it("trims before measuring, so whitespace is not a name", () => {
+    const result = basketStepSchema.safeParse({ restaurantName: "   " });
+    expect(result.success).toBe(false);
+    expect(result.success ? null : result.error.issues[0]?.message).toBe(
+      ERROR_MESSAGES.restaurantMissing,
+    );
+  });
+
+  it("stores the trimmed name", () => {
+    const result = basketStepSchema.safeParse({ restaurantName: "  Al Safadi  " });
+    expect(result.success ? result.data.restaurantName : null).toBe("Al Safadi");
+  });
+
+  it("rejects a name that is too long", () => {
+    const result = basketStepSchema.safeParse({ restaurantName: "a".repeat(121) });
+    expect(result.success).toBe(false);
+    expect(result.success ? null : result.error.issues[0]?.message).toBe(
+      ERROR_MESSAGES.restaurantTooLong,
+    );
+  });
+
+  it("requires a restaurant on the whole submission too", () => {
+    expect(submissionFieldsSchema.safeParse(baseSubmission({ restaurantName: "" })).success).toBe(
+      false,
+    );
+  });
+});
+
+describe("cart items", () => {
+  it("accepts no items at all - the list is optional", () => {
+    const result = cartItemsSchema.safeParse([]);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a normal list", () => {
+    const result = cartItemsSchema.safeParse([
+      { name: "Chicken Shawarma", quantity: 2 },
+      { name: "Hummus", quantity: 1 },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a quantity outside 1-99, matching the database constraint", () => {
+    expect(cartItemsSchema.safeParse([{ name: "A", quantity: 0 }]).success).toBe(false);
+    expect(cartItemsSchema.safeParse([{ name: "A", quantity: 100 }]).success).toBe(false);
+    expect(cartItemsSchema.safeParse([{ name: "A", quantity: 1.5 }]).success).toBe(false);
+    expect(cartItemsSchema.safeParse([{ name: "A", quantity: 1 }]).success).toBe(true);
+    expect(cartItemsSchema.safeParse([{ name: "A", quantity: 99 }]).success).toBe(true);
+  });
+
+  it("rejects a blank name, matching the database constraint", () => {
+    expect(cartItemsSchema.safeParse([{ name: "   ", quantity: 1 }]).success).toBe(false);
+  });
+
+  it("rejects an item name that is too long", () => {
+    expect(cartItemsSchema.safeParse([{ name: "a".repeat(121), quantity: 1 }]).success).toBe(false);
+  });
+
+  it("caps the list so a tampered payload cannot insert thousands of rows", () => {
+    const many = Array.from({ length: 21 }, () => ({ name: "Item", quantity: 1 }));
+    expect(cartItemsSchema.safeParse(many).success).toBe(false);
+    expect(cartItemsSchema.safeParse(many.slice(0, 20)).success).toBe(true);
+  });
+
+  it("rejects anything that is not a list of items", () => {
+    expect(cartItemsSchema.safeParse("Chicken Shawarma").success).toBe(false);
+    expect(cartItemsSchema.safeParse({ name: "A", quantity: 1 }).success).toBe(false);
+    expect(cartItemsSchema.safeParse([{ name: "A" }]).success).toBe(false);
+    expect(cartItemsSchema.safeParse([{ name: "A", quantity: "2" }]).success).toBe(false);
   });
 });
 

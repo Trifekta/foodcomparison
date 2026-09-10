@@ -1,6 +1,10 @@
 import { z } from "zod";
 import {
+  MAX_CART_ITEMS,
   MAX_IMAGE_BYTES,
+  MAX_ITEM_NAME_LENGTH,
+  MAX_ITEM_QUANTITY,
+  MAX_RESTAURANT_NAME_LENGTH,
   MAX_TOTAL_AED,
   MIN_TOTAL_AED,
   OTHER_APP_VALUE,
@@ -19,6 +23,9 @@ export const ERROR_MESSAGES = {
   cartMissing: "Please upload a screenshot of your cart.",
   invalidImage: "Please upload a JPG, PNG or WEBP image.",
   oversizedImage: "This image is larger than 10 MB.",
+  restaurantMissing: "Please tell us which restaurant this order is from.",
+  restaurantTooLong: `Keep the restaurant name under ${MAX_RESTAURANT_NAME_LENGTH} characters.`,
+  itemsInvalid: "Please check the items you added.",
   areaMissing: "Please select your Dubai area.",
   appMissing: "Please choose the app you're ordering from.",
   otherAppMissing: "Please tell us the app name.",
@@ -44,6 +51,11 @@ export const contactTypeSchema = z.enum(["whatsapp", "email"]);
 
 /** The fields both the wizard and the API route validate. */
 const baseFields = {
+  restaurantName: z
+    .string()
+    .trim()
+    .min(2, ERROR_MESSAGES.restaurantMissing)
+    .max(MAX_RESTAURANT_NAME_LENGTH, ERROR_MESSAGES.restaurantTooLong),
   areaId: z.uuid({ message: ERROR_MESSAGES.areaMissing }),
   sourceApp: z.string().min(1, ERROR_MESSAGES.appMissing),
   sourceAppOther: z.string().trim().max(80),
@@ -56,6 +68,7 @@ const baseFields = {
 };
 
 type BaseValues = {
+  restaurantName: string;
   areaId: string;
   sourceApp: string;
   sourceAppOther: string;
@@ -133,6 +146,8 @@ export const submissionFieldsSchema = z.object(baseFields).superRefine(checkCros
  * schema only run once every field in that object parses, which would hide the
  * "Other" app error while a later step is still blank.
  */
+export const basketStepSchema = z.object({ restaurantName: baseFields.restaurantName });
+
 export const locationStepSchema = z
   .object({
     areaId: baseFields.areaId,
@@ -152,6 +167,22 @@ export const contactStepSchema = z
   })
   .superRefine(checkContactRules);
 
+
+/**
+ * The optional item list.
+ *
+ * Kept out of submissionFieldsSchema because every other field is a string and
+ * travels as one FormData entry; the items travel as a single JSON entry and
+ * are parsed separately, on the client and again on the server.
+ */
+export const cartItemSchema = z.object({
+  name: z.string().trim().min(1).max(MAX_ITEM_NAME_LENGTH),
+  quantity: z.number().int().min(1).max(MAX_ITEM_QUANTITY),
+});
+
+export const cartItemsSchema = z.array(cartItemSchema).max(MAX_CART_ITEMS);
+
+export type CartItem = z.infer<typeof cartItemSchema>;
 
 export type SubmissionFields = z.infer<typeof submissionFieldsSchema>;
 

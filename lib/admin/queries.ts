@@ -6,6 +6,7 @@ import type { AnalyticsRow } from "@/lib/calculations/analytics";
 import type {
   AreaRow,
   SubmissionEventRow,
+  SubmissionItemRow,
   SubmissionStatus,
   SubmissionWithArea,
 } from "@/types/database";
@@ -133,6 +134,20 @@ export async function getSubmission(id: string): Promise<SubmissionWithArea | nu
 
   if (error) throw new Error(`Could not load submission: ${error.message}`);
   return (data as unknown as SubmissionWithArea) ?? null;
+}
+
+/** The optional item list the customer confirmed. Often empty. */
+export async function getSubmissionItems(id: string): Promise<SubmissionItemRow[]> {
+  const supabase = await createServerSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("submission_items")
+    .select("*")
+    .eq("submission_id", id)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw new Error(`Could not load items: ${error.message}`);
+  return (data ?? []) as SubmissionItemRow[];
 }
 
 export async function getSubmissionEvents(id: string): Promise<SubmissionEventRow[]> {

@@ -67,6 +67,9 @@ export interface SubmissionRow {
   email: string | null;
   marketing_consent: boolean;
   admin_notes: string | null;
+  /** The restaurant as the CUSTOMER stated it on the basket step. */
+  restaurant_name: string | null;
+  /** The restaurant the ADMIN located on the comparison app. */
   restaurant_found: string | null;
   comparison_location_note: string | null;
   result_message: string | null;
@@ -79,6 +82,16 @@ export interface SubmissionRow {
 
 export interface SubmissionWithArea extends SubmissionRow {
   areas: { id: string; name: string; test_location_label: string | null; admin_location_notes: string | null } | null;
+}
+
+/** One line of the optional item list the customer confirmed. */
+export interface SubmissionItemRow {
+  id: string;
+  submission_id: string;
+  name: string;
+  quantity: number;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface SubmissionEventRow {

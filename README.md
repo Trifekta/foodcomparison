@@ -5,8 +5,8 @@ Before you order, check if you can save.
 FindFoodae lets a Dubai food-delivery customer send the basket they are about to
 order, and get back an answer: is the same order cheaper on another app?
 
-**Phase 1 is deliberately manual.** A customer submits a cart screenshot, their
-area, their app and their checkout total. An admin opens Keeta, rebuilds the same
+**Phase 1 is deliberately manual.** A customer submits a cart screenshot, the
+restaurant it is from, their area, their app and their checkout total. An admin opens Keeta, rebuilds the same
 basket by hand, types the total, and the system does the rest — calculates the
 saving, writes the customer message, and hands the admin a prefilled WhatsApp
 link. Nothing is scraped, no platform APIs are called, and no AI reads the
@@ -108,7 +108,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 
 ## 2. Run the migrations
 
-Open **SQL Editor → New query** in the Supabase dashboard and run these three
+Open **SQL Editor → New query** in the Supabase dashboard and run these four
 files **in order**, one at a time:
 
 | Order | File | What it does |
@@ -116,6 +116,7 @@ files **in order**, one at a time:
 | 1 | `supabase/migrations/0001_initial_schema.sql` | Tables, constraints, indexes, `updated_at` trigger |
 | 2 | `supabase/migrations/0002_row_level_security.sql` | `is_admin()` plus every RLS policy |
 | 3 | `supabase/migrations/0003_storage.sql` | Creates the private bucket and its policies |
+| 4 | `supabase/migrations/0004_cart_items.sql` | Adds `submissions.restaurant_name` and the optional `submission_items` table |
 
 Each file is safe to run more than once.
 
@@ -132,7 +133,7 @@ supabase db push
 ```sql
 select table_name from information_schema.tables
 where table_schema = 'public' order by 1;
--- expect: admin_profiles, areas, submission_events, submissions
+-- expect: admin_profiles, areas, submission_events, submission_items, submissions
 ```
 
 ---
@@ -405,27 +406,29 @@ non-admin sessions, and an admin cannot grant admin rights from inside the app.
 
 1. Open the homepage, tap **Check my order**.
 2. Upload a cart screenshot into slot 1; leave slot 2 (marked **Optional**)
-   empty → **Check my order**.
-3. Choose **Al Karama**, choose **Talabat** → **Continue**.
-4. Enter **82** → **Continue**. (The optional checkout screenshot lives on
+   empty → **Continue**.
+3. Type **Al Safadi** as the restaurant. Add an item or two if you like — the
+   list is optional and a blank row is simply dropped → **Continue**.
+4. Choose **Al Karama**, choose **Talabat** → **Continue**.
+5. Enter **82** → **Continue**. (The optional checkout screenshot lives on
    screen 1, alongside the required cart screenshot.)
-5. Enter a WhatsApp number → **Continue**.
-6. Review, then **Get a Keeta price**.
-7. You land on the success screen with a reference like `FFA-260910-0042`.
+6. Enter a WhatsApp number → **Continue**.
+7. Review, then **Get a Keeta price**.
+8. You land on the success screen with a reference like `FFA-260910-0042`.
 
 **Admin:**
 
-8. Sign in at `/admin/login`. The submission is at the top of the table.
-9. Open it. You see Al Karama, Talabat, AED 82.00 and the cart screenshot
-   (click to enlarge).
-10. **Start review** → status becomes Reviewing.
-11. Type **63** as the Keeta total. The card shows **AED 19.00 saving, 23.2%**
+9. Sign in at `/admin/login`. The submission is at the top of the table.
+10. Open it. You see Al Safadi, Al Karama, Talabat, AED 82.00, whatever items
+    the customer listed, and the cart screenshot (click to enlarge).
+11. **Start review** → status becomes Reviewing.
+12. Type **63** as the Keeta total. The card shows **AED 19.00 saving, 23.2%**
     live as you type.
-12. **Save comparison & generate result** → status becomes Result Ready and the
+13. **Save comparison & generate result** → status becomes Result Ready and the
     customer message appears.
-13. **Open in WhatsApp** → the wa.me link carries the customer's number and the
+14. **Open in WhatsApp** → the wa.me link carries the customer's number and the
     prefilled message.
-14. **Mark as sent** → status becomes Sent, and the dashboard agrees.
+15. **Mark as sent** → status becomes Sent, and the dashboard agrees.
 
 **No-saving case:** submit another order with a total of **AED 50**, enter a
 Keeta total of **AED 54**. The system must not claim a saving — it shows

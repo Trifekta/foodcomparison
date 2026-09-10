@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, MapPin } from "lucide-react";
-import { getSignedImageUrl, getSubmission, getSubmissionEvents } from "@/lib/admin/queries";
+import {
+  getSignedImageUrl,
+  getSubmission,
+  getSubmissionEvents,
+  getSubmissionItems,
+} from "@/lib/admin/queries";
 import { isEmailConfigured } from "@/lib/notifications/resend";
 import { ScreenshotViewer } from "@/components/admin/ScreenshotViewer";
 import { ComparisonPanel } from "@/components/admin/ComparisonPanel";
@@ -39,10 +44,11 @@ export default async function SubmissionDetailPage({
   const submission = await getSubmission(id);
   if (!submission) notFound();
 
-  const [cartUrl, checkoutUrl, events] = await Promise.all([
+  const [cartUrl, checkoutUrl, events, items] = await Promise.all([
     getSignedImageUrl(submission.cart_image_path),
     getSignedImageUrl(submission.checkout_image_path),
     getSubmissionEvents(submission.id),
+    getSubmissionItems(submission.id),
   ]);
 
   const appLabel =
@@ -81,6 +87,7 @@ export default async function SubmissionDetailPage({
             <h2 className="text-base font-semibold text-ink-900">Order</h2>
             <dl className="mt-3 divide-y divide-ink-100">
               <Row label="Submitted" value={formatDubaiDateTime(submission.created_at)} />
+              <Row label="Restaurant" value={submission.restaurant_name ?? "—"} />
               <Row label="Area" value={submission.areas?.name ?? "—"} />
               <Row label="Ordering from" value={appLabel} />
               <Row
@@ -119,6 +126,41 @@ export default async function SubmissionDetailPage({
                 ) : null}
               </div>
             ) : null}
+          </section>
+
+          {/* What the customer typed in. The screenshot below is still the
+              source of truth - this list is optional and may be incomplete. */}
+          <section className="rounded-2xl border border-ink-200 bg-white p-5">
+            <h2 className="text-base font-semibold text-ink-900">
+              Items the customer listed
+            </h2>
+            {items.length > 0 ? (
+              <>
+                <ul className="mt-3 divide-y divide-ink-100">
+                  {items.map((item) => (
+                    <li
+                      key={item.id}
+                      className="flex items-start justify-between gap-4 py-2.5 text-sm"
+                    >
+                      <span className="min-w-0 break-words font-semibold text-ink-900">
+                        {item.name}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-ink-500">
+                        &times;{item.quantity}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs text-ink-500">
+                  Typed by the customer, not read from the screenshot. Check it against the cart
+                  below.
+                </p>
+              </>
+            ) : (
+              <p className="mt-1.5 text-sm text-ink-500">
+                Customer did not list items. Rebuild the basket from the cart screenshot.
+              </p>
+            )}
           </section>
 
           <section className="rounded-2xl border border-ink-200 bg-white p-5">

@@ -1,9 +1,19 @@
 import "server-only";
 
-import { COMPARISON_APP, OTHER_APP_VALUE, STORAGE_BUCKET } from "@/lib/constants";
+import {
+  COMPARISON_APP,
+  MAX_ITEM_NAME_LENGTH,
+  MAX_RESTAURANT_NAME_LENGTH,
+  OTHER_APP_VALUE,
+  STORAGE_BUCKET,
+} from "@/lib/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { validateImageFile, type ImageValidationSuccess } from "@/lib/validation/image";
-import { submissionFieldsSchema } from "@/lib/validation/submission";
+import {
+  ERROR_MESSAGES,
+  cartItemsSchema,
+  submissionFieldsSchema,
+} from "@/lib/validation/submission";
 import { generateReferenceNumber } from "@/lib/utils/reference";
 import { normalisePhone } from "@/lib/utils/phone";
 import { sanitiseText } from "@/lib/utils/text";
@@ -25,9 +35,38 @@ export type CreateSubmissionResult =
 const GENERIC_FAILURE = "We couldn't submit your order. Please try again.";
 const MAX_REFERENCE_ATTEMPTS = 5;
 
+type ParsedItems =
+  | { ok: true; value: Array<{ name: string; quantity: number }> }
+  | { ok: false; error: string };
+
+/** Reads the optional `items` JSON entry. Absent is fine; malformed is not. */
+function parseItems(raw: FormDataEntryValue | null): ParsedItems {
+  if (typeof raw !== "string" || raw.trim() === "") return { ok: true, value: [] };
+
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: ERROR_MESSAGES.itemsInvalid };
+  }
+
+  const parsed = cartItemsSchema.safeParse(decoded);
+  if (!parsed.success) return { ok: false, error: ERROR_MESSAGES.itemsInvalid };
+
+  // Names are re-cleaned here: the schema bounds them, sanitiseText strips
+  // control characters. A name that sanitises away entirely is dropped.
+  const value = parsed.data.flatMap((item) => {
+    const name = sanitiseText(item.name, MAX_ITEM_NAME_LENGTH);
+    return name ? [{ name, quantity: item.quantity }] : [];
+  });
+
+  return { ok: true, value };
+}
+
 export async function createSubmission(formData: FormData): Promise<CreateSubmissionResult> {
   // ---- 1. Fields ----------------------------------------------------------
   const parsed = submissionFieldsSchema.safeParse({
+    restaurantName: String(formData.get("restaurantName") ?? ""),
     areaId: String(formData.get("areaId") ?? ""),
     sourceApp: String(formData.get("sourceApp") ?? ""),
     sourceAppOther: String(formData.get("sourceAppOther") ?? ""),
@@ -49,6 +88,14 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     };
   }
   const fields = parsed.data;
+
+  // The optional item list arrives as one JSON entry. Bad JSON is rejected
+  // rather than ignored: it can only come from a tampered or broken client, and
+  // silently dropping a basket the customer thinks they sent would be worse.
+  const items = parseItems(formData.get("items"));
+  if (!items.ok) {
+    return { ok: false, status: 400, error: items.error, field: "items" };
+  }
 
   // ---- 2. Images (magic-byte checked, never trusted by extension) ---------
   const cartFile = formData.get("cartImage");
@@ -178,6 +225,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       whatsapp_number: whatsappNumber,
       email,
       marketing_consent: fields.marketingConsent,
+      restaurant_name: sanitiseText(fields.restaurantName, MAX_RESTAURANT_NAME_LENGTH),
     });
 
     if (!error) {
@@ -194,11 +242,31 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     return { ok: false, status: 500, error: GENERIC_FAILURE };
   }
 
+  // Items are a convenience for the admin, not part of the comparison itself.
+  // A failed insert must not cost the customer their submission - the cart
+  // screenshot still carries everything - so the outcome is only recorded.
+  let itemsStored = 0;
+  if (items.value.length > 0) {
+    const rows = items.value.map((item, index) => ({
+      submission_id: submissionId,
+      name: item.name,
+      quantity: item.quantity,
+      sort_order: index,
+    }));
+
+    const { error } = await supabase.from("submission_items").insert(rows);
+    if (!error) itemsStored = rows.length;
+  }
+
   await supabase.from("submission_events").insert({
     submission_id: submissionId,
     event_type: "submission_created",
     new_status: "new",
-    metadata: { source_app: fields.sourceApp, has_checkout_image: checkoutPath !== null },
+    metadata: {
+      source_app: fields.sourceApp,
+      has_checkout_image: checkoutPath !== null,
+      item_count: itemsStored,
+    },
   });
 
   return { ok: true, referenceNumber, id: submissionId };

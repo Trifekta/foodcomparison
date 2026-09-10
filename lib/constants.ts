@@ -50,6 +50,17 @@ export const ACCEPTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"] as const
 export const IMAGE_MAX_DIMENSION = 1600;
 export const IMAGE_COMPRESSION_QUALITY = 0.85;
 
+/**
+ * The basket the customer confirms after uploading. The restaurant is required
+ * because an admin cannot rebuild an order without knowing where it is from;
+ * the item list is optional, since the cart screenshot remains the source of
+ * truth and we never read items out of it automatically.
+ */
+export const MAX_RESTAURANT_NAME_LENGTH = 120;
+export const MAX_CART_ITEMS = 20;
+export const MAX_ITEM_NAME_LENGTH = 120;
+export const MAX_ITEM_QUANTITY = 99;
+
 /** Money limits for the checkout total the customer types in. */
 export const MIN_TOTAL_AED = 0.01;
 export const MAX_TOTAL_AED = 5000;

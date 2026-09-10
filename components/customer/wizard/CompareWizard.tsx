@@ -7,6 +7,8 @@ import type { z } from "zod";
 import type { PublicArea } from "@/types/database";
 import {
   ERROR_MESSAGES,
+  basketStepSchema,
+  cartItemsSchema,
   contactStepSchema,
   locationStepSchema,
   submissionFieldsSchema,
@@ -14,17 +16,34 @@ import {
 } from "@/lib/validation/submission";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
+import { StepBasket } from "./StepBasket";
 import { StepLocation } from "./StepLocation";
 import { StepTotal } from "./StepTotal";
 import { StepContact } from "./StepContact";
 import { StepReview } from "./StepReview";
-import { WIZARD_DEFAULTS, type WizardFiles, type WizardValues } from "./types";
+import {
+  WIZARD_DEFAULTS,
+  type CartItemDraft,
+  type WizardFiles,
+  type WizardValues,
+} from "./types";
 
 const STEP_UPLOAD = 1;
-const STEP_LOCATION = 2;
-const STEP_TOTAL = 3;
-const STEP_CONTACT = 4;
-const STEP_REVIEW = 5;
+const STEP_BASKET = 2;
+const STEP_LOCATION = 3;
+const STEP_TOTAL = 4;
+const STEP_CONTACT = 5;
+const STEP_REVIEW = 6;
+
+/**
+ * Item rows the customer left blank are dropped rather than flagged: the list
+ * is optional, so an empty row means "not filled in", not "invalid".
+ */
+function usableItems(items: CartItemDraft[]) {
+  return items
+    .map((item) => ({ name: item.name.trim(), quantity: item.quantity }))
+    .filter((item) => item.name.length > 0);
+}
 
 /**
  * The customer wizard.
@@ -52,6 +71,9 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
 
   const [step, setStep] = useState<number>(STEP_UPLOAD);
   const [files, setFiles] = useState<WizardFiles>({ cart: null, checkout: null });
+  // Items are an array of objects, so they live here rather than in
+  // react-hook-form, whose values all travel as single FormData entries.
+  const [items, setItems] = useState<CartItemDraft[]>([]);
   const [cartError, setCartError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -90,7 +112,11 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       return;
     }
     setCartError(null);
-    goTo(STEP_LOCATION);
+    goTo(STEP_BASKET);
+  };
+
+  const handleBasketContinue = () => {
+    if (validateStep(basketStepSchema, ["restaurantName"])) goTo(STEP_LOCATION);
   };
 
   const handleLocationContinue = () => {
@@ -128,7 +154,8 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       }
       // Send the customer back to the earliest step that still needs attention.
       const bad = parsed.error.issues[0]?.path[0];
-      if (bad === "areaId" || bad === "sourceApp" || bad === "sourceAppOther") goTo(STEP_LOCATION);
+      if (bad === "restaurantName") goTo(STEP_BASKET);
+      else if (bad === "areaId" || bad === "sourceApp" || bad === "sourceAppOther") goTo(STEP_LOCATION);
       else if (bad === "currentTotal") goTo(STEP_TOTAL);
       else goTo(STEP_CONTACT);
       return;
@@ -144,6 +171,12 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       if (files.checkout) body.append("checkoutImage", files.checkout);
       for (const [key, value] of Object.entries(parsed.data)) {
         body.append(key, typeof value === "boolean" ? String(value) : value);
+      }
+
+      // Sent as one JSON entry, and re-parsed and re-validated on the server.
+      const cartItems = cartItemsSchema.safeParse(usableItems(items));
+      if (cartItems.success && cartItems.data.length > 0) {
+        body.append("items", JSON.stringify(cartItems.data));
       }
 
       const response = await fetch("/api/submissions", { method: "POST", body });
@@ -187,6 +220,17 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           }
           error={cartError}
           onContinue={handleUploadContinue}
+        />
+      ) : null}
+
+      {step === STEP_BASKET ? (
+        <StepBasket
+          restaurantName={values.restaurantName}
+          items={items}
+          restaurantError={errors.restaurantName?.message}
+          onRestaurantNameChange={(value) => setField("restaurantName", value)}
+          onItemsChange={setItems}
+          onContinue={handleBasketContinue}
         />
       ) : null}
 
@@ -245,11 +289,13 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
         <StepReview
           values={values}
           files={files}
+          items={usableItems(items)}
           areaName={areaName}
           submitting={submitting}
           submitError={submitError}
           onSubmit={() => void handleSubmit()}
           onBack={() => goTo(STEP_CONTACT)}
+          onEditBasket={() => goTo(STEP_BASKET)}
           onEditArea={() => goTo(STEP_LOCATION)}
           onEditContact={() => goTo(STEP_CONTACT)}
         />

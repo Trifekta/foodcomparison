@@ -1,24 +1,28 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { AlertCircle, Check, ChevronRight, MapPin, Minus, Receipt } from "lucide-react";
+import { AlertCircle, Check, ChevronRight, MapPin, Minus, Receipt, Store } from "lucide-react";
 import { COMPARISON_APP, CURRENCY, OTHER_APP_VALUE } from "@/lib/constants";
 import { maskEmail, maskPhone, normalisePhone } from "@/lib/utils/phone";
 import { Button } from "@/components/ui/Button";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptNote, Sparks } from "@/components/customer/Motifs";
 import { cn } from "@/lib/utils/cn";
+import type { CartItem } from "@/lib/validation/submission";
 import type { WizardFiles, WizardValues } from "./types";
 
 interface StepReviewProps {
   values: WizardValues;
   files: WizardFiles;
+  /** Already stripped of blank rows by the wizard. */
+  items: CartItem[];
   areaName: string;
   submitting: boolean;
   submitError: string | null;
   onSubmit: () => void;
   onBack: () => void;
   /** Jump back to the step that owns a value, from its row on this screen. */
+  onEditBasket: () => void;
   onEditArea: () => void;
   onEditContact: () => void;
 }
@@ -89,11 +93,13 @@ function EditRow({
 export function StepReview({
   values,
   files,
+  items,
   areaName,
   submitting,
   submitError,
   onSubmit,
   onBack,
+  onEditBasket,
   onEditArea,
   onEditContact,
 }: StepReviewProps) {
@@ -148,8 +154,8 @@ export function StepReview({
           </span>
         </div>
 
-        {/* The screenshots they actually sent. We show these rather than a list
-            of items, because nothing is read out of the images in this phase. */}
+        {/* The screenshots they actually sent. Nothing is read out of them
+            automatically - an admin opens them by hand. */}
         <div className="px-4 pb-4">
           <div className="flex items-start gap-3">
           <div className="flex shrink-0 gap-2">
@@ -175,7 +181,7 @@ export function StepReview({
               {hasCheckoutShot ? "2 screenshots ready" : "1 screenshot ready"}
             </p>
             <p className="mt-0.5 text-[0.85rem] leading-snug text-slate-500">
-              We&apos;ll read the restaurant and items from these.
+              An admin opens these to rebuild your basket.
             </p>
           </div>
           </div>
@@ -183,6 +189,38 @@ export function StepReview({
             <StatusPill ok>Cart screenshot added</StatusPill>
           </div>
         </div>
+
+        <div className="border-t border-ink-100" />
+        <EditRow
+          icon={<Store className="h-5 w-5 text-slate-600" />}
+          label="Restaurant"
+          value={values.restaurantName.trim()}
+          onEdit={onEditBasket}
+        />
+
+        {items.length > 0 ? (
+          <div className="px-4 pb-4">
+            <ul className="divide-y divide-ink-100 rounded-2xl bg-ink-50 px-3.5">
+              {items.map((item, index) => (
+                <li
+                  key={`${index}-${item.name}`}
+                  className="flex items-center justify-between gap-3 py-2.5"
+                >
+                  <span className="min-w-0 flex-1 truncate text-[0.92rem] font-semibold text-ink-900">
+                    {item.name}
+                  </span>
+                  <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[0.78rem] font-bold tabular-nums text-slate-600 ring-1 ring-ink-200">
+                    &times;{item.quantity}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[0.8rem] text-slate-500">
+              {items.length === 1 ? "1 item added" : `${items.length} items added`} — we&apos;ll
+              check the rest against your screenshot.
+            </p>
+          </div>
+        ) : null}
 
         <div className="border-t border-ink-100" />
 
