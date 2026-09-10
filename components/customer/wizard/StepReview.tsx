@@ -6,7 +6,7 @@ import { COMPARISON_APP, CURRENCY, OTHER_APP_VALUE } from "@/lib/constants";
 import { maskEmail, maskPhone, normalisePhone } from "@/lib/utils/phone";
 import { Button } from "@/components/ui/Button";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
-import { Sparks } from "@/components/customer/Motifs";
+import { ScriptNote, Sparks } from "@/components/customer/Motifs";
 import { cn } from "@/lib/utils/cn";
 import type { WizardFiles, WizardValues } from "./types";
 
@@ -240,16 +240,8 @@ export function StepReview({
       ) : null}
 
       {/* The price challenge - the most prominent element on the screen */}
-      {/*
-        The price challenge. The supplied cluster carries its own warm panel
-        background and the handwritten line, so the card is flat #fdefc9 to
-        match it and the render bleeds into the top-right corner - no seam, and
-        no second copy of the script.
-      */}
-      <section
-        className="mt-4 overflow-hidden rounded-3xl p-4"
-        style={{ backgroundColor: "#fdefc9" }}
-      >
+      {/* The price challenge: the most prominent element on the screen. */}
+      <section className="mt-4 overflow-hidden rounded-3xl bg-linear-to-br from-brand-100 to-brand-200 p-4">
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <h2 className="text-[1.4rem] font-extrabold leading-tight text-ink-900">
@@ -261,10 +253,14 @@ export function StepReview({
               We&apos;ll rebuild the same food and delivery location, then send you the price.
             </p>
           </div>
-          <FoodPhoto
-            name="bagCluster"
-            className="pointer-events-none -mr-4 -mt-4 w-[46%] shrink-0 select-none"
-          />
+          <span aria-hidden="true" className="relative block w-[44%] shrink-0 select-none">
+            <FoodPhoto name="bagCluster" className="w-full" />
+            <ScriptNote className="absolute -top-1 right-0 text-[0.66rem] leading-tight text-ink-800">
+              Same Food
+              <br />
+              Lower Prices
+            </ScriptNote>
+          </span>
         </div>
 
         <div className="mt-4">

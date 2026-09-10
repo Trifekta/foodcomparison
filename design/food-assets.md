@@ -11,3 +11,20 @@ These files were cropped from the ChatGPT-generated FindFood reference screens f
 - receipt.png — checkout receipt upload icon
 
 Use the supplied PNG assets directly. Do not redraw, vectorize, or substitute them. Reference screens are included in reference-screens/.
+
+## Rule: assets carry food only
+
+The PNGs here are food and illustration. Everything else is native HTML/CSS,
+layered around them in the components:
+
+| Element | Where it lives |
+| --- | --- |
+| Camera badge, sparks, "Tap to upload" label | `components/forms/ImageUpload.tsx` |
+| "Same Food / Lower Prices" and every handwritten line | `components/customer/Motifs.tsx` |
+| Checkmarks, Required / Optional / Added pills, status pills | `ImageUpload.tsx`, `StepReview.tsx` |
+| Confirmation tick badge | `components/customer/FoodArt.tsx` |
+| Panel backgrounds and gradients | the screen components |
+
+So an asset should arrive on a transparent background with no badge, tick,
+label or caption in its pixels. Anything baked in ends up duplicated, because
+the component draws its own.

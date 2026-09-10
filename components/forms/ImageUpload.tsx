@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Check, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Camera, Check, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/constants";
 import { validateImageClientSide } from "@/lib/validation/submission";
 import { downscaleImage } from "@/lib/utils/image-client";
 import { FieldError } from "@/components/ui/FieldError";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
+import { Sparks } from "@/components/customer/Motifs";
 import { cn } from "@/lib/utils/cn";
 
 interface ImageUploadProps {
@@ -189,7 +190,14 @@ export function ImageUpload({
               </>
             ) : (
               <>
-                <FoodPhoto name={art} className="mb-1 h-[4.5rem] w-auto object-contain" />
+                <span aria-hidden="true" className="relative mb-1.5 block h-[4.5rem] w-24">
+                  <FoodPhoto name={art} className="absolute inset-0 h-full w-full object-contain" />
+                  <span className="absolute -bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-brand-400 shadow-sm">
+                    <Camera className="h-4.5 w-4.5 text-ink-900" strokeWidth={2.2} />
+                  </span>
+                  <Sparks className="absolute -left-3 top-3 h-5 w-5" />
+                  <Sparks className="absolute -right-2 top-1 h-5 w-5 -scale-x-100" />
+                </span>
                 <span className="text-[0.95rem] font-extrabold text-ink-900">Tap to upload</span>
                 <span className="text-xs text-slate-400">JPG, PNG or WEBP · up to 10 MB</span>
               </>
