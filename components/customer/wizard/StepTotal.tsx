@@ -10,8 +10,10 @@ interface StepTotalProps {
   onCurrentTotalChange: (value: string) => void;
   totalError?: string;
   hasCheckoutScreenshot: boolean;
-  /** The total read off the screenshot, if one was found. */
+  /** The total read off the screenshots, if one was found. */
   readTotal: string | null;
+  /** Whether that total came off the checkout screen rather than the cart. */
+  totalFromCheckout: boolean;
   onUseReadTotal: () => void;
   onContinue: () => void;
 }
@@ -22,6 +24,7 @@ export function StepTotal({
   totalError,
   hasCheckoutScreenshot,
   readTotal,
+  totalFromCheckout,
   onUseReadTotal,
   onContinue,
 }: StepTotalProps) {
@@ -52,7 +55,7 @@ export function StepTotal({
           <p className="flex min-w-0 flex-1 items-start gap-2 text-sm leading-snug text-chip-green-fg">
             <ScanLine aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              Your screenshot looked like{" "}
+              Your {totalFromCheckout ? "checkout screenshot" : "screenshot"} looked like{" "}
               <span className="font-extrabold tabular-nums">
                 {CURRENCY} {readTotal}
               </span>

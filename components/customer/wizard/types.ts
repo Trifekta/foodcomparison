@@ -91,3 +91,58 @@ export function usableItems(items: CartItemDraft[]): CartItem[] {
     ];
   });
 }
+
+/** Which screenshot a read belongs to. Both are read; each is believed about
+ *  a different thing - the cart for what was ordered, the payment screen for
+ *  what it came to. */
+export type ReadSlot = "cart" | "checkout";
+
+/** True when a read found at least one figure worth showing. */
+export function hasAnyTotal(totals: ReadTotals | null): totals is ReadTotals {
+  return totals !== null && Object.values(totals).some((value) => value !== "");
+}
+
+/**
+ * One set of figures out of two screenshots.
+ *
+ * The cart screen lists what was ordered, but the payment screen is where the
+ * money is actually settled: fees added, discount applied, delivery counted.
+ * So wherever the payment screen was read, it wins - field by field, because
+ * OCR routinely loses one line and not the next, and a figure the cart screen
+ * did read is better than a blank row.
+ */
+export function mergeReadTotals(
+  cart: ReadTotals | null,
+  checkout: ReadTotals | null,
+): ReadTotals | null {
+  if (!hasAnyTotal(checkout)) return cart;
+  if (!cart) return checkout;
+
+  const pick = (from: keyof ReadTotals) => (checkout[from] !== "" ? checkout[from] : cart[from]);
+
+  return {
+    subtotal: pick("subtotal"),
+    deliveryFee: pick("deliveryFee"),
+    serviceFee: pick("serviceFee"),
+    discount: pick("discount"),
+    finalTotal: pick("finalTotal"),
+  };
+}
+
+/**
+ * One banner out of two reads.
+ *
+ * Still reading anything means still reading: the totals on screen may yet
+ * change, and saying so is more honest than showing a settled result that is
+ * about to move. Otherwise anything found beats nothing found.
+ */
+export function combineStatus(
+  cart: ExtractionStatus,
+  checkout: ExtractionStatus,
+): ExtractionStatus {
+  const both = [cart, checkout];
+  if (both.includes("reading")) return "reading";
+  if (both.includes("applied")) return "applied";
+  if (both.includes("empty")) return "empty";
+  return "idle";
+}

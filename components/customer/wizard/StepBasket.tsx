@@ -21,8 +21,10 @@ interface StepBasketProps {
   items: CartItemDraft[];
   restaurantError?: string;
   extractionStatus: ExtractionStatus;
-  /** Totals read off the screenshot, shown back so they can be checked. */
+  /** Totals read off the screenshots, shown back so they can be checked. */
   readTotals: ReadTotals | null;
+  /** Whether the payment screenshot is where those figures came from. */
+  totalsFromCheckout: boolean;
   onRestaurantNameChange: (value: string) => void;
   onItemsChange: (items: CartItemDraft[]) => void;
   onContinue: () => void;
@@ -46,6 +48,7 @@ export function StepBasket({
   restaurantError,
   extractionStatus,
   readTotals,
+  totalsFromCheckout,
   onRestaurantNameChange,
   onItemsChange,
   onContinue,
@@ -326,7 +329,7 @@ export function StepBasket({
           {totalRows.length > 0 || readTotals?.finalTotal ? (
             <dl className="mt-4 rounded-2xl bg-ink-50 px-4 py-3 text-[0.9rem]">
               <p className="mb-2 text-[0.72rem] font-bold uppercase tracking-wide text-slate-500">
-                From your screenshot
+                {totalsFromCheckout ? "From your checkout screenshot" : "From your screenshot"}
               </p>
               {totalRows.map(([label, value]) => (
                 <div key={label} className="flex justify-between py-1 text-slate-600">

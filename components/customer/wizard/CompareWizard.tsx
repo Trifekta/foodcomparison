@@ -23,9 +23,13 @@ import { StepContact } from "./StepContact";
 import { StepReview } from "./StepReview";
 import {
   WIZARD_DEFAULTS,
+  combineStatus,
+  hasAnyTotal,
+  mergeReadTotals,
   usableItems,
   type CartItemDraft,
   type ExtractionStatus,
+  type ReadSlot,
   type ReadTotals,
   type WizardFiles,
   type WizardValues,
@@ -67,15 +71,41 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   // Items are an array of objects, so they live here rather than in
   // react-hook-form, whose values all travel as single FormData entries.
   const [items, setItems] = useState<CartItemDraft[]>([]);
-  const [extractionStatus, setExtractionStatus] = useState<ExtractionStatus>("idle");
-  const [readTotals, setReadTotals] = useState<ReadTotals | null>(null);
-  // Identifies the newest read, so a slow one for a replaced screenshot loses.
-  const readRun = useRef(0);
+  // Both screenshots are read, and each is tracked on its own: they are chosen
+  // at different moments and can finish in either order.
+  const [cartStatus, setCartStatus] = useState<ExtractionStatus>("idle");
+  const [checkoutStatus, setCheckoutStatus] = useState<ExtractionStatus>("idle");
+  const [cartTotals, setCartTotals] = useState<ReadTotals | null>(null);
+  const [checkoutTotals, setCheckoutTotals] = useState<ReadTotals | null>(null);
+  // Identifies the newest read per slot, so a slow one for a replaced
+  // screenshot loses to the read for the screenshot now on screen.
+  const readRuns = useRef<Record<ReadSlot, number>>({ cart: 0, checkout: 0 });
   const [cartError, setCartError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Guards against a double tap firing two submissions before state settles.
   const submitLock = useRef(false);
+
+  const setStatus = (slot: ReadSlot, status: ExtractionStatus) => {
+    if (slot === "cart") setCartStatus(status);
+    else setCheckoutStatus(status);
+  };
+
+  const setTotals = (slot: ReadSlot, totals: ReadTotals | null) => {
+    if (slot === "cart") setCartTotals(totals);
+    else setCheckoutTotals(totals);
+  };
+
+  /** Abandons whatever is in flight for a slot and forgets what it read. */
+  const clearRead = (slot: ReadSlot) => {
+    readRuns.current[slot] += 1;
+    setStatus(slot, "idle");
+    setTotals(slot, null);
+  };
+
+  const extractionStatus = combineStatus(cartStatus, checkoutStatus);
+  const readTotals = mergeReadTotals(cartTotals, checkoutTotals);
+  const totalsFromCheckout = hasAnyTotal(checkoutTotals);
 
   const setField = <K extends keyof WizardValues & string>(
     name: K,
@@ -99,19 +129,25 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   };
 
   /**
-   * Reads the screenshot on the customer's own device while they walk to the
+   * Reads a screenshot on the customer's own device while they walk to the
    * confirm step. No server, no API, no cost - tesseract.js in this browser,
    * then a rules parser. It is rougher than a model would be, which is exactly
    * why the next screen is editable and asks them to confirm.
    *
+   * The cart screenshot is read for everything; the payment screenshot only
+   * for its money, because it is the screen where the money is settled and the
+   * cart screen is the one that lists what was ordered.
+   *
    * Failure is silent: the confirm step simply starts empty, as it did before
    * any of this existed.
    */
-  const startRead = (file: File) => {
-    const run = readRun.current + 1;
-    readRun.current = run;
-    setExtractionStatus("reading");
-    setReadTotals(null);
+  const startRead = (file: File, slot: ReadSlot) => {
+    const run = readRuns.current[slot] + 1;
+    readRuns.current[slot] = run;
+    const stillCurrent = () => run === readRuns.current[slot];
+
+    setStatus(slot, "reading");
+    setTotals(slot, null);
 
     void (async () => {
       try {
@@ -121,30 +157,39 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
         ]);
 
         const ocr = await readImageInBrowser(file);
-        if (run !== readRun.current) return;
+        if (!stillCurrent()) return;
         if (!ocr.ok) {
-          setExtractionStatus("empty");
+          setStatus(slot, "empty");
           return;
         }
 
         const { basket, empty } = parseOcrText(ocr.text);
-        if (run !== readRun.current) return;
+        if (!stillCurrent()) return;
 
         if (empty) {
-          setExtractionStatus("empty");
+          setStatus(slot, "empty");
           return;
         }
 
-        setReadTotals({
+        const totals: ReadTotals = {
           subtotal: basket.subtotal,
           deliveryFee: basket.delivery_fee,
           serviceFee: basket.service_fee,
           discount: basket.discount,
           finalTotal: basket.final_total,
-        });
+        };
+        setTotals(slot, totals);
+
+        if (slot === "checkout") {
+          // Nothing else off this screen: a payment screen that happens to
+          // list items lists them without their options, and the cart screen
+          // has already answered that question properly.
+          setStatus(slot, hasAnyTotal(totals) ? "applied" : "empty");
+          return;
+        }
 
         // Never overwrite something the customer typed while waiting.
-        let applied = false;
+        let applied = hasAnyTotal(totals);
 
         if (basket.restaurant_name && !getValues("restaurantName").trim()) {
           setValue("restaurantName", basket.restaurant_name);
@@ -171,9 +216,9 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           }));
         });
 
-        setExtractionStatus(applied ? "applied" : "empty");
+        setStatus(slot, applied ? "applied" : "empty");
       } catch {
-        if (run === readRun.current) setExtractionStatus("empty");
+        if (stillCurrent()) setStatus(slot, "empty");
       }
     })();
   };
@@ -291,19 +336,16 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           onCartChange={(file: File | null, original?: File | null) => {
             setFiles((current) => ({ ...current, cart: file }));
             setCartError(null);
-            if (file) {
-              // Read the original, not the compressed upload: JPEG artifacts on
-              // small text cost far more accuracy than the extra pixels cost time.
-              startRead(original ?? file);
-            } else {
-              readRun.current += 1;
-              setExtractionStatus("idle");
-              setReadTotals(null);
-            }
+            // Read the original, not the compressed upload: JPEG artifacts on
+            // small text cost far more accuracy than the extra pixels cost time.
+            if (file) startRead(original ?? file, "cart");
+            else clearRead("cart");
           }}
-          onCheckoutChange={(file: File | null) =>
-            setFiles((current) => ({ ...current, checkout: file }))
-          }
+          onCheckoutChange={(file: File | null, original?: File | null) => {
+            setFiles((current) => ({ ...current, checkout: file }));
+            if (file) startRead(original ?? file, "checkout");
+            else clearRead("checkout");
+          }}
           error={cartError}
           onContinue={handleUploadContinue}
         />
@@ -316,6 +358,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           restaurantError={errors.restaurantName?.message}
           extractionStatus={extractionStatus}
           readTotals={readTotals}
+          totalsFromCheckout={totalsFromCheckout}
           onRestaurantNameChange={(value) => setField("restaurantName", value)}
           onItemsChange={setItems}
           onContinue={handleBasketContinue}
@@ -347,6 +390,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           totalError={errors.currentTotal?.message}
           hasCheckoutScreenshot={files.checkout !== null}
           readTotal={readTotals?.finalTotal || null}
+          totalFromCheckout={totalsFromCheckout && checkoutTotals.finalTotal !== ""}
           onUseReadTotal={() => {
             const total = readTotals?.finalTotal;
             if (total) setField("currentTotal", total);

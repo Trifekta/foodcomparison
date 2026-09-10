@@ -9,8 +9,9 @@ import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
 interface StepUploadProps {
   cartFile: File | null;
   checkoutFile: File | null;
-  onCartChange: (file: File | null) => void;
-  onCheckoutChange: (file: File | null) => void;
+  /** `original` is the untouched file, before it was compressed for upload. */
+  onCartChange: (file: File | null, original?: File | null) => void;
+  onCheckoutChange: (file: File | null, original?: File | null) => void;
   error: string | null;
   onContinue: () => void;
 }
