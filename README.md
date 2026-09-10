@@ -309,6 +309,25 @@ Local Worker runs read secrets from a `.dev.vars` file (git-ignored) in the same
 
 #### Notes specific to Workers
 
+- **`esbuild` is a deliberate direct devDependency — do not remove it.** Nothing
+  in this codebase imports it. `@opennextjs/cloudflare` does, from
+  `dist/cli/build/bundle-server.js`, but never declares it in its own
+  `dependencies` or `peerDependencies`. It therefore only resolves if some other
+  package happens to hoist a copy to the top of `node_modules`, and which copy
+  wins that slot varies between `npm install`, `npm ci` and npm versions — three
+  different esbuild versions compete for it here (via `@opennextjs/aws`,
+  `wrangler` and `vite`). On Cloudflare's builder none was resolvable and the
+  build died with `Cannot find package 'esbuild'`. Declaring it directly pins one
+  copy at the root on every machine. The version must stay in `^0.28`: `vite`
+  declares a peer range of `^0.27 || ^0.28`, and pinning lower makes `npm ci`
+  fail with ERESOLVE.
+- **Blocked install scripts are fine.** Cloudflare's builder warns that
+  `esbuild`, `workerd` and `unrs-resolver` have postinstall scripts it will not
+  run. Verified that esbuild still works with `--ignore-scripts`: modern versions
+  get their binary from the `@esbuild/<platform>` optional dependency rather than
+  a postinstall download.
+
+
 - **No `WORKER_SELF_REFERENCE` binding.** OpenNext's scaffolder adds one to
   drive the ISR revalidation queue. This app has no ISR — every customer and
   admin route is `force-dynamic` and the static pages come from Workers Assets —
