@@ -25,6 +25,8 @@ import {
   WIZARD_DEFAULTS,
   usableItems,
   type CartItemDraft,
+  type ExtractionStatus,
+  type ReadTotals,
   type WizardFiles,
   type WizardValues,
 } from "./types";
@@ -65,6 +67,10 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   // Items are an array of objects, so they live here rather than in
   // react-hook-form, whose values all travel as single FormData entries.
   const [items, setItems] = useState<CartItemDraft[]>([]);
+  const [extractionStatus, setExtractionStatus] = useState<ExtractionStatus>("idle");
+  const [readTotals, setReadTotals] = useState<ReadTotals | null>(null);
+  // Identifies the newest read, so a slow one for a replaced screenshot loses.
+  const readRun = useRef(0);
   const [cartError, setCartError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -90,6 +96,83 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       if (field) setError(field, { type: "manual", message: issue.message });
     }
     return false;
+  };
+
+  /**
+   * Reads the screenshot on the customer's own device while they walk to the
+   * confirm step. No server, no API, no cost - tesseract.js in this browser,
+   * then a rules parser. It is rougher than a model would be, which is exactly
+   * why the next screen is editable and asks them to confirm.
+   *
+   * Failure is silent: the confirm step simply starts empty, as it did before
+   * any of this existed.
+   */
+  const startRead = (file: File) => {
+    const run = readRun.current + 1;
+    readRun.current = run;
+    setExtractionStatus("reading");
+    setReadTotals(null);
+
+    void (async () => {
+      try {
+        const [{ readImageInBrowser }, { parseOcrText }] = await Promise.all([
+          import("@/lib/ocr/browser"),
+          import("@/lib/extraction/parse-text"),
+        ]);
+
+        const ocr = await readImageInBrowser(file);
+        if (run !== readRun.current) return;
+        if (!ocr.ok) {
+          setExtractionStatus("empty");
+          return;
+        }
+
+        const { basket, empty } = parseOcrText(ocr.text);
+        if (run !== readRun.current) return;
+
+        if (empty) {
+          setExtractionStatus("empty");
+          return;
+        }
+
+        setReadTotals({
+          subtotal: basket.subtotal,
+          deliveryFee: basket.delivery_fee,
+          serviceFee: basket.service_fee,
+          discount: basket.discount,
+          finalTotal: basket.final_total,
+        });
+
+        // Never overwrite something the customer typed while waiting.
+        let applied = false;
+
+        if (basket.restaurant_name && !getValues("restaurantName").trim()) {
+          setValue("restaurantName", basket.restaurant_name);
+          clearErrors("restaurantName");
+          applied = true;
+        }
+
+        setItems((current) => {
+          if (current.length > 0 || basket.items.length === 0) return current;
+          applied = true;
+          return basket.items.map((item) => ({
+            key: crypto.randomUUID(),
+            name: [item.name, ...item.modifiers].join(" · ").slice(0, 120),
+            quantity: item.quantity,
+            linePrice: item.line_total || null,
+            proposed: {
+              name: [item.name, ...item.modifiers].join(" · ").slice(0, 120),
+              quantity: item.quantity,
+              linePrice: item.line_total || null,
+            },
+          }));
+        });
+
+        setExtractionStatus(applied ? "applied" : "empty");
+      } catch {
+        if (run === readRun.current) setExtractionStatus("empty");
+      }
+    })();
   };
 
   const goTo = (next: number) => {
@@ -202,9 +285,18 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
         <StepUpload
           cartFile={files.cart}
           checkoutFile={files.checkout}
-          onCartChange={(file: File | null) => {
+          onCartChange={(file: File | null, original?: File | null) => {
             setFiles((current) => ({ ...current, cart: file }));
             setCartError(null);
+            if (file) {
+              // Read the original, not the compressed upload: JPEG artifacts on
+              // small text cost far more accuracy than the extra pixels cost time.
+              startRead(original ?? file);
+            } else {
+              readRun.current += 1;
+              setExtractionStatus("idle");
+              setReadTotals(null);
+            }
           }}
           onCheckoutChange={(file: File | null) =>
             setFiles((current) => ({ ...current, checkout: file }))
@@ -219,6 +311,8 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           restaurantName={values.restaurantName}
           items={items}
           restaurantError={errors.restaurantName?.message}
+          extractionStatus={extractionStatus}
+          readTotals={readTotals}
           onRestaurantNameChange={(value) => setField("restaurantName", value)}
           onItemsChange={setItems}
           onContinue={handleBasketContinue}
@@ -249,6 +343,11 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           onCurrentTotalChange={(value) => setField("currentTotal", value)}
           totalError={errors.currentTotal?.message}
           hasCheckoutScreenshot={files.checkout !== null}
+          readTotal={readTotals?.finalTotal || null}
+          onUseReadTotal={() => {
+            const total = readTotals?.finalTotal;
+            if (total) setField("currentTotal", total);
+          }}
           onContinue={handleTotalContinue}
         />
       ) : null}

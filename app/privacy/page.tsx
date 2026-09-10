@@ -75,19 +75,28 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title="How your order is read">
+          <p>
+            When you upload your cart screenshot, your own phone reads the text off
+            it and fills in the next screen. That happens entirely on your device —
+            the reading is done by software running inside your browser, and nothing
+            is sent anywhere to do it.
+          </p>
+          <p>
+            What it produces is a first guess, not a decision. It is shown to you to
+            correct, and what we keep is the version you confirmed.
+          </p>
+        </Section>
+
         {readsScreenshots ? (
-          <Section title="How we read your screenshot">
+          <Section title="If our staff need a second look">
             <p>
-              Sending us a comparison does not send your screenshot anywhere. It is stored privately
-              and, in the normal course of things, only a member of staff opens it.
-            </p>
-            <p>
-              When staff work on your comparison they may use software to help read the basket. That
-              reading happens on the staff member&apos;s own computer, and only the resulting{" "}
-              <em>text</em> — restaurant, items, quantities, prices — is sent to Anthropic&apos;s
-              Claude API to be tidied into a list. Your screenshot itself stays with us. Anthropic
-              processes that text on our behalf to answer that one request and does not use it to
-              train their models.
+              While working on your comparison, a member of staff may ask for help tidying the
+              basket into a list. In that case the reading is done on their computer and only the
+              resulting <em>text</em> — restaurant, items, quantities, prices — is sent to
+              Anthropic&apos;s Claude API. Your screenshot itself stays with us. Anthropic processes
+              that text on our behalf to answer that one request and does not use it to train their
+              models.
             </p>
             <p>
               Occasionally the reading software cannot cope — an unclear photo, or Arabic it cannot
@@ -96,9 +105,9 @@ export default function PrivacyPage() {
               automatically, and it happens outside the UAE.
             </p>
             <p>
-              Nothing read this way is treated as final. A member of staff checks and corrects it
-              before it is used, and it never replaces the restaurant or the total you told us
-              yourself.
+              Nothing read this way is treated as final either. A member of staff checks and
+              corrects it before it is used, and it never replaces the restaurant or the total you
+              confirmed yourself.
             </p>
           </Section>
         ) : null}

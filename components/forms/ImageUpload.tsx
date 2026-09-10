@@ -17,7 +17,12 @@ interface ImageUploadProps {
   label: string;
   hint?: string;
   file: File | null;
-  onChange: (file: File | null) => void;
+  /**
+   * `file` is the downscaled version that gets uploaded. `original` is what the
+   * customer actually picked - handed back because reading text off it must not
+   * be done on a JPEG re-encode, which destroys small print and Arabic.
+   */
+  onChange: (file: File | null, original?: File | null) => void;
   error?: string | null;
   /** Drives the pill: Required is red, Optional is green, as in the designs. */
   requirement: "required" | "optional";
@@ -72,7 +77,7 @@ export function ImageUpload({
     setLocalError(null);
     setProcessing(true);
     try {
-      onChange(await downscaleImage(candidate));
+      onChange(await downscaleImage(candidate), candidate);
     } finally {
       setProcessing(false);
     }

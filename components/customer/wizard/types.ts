@@ -36,6 +36,18 @@ export interface CartItemDraft {
   proposed: ProposedItem | null;
 }
 
+/** How the free screenshot read is going, as far as the wizard is concerned. */
+export type ExtractionStatus = "idle" | "reading" | "applied" | "empty";
+
+/** Totals read off the screenshot, shown back so the customer can check them. */
+export interface ReadTotals {
+  subtotal: string;
+  deliveryFee: string;
+  serviceFee: string;
+  discount: string;
+  finalTotal: string;
+}
+
 export const TOTAL_STEPS = 5;
 
 export const WIZARD_DEFAULTS: WizardValues = {

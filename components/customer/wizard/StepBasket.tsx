@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef } from "react";
-import { Minus, Plus, Store, Trash2, UtensilsCrossed } from "lucide-react";
+import { Loader2, Minus, Plus, ScanLine, Store, Trash2, UtensilsCrossed } from "lucide-react";
 import {
   CURRENCY,
   MAX_CART_ITEMS,
@@ -14,12 +14,15 @@ import { FieldError } from "@/components/ui/FieldError";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote } from "@/components/customer/Motifs";
 import { cn } from "@/lib/utils/cn";
-import type { CartItemDraft } from "./types";
+import type { CartItemDraft, ExtractionStatus, ReadTotals } from "./types";
 
 interface StepBasketProps {
   restaurantName: string;
   items: CartItemDraft[];
   restaurantError?: string;
+  extractionStatus: ExtractionStatus;
+  /** Totals read off the screenshot, shown back so they can be checked. */
+  readTotals: ReadTotals | null;
   onRestaurantNameChange: (value: string) => void;
   onItemsChange: (items: CartItemDraft[]) => void;
   onContinue: () => void;
@@ -28,9 +31,10 @@ interface StepBasketProps {
 /**
  * Confirm the basket.
  *
- * Entirely customer-entered. Screenshot reading happens in the admin dashboard,
- * on an admin's explicit action - nothing on this screen is machine-filled, and
- * no screenshot is sent anywhere as a side effect of the customer using it.
+ * Arrives pre-filled from a read of the screenshot done on the customer's own
+ * device - no server, no API, no cost. That read is rough, which is the point
+ * of this screen: it shows what was read and invites correction, rather than
+ * pretending to be right.
  *
  * The restaurant is required: nobody can rebuild the order without it. The
  * items stay optional, and blank rows are dropped rather than flagged, because
@@ -40,6 +44,8 @@ export function StepBasket({
   restaurantName,
   items,
   restaurantError,
+  extractionStatus,
+  readTotals,
   onRestaurantNameChange,
   onItemsChange,
   onContinue,
@@ -50,6 +56,16 @@ export function StepBasket({
   const pendingFocus = useRef<string | null>(null);
 
   const full = items.length >= MAX_CART_ITEMS;
+  const reading = extractionStatus === "reading";
+
+  const totalRows = readTotals
+    ? ([
+        ["Subtotal", readTotals.subtotal],
+        ["Delivery", readTotals.deliveryFee],
+        ["Service", readTotals.serviceFee],
+        ["Discount", readTotals.discount],
+      ].filter(([, value]) => value !== "") as Array<[string, string]>)
+    : [];
 
   const addItem = () => {
     if (full) return;
@@ -105,6 +121,24 @@ export function StepBasket({
         </div>
       </div>
 
+      <div aria-live="polite" className="mt-4 empty:mt-0">
+        {reading ? (
+          <p className="flex items-center gap-2.5 rounded-2xl bg-brand-100 px-3.5 py-3 text-sm font-semibold text-ink-800">
+            <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin" />
+            Reading your screenshot on your phone…
+          </p>
+        ) : null}
+        {extractionStatus === "applied" ? (
+          <p className="flex items-start gap-2.5 rounded-2xl bg-chip-green-bg px-3.5 py-3 text-sm leading-snug text-chip-green-fg">
+            <ScanLine aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              <span className="font-bold">This is what we read from your screenshot.</span> Check it
+              and fix anything that&apos;s wrong.
+            </span>
+          </p>
+        ) : null}
+      </div>
+
       <div className="mt-4 space-y-5">
         {/* Restaurant - required */}
         <div className="rounded-3xl bg-linear-to-b from-brand-100 to-beige p-3.5">
@@ -133,7 +167,7 @@ export function StepBasket({
               "min-h-14 w-full rounded-2xl bg-white px-4 text-base font-semibold text-ink-900 ring-1 placeholder:font-normal placeholder:text-slate-400",
               restaurantError ? "ring-rose-400" : "ring-ink-200",
             )}
-            placeholder="e.g. Al Safadi"
+            placeholder={reading ? "Reading…" : "e.g. Al Safadi"}
           />
           {restaurantError ? (
             <FieldError id={`${restaurantId}-error`} message={restaurantError} />
@@ -264,6 +298,34 @@ export function StepBasket({
             <p className="mt-2 text-center text-sm text-slate-500">
               That&apos;s the most we need — your screenshot covers the rest.
             </p>
+          ) : null}
+
+          {/* What the screenshot said the money was. Shown, not stored: the
+              total that drives the comparison is the one they type themselves
+              on the next screen but one. */}
+          {totalRows.length > 0 || readTotals?.finalTotal ? (
+            <dl className="mt-4 rounded-2xl bg-ink-50 px-4 py-3 text-[0.9rem]">
+              <p className="mb-2 text-[0.72rem] font-bold uppercase tracking-wide text-slate-500">
+                From your screenshot
+              </p>
+              {totalRows.map(([label, value]) => (
+                <div key={label} className="flex justify-between py-1 text-slate-600">
+                  <dt>{label}</dt>
+                  <dd className="tabular-nums">
+                    {label === "Discount" ? "-" : ""}
+                    {CURRENCY} {value}
+                  </dd>
+                </div>
+              ))}
+              {readTotals?.finalTotal ? (
+                <div className="mt-1 flex justify-between border-t border-ink-200 pt-2 font-extrabold text-ink-900">
+                  <dt>Total</dt>
+                  <dd className="tabular-nums">
+                    {CURRENCY} {readTotals.finalTotal}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
           ) : null}
         </section>
 

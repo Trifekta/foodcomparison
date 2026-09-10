@@ -5,11 +5,11 @@ Before you order, check if you can save.
 FindFoodae lets a Dubai food-delivery customer send the basket they are about to
 order, and get back an answer: is the same order cheaper on another app?
 
-**Phase 1 is deliberately manual.** A customer submits a cart screenshot, the
-restaurant it is from, their area, their app and their checkout total, all typed
-by them. In the admin dashboard, staff can have the screenshot read for them -
-OCR in their own browser, then a model to structure the text - but that is an
-assist they trigger and confirm, never something that happens to a customer. An admin opens Keeta, rebuilds the same
+**Phase 1 is deliberately manual.** A customer uploads a cart screenshot; their
+own phone reads it and fills in a basket they check and correct. An admin then
+opens the comparison app, rebuilds that basket by hand, and types the total.
+Nothing is scraped, no platform APIs are called, and the customer-side reading
+costs nothing and sends the screenshot nowhere. An admin opens Keeta, rebuilds the same
 basket by hand, types the total, and the system does the rest — calculates the
 saving, writes the customer message, and hands the admin a prefilled WhatsApp
 link. Nothing is scraped, no platform APIs are called, and no AI reads the
@@ -422,11 +422,12 @@ non-admin sessions, and an admin cannot grant admin rights from inside the app.
 1. Open the homepage, tap **Check my order**.
 2. Upload a cart screenshot into slot 1; leave slot 2 (marked **Optional**)
    empty → **Continue**.
-3. Type **Al Safadi** as the restaurant. The item list is optional and a blank
-   row is simply dropped → **Continue**.
+3. The restaurant, items and prices are already filled in — your phone read them
+   off the screenshot. Correct anything wrong, delete what you do not want, then
+   **Continue**. (No key needed: this step costs nothing and sends nothing.)
 4. Choose **Al Karama**, choose **Talabat** → **Continue**.
-5. Enter **82** → **Continue**. (The optional checkout screenshot lives on
-   screen 1, alongside the required cart screenshot.)
+5. Tap **Use this** to take the total read off your screenshot, or type **82** →
+   **Continue**.
 6. Enter a WhatsApp number → **Continue**.
 7. Review, then **Get a Keeta price**.
 8. You land on the success screen with a reference like `FFA-260910-0042`.
@@ -505,83 +506,73 @@ Everything else renders on the server.
 
 ## Reading the screenshot
 
-With `ANTHROPIC_API_KEY` set, the submission detail page gains an **Extract
-basket** button. It is an assist for whoever is doing the comparison, not a
-customer-facing feature: the customer types their own basket and nothing they do
-sends a screenshot anywhere.
+Two separate things share the name, and they work differently on purpose.
 
-### The flow
+### The customer's phone reads it, for free
 
-```
-screenshot → OCR (admin's browser) → raw text → Claude → structured JSON → admin review → confirm
-```
+When a customer picks their cart screenshot, tesseract.js reads the text off it
+**in their own browser**, and `lib/extraction/parse-text.ts` turns that text into
+a basket with rules - no model, no API, no account, no cost, and the image never
+leaves the device. The confirm step arrives filled in with the restaurant, the
+items, the quantities and the row prices, plus the subtotal, fees, discount and
+total read off the receipt. Everything is editable, because the read is rough
+and the screen exists to be corrected.
 
-The screenshot is already in the admin's browser, because they are looking at
-it. OCR runs there, on their machine, with tesseract.js. Only the resulting
-**text** is sent to be structured. The image itself never reaches the model and
-never reaches our own server for this purpose.
+The parser is deliberately not per-app. There is no Talabat branch and no Careem
+branch; it leans on the one thing every receipt does - a price sits on the line
+of whatever it is the price of - plus English and Arabic keywords for the fee
+and total rows. A layout that defeats it should be fixed by the customer and
+noticed in the numbers, not patched with a special case per brand.
 
-The OCR engine's WASM and language files are served from `/tesseract` on our own
+Two things that look like details and are not:
+
+- **OCR reads the original file, not the upload.** Uploads are downscaled and
+  re-encoded as JPEG; those artifacts wreck small print and Arabic. Reading the
+  original was worth both accuracy and speed - Arabic went from unreadable to
+  correct, and the read got faster.
+- **The total is never filled in silently.** It is the baseline for the saving
+  we quote back, so the total step offers what was read behind an explicit
+  "use this" tap.
+
+The engine's WASM and language files are served from `/tesseract` on our own
 origin, copied out of `node_modules` at build time by
 `scripts/copy-ocr-assets.mjs`. tesseract.js would otherwise fetch them from a
-public CDN on first use, which would undercut the whole point.
+public CDN, which would undercut "nothing leaves the device". The cost is a
+~7 MB download the first time a customer uploads, cached thereafter.
 
-### The vision fallback
+### Staff can ask a model, when a key is configured
 
-**Use AI vision fallback** sends the screenshot itself. It exists because Arabic
-OCR and low-contrast screenshots defeat Tesseract often enough to need an escape
-hatch. It is a separate button behind a confirmation, it is never an automatic
-retry after a poor read, and no customer action can reach it. Use it when OCR
-output is unusable, the restaurant cannot be found, items are missing, Arabic is
-unreadable, or prices cannot be tied to rows.
+With `ANTHROPIC_API_KEY` set, the admin submission page gains **Extract basket**.
+OCR runs in the admin's browser and only the resulting text goes to Claude to be
+structured - the image stays with us. **Use AI vision fallback** does send the
+screenshot, behind its own confirmation, for when OCR has failed. Neither is
+reachable from anything a customer does.
 
-### Nothing is saved until a person says so
+Without a key that panel says so and nothing else changes. The customer-side
+read above works either way, because it uses no API at all.
 
-The model proposes. `submission_extractions` records the run - raw OCR text,
-confidence, engine, model, prompt version, timings, the structured result, and
-any error - but the submission itself is untouched until the admin presses
-**Confirm and save basket**.
-
-Fields the model was unsure about come back in `uncertain_fields` and are
-outlined in the review form. The prompt tells it to flag generously: a wrong
-value that was flagged costs a glance, one that was not costs a wrong
-comparison.
-
-Confirming writes items with `source = 'extracted'` and stores the confirmed
-basket alongside the model's original, so the two stay comparable. It replaces
-only rows a previous extraction created - anything the customer typed is left
-alone, and `submissions.restaurant_name` and `current_total` are never
-overwritten. Those are what the customer said, and they stay that way.
+`submission_extractions` records every staff run - raw OCR text, confidence,
+engine, model, prompt version, timings, the structured result, errors - and the
+submission is untouched until the admin presses **Confirm and save basket**.
+Confirming replaces only rows a previous extraction created; the customer's own
+items, `restaurant_name` and `current_total` are never overwritten.
 
 ### Measuring accuracy
 
-Label a folder of real screenshots and run:
-
 ```bash
-npm run extract:eval -- eval/shots            # the OCR route
+npm run extract:eval -- eval/shots            # the OCR-plus-model route
 npm run extract:eval -- eval/shots --vision   # the fallback, for comparison
 ```
 
 Each screenshot needs a sibling `.json` naming the app and language and stating
-what a human reads off the screen; the format is documented at the top of
+what a human reads off the screen; the format is at the top of
 `scripts/eval-extraction.mjs`. It reports restaurant accuracy, item recall and
-precision, quantity accuracy, price accuracy and total accuracy - overall, per
-app (Talabat, Careem Food, Deliveroo, Noon Food) and per language (English,
-Arabic, mixed).
+precision, quantity, price and total accuracy - overall, per app and per
+language. It needs an API key and costs one model call per screenshot.
 
-It imports the same OCR settings, schema and prompt the dashboard uses, so the
-numbers describe the real thing. Every screenshot costs one model call.
-
-`PROMPT_VERSION` in `lib/extraction/prompt.ts` is stored against every
+`PROMPT_VERSION` in `lib/extraction/prompt.ts` is stored against every staff
 extraction. Bump it whenever the prompt changes, or last month's measurement
 cannot be compared with today's.
-
-### Cost and model
-
-Text-only structuring is far cheaper than sending images - a few tenths of a
-cent per basket on the default `claude-opus-5`, against roughly two cents for
-the vision fallback. `EXTRACTION_MODEL` switches models; measure with
-`extract:eval` before deciding.
 
 ---
 
