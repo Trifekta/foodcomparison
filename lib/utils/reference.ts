@@ -45,3 +45,31 @@ export function generateReferenceNumber(
 export function isValidReferenceNumber(value: string): boolean {
   return REFERENCE_PATTERN.test(value);
 }
+
+/**
+ * The unguessable half of a submission's identity.
+ *
+ * The reference number above is a date and four random digits - ten thousand
+ * per day - which is fine for something people quote back at us and useless as
+ * a key to anything. This is the key: 128 bits of randomness, hex so it
+ * survives a URL, a copy-paste and a WhatsApp preview intact. It appears in
+ * exactly one place, the link we send the customer, and grants sight of that
+ * one submission.
+ */
+export function generateResultToken(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export const RESULT_TOKEN_PATTERN = /^[0-9a-f]{32}$/;
+
+/** Rejects a malformed token before it ever reaches the database. */
+export function isValidResultToken(value: string): boolean {
+  return RESULT_TOKEN_PATTERN.test(value);
+}
+
+/** The customer-facing path for a result. Relative, so any host works. */
+export function resultPath(token: string): string {
+  return `/r/${token}`;
+}

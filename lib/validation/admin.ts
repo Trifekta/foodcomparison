@@ -22,6 +22,20 @@ export const comparisonInputSchema = z.object({
    */
   sourceApp: z.string().trim().max(80).optional(),
   comparisonTotal: comparisonTotalSchema,
+  /**
+   * The restaurant's page on the comparison app, pasted from the page the
+   * admin is already looking at. It becomes the button on the customer's
+   * result, so it has to be a real https link or nothing at all.
+   */
+  comparisonUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .refine(
+      (value) => value === "" || /^https:\/\/\S+$/i.test(value),
+      "Paste the full https:// link from the app.",
+    )
+    .optional(),
   restaurantFound: z.string().trim().max(160).optional(),
   comparisonLocationNote: z.string().trim().max(160).optional(),
   adminNotes: z.string().trim().max(2000).optional(),

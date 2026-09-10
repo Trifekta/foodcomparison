@@ -132,3 +132,27 @@ describe("sourceAppLabel", () => {
     expect(sourceAppLabel({ source_app: "Other", source_app_other: null })).toBe("Your order");
   });
 });
+
+describe("the result link in a message", () => {
+  const base = {
+    sourceAppLabel: "Talabat",
+    currentTotal: "34.65",
+    comparisonTotal: "29.00",
+  };
+
+  it("sends the customer back to their own result page", () => {
+    const { message } = buildResultMessage({
+      ...base,
+      resultUrl: "https://findfoodae.example/r/0123456789abcdef0123456789abcdef",
+    });
+    expect(message).toContain("https://findfoodae.example/r/0123456789abcdef0123456789abcdef");
+  });
+
+  it("reads perfectly well without one", () => {
+    // NEXT_PUBLIC_APP_URL may be unset. A link to localhost in someone's
+    // WhatsApp is worse than no link at all.
+    const { message } = buildResultMessage(base);
+    expect(message).not.toContain("http");
+    expect(message).toContain("You could save");
+  });
+});

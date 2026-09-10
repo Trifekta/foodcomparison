@@ -282,15 +282,17 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
 
       const response = await fetch("/api/submissions", { method: "POST", body });
       const payload = (await response.json().catch(() => null)) as
-        | { referenceNumber?: string; error?: string }
+        | { referenceNumber?: string; resultPath?: string; error?: string }
         | null;
 
-      if (!response.ok || !payload?.referenceNumber) {
+      if (!response.ok || !payload?.resultPath) {
         setSubmitError(payload?.error ?? ERROR_MESSAGES.network);
         return;
       }
 
-      router.replace(`/success?ref=${encodeURIComponent(payload.referenceNumber)}`);
+      // Straight to their own result page, which starts out saying we are
+      // checking and turns into the answer without them doing anything.
+      router.replace(payload.resultPath);
       return;
     } catch {
       setSubmitError(ERROR_MESSAGES.network);

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, MapPin } from "lucide-react";
+import { ArrowLeft, ExternalLink, MapPin } from "lucide-react";
 import {
   getLatestExtraction,
   getSignedImageUrl,
@@ -21,6 +21,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDecimalStringAsCurrency, formatMinorAsCurrency } from "@/lib/calculations/money";
 import { formatDubaiDateTime } from "@/lib/utils/text";
 import { LEGACY_OTHER_APP } from "@/lib/constants";
+import { resultPath } from "@/lib/utils/reference";
 import { maskEmail } from "@/lib/utils/phone";
 import { statusLabel } from "@/lib/utils/status";
 import type { SubmissionItemSource } from "@/types/database";
@@ -125,6 +126,22 @@ export default async function SubmissionDetailPage({
               <Row label="Restaurant" value={submission.restaurant_name ?? "—"} />
               <Row label="Area" value={submission.areas?.name ?? "—"} />
               <Row label="Ordering from" value={appLabel} />
+              {/* The customer's own page, so an admin can see exactly what they
+                  are looking at right now. */}
+              <Row
+                label="Customer result page"
+                value={
+                  <a
+                    href={resultPath(submission.result_token)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 font-medium text-ink-900 underline underline-offset-2"
+                  >
+                    Open
+                    <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
+                  </a>
+                }
+              />
               <Row
                 label="Current total"
                 value={
@@ -265,6 +282,7 @@ export default async function SubmissionDetailPage({
             areaName={submission.areas?.name ?? "Dubai"}
             initial={{
               sourceApp: submission.source_app,
+              comparisonUrl: submission.comparison_url ?? "",
               comparisonTotal: submission.comparison_total ?? "",
               restaurantFound: submission.restaurant_found ?? "",
               comparisonLocationNote: submission.comparison_location_note ?? "",

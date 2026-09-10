@@ -73,6 +73,10 @@ export interface SubmissionRow {
   restaurant_found: string | null;
   comparison_location_note: string | null;
   result_message: string | null;
+  /** Unguessable address for the customer's own result page. Never logged. */
+  result_token: string;
+  /** Where the rebuilt basket lives on the comparison app, pasted by an admin. */
+  comparison_url: string | null;
   result_sent_at: string | null;
   review_started_at: string | null;
   completed_at: string | null;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSubmission } from "@/lib/submissions/create";
 import { checkRateLimit, clientKeyFromHeaders } from "@/lib/utils/rate-limit";
 import { MAX_IMAGE_BYTES } from "@/lib/constants";
+import { resultPath } from "@/lib/utils/reference";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,5 +49,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error, field: result.field }, { status: result.status });
   }
 
-  return NextResponse.json({ referenceNumber: result.referenceNumber }, { status: 201 });
+  // The path, not a full URL: the customer is already on this host, and a token
+  // is not something to spell out in a response any more than it has to be.
+  return NextResponse.json(
+    { referenceNumber: result.referenceNumber, resultPath: resultPath(result.resultToken) },
+    { status: 201 },
+  );
 }

@@ -33,6 +33,8 @@ export interface ResultMessageInput {
   currentTotal: string;
   comparisonTotal: string;
   comparisonAppLabel?: string;
+  /** Absolute link to the customer's own result page, when we can build one. */
+  resultUrl?: string | null;
 }
 
 export interface GeneratedResult {
@@ -69,6 +71,7 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
         formatMinorAsCurrency(saving.savingMinor),
         "",
         `That's about ${Math.round(saving.savingPercentage)}% less.`,
+        ...(input.resultUrl ? ["", "See it and open the restaurant:", input.resultUrl] : []),
         "",
         "Prices and promotions can change, so please confirm the final amount in the delivery app before ordering.",
         "",

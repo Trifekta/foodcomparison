@@ -13,6 +13,8 @@ import {
 } from "@/lib/notifications/messages";
 import { getEmailProvider } from "@/lib/notifications/resend";
 import { sanitiseMultiline, sanitiseText } from "@/lib/utils/text";
+import { absoluteUrl } from "@/lib/env";
+import { resultPath } from "@/lib/utils/reference";
 import { formatMinorToDecimalString, parseAmountToMinor } from "@/lib/calculations/money";
 import type { SubmissionRow, SubmissionStatus } from "@/types/database";
 
@@ -58,7 +60,7 @@ async function loadSubmission(id: string) {
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, status, source_app, source_app_other, current_total, comparison_total, comparison_app, contact_type, whatsapp_number, email, reference_number, result_message",
+      "id, status, source_app, source_app_other, current_total, comparison_total, comparison_app, contact_type, whatsapp_number, email, reference_number, result_message, result_token",
     )
     .eq("id", id)
     .maybeSingle<
@@ -68,6 +70,7 @@ async function loadSubmission(id: string) {
         | "status"
         | "source_app"
         | "source_app_other"
+        | "result_token"
         | "current_total"
         | "comparison_total"
         | "comparison_app"
@@ -124,6 +127,7 @@ export async function saveComparison(formData: FormData): Promise<ActionResult> 
   const parsed = comparisonInputSchema.safeParse({
     submissionId: String(formData.get("submissionId") ?? ""),
     comparisonTotal: String(formData.get("comparisonTotal") ?? ""),
+    comparisonUrl: String(formData.get("comparisonUrl") ?? ""),
     sourceApp: String(formData.get("sourceApp") ?? "") || undefined,
     restaurantFound: String(formData.get("restaurantFound") ?? ""),
     comparisonLocationNote: String(formData.get("comparisonLocationNote") ?? ""),
@@ -158,6 +162,7 @@ export async function saveComparison(formData: FormData): Promise<ActionResult> 
     currentTotal: submission.current_total,
     comparisonTotal,
     comparisonAppLabel: submission.comparison_app,
+    resultUrl: absoluteUrl(resultPath(submission.result_token)),
   });
 
   const supabase = await createServerSupabaseClient();
@@ -165,6 +170,7 @@ export async function saveComparison(formData: FormData): Promise<ActionResult> 
     .from("submissions")
     .update({
       source_app: sourceApp,
+      comparison_url: parsed.data.comparisonUrl ? parsed.data.comparisonUrl : null,
       comparison_total: comparisonTotal,
       saving_amount: persisted.saving_amount,
       saving_percentage: persisted.saving_percentage,

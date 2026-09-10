@@ -45,12 +45,13 @@ export default function PrivacyPage() {
             <li>your cart screenshot</li>
             <li>your checkout screenshot, if you choose to add one</li>
             <li>the Dubai area you selected</li>
-            <li>the delivery app you are ordering from</li>
             <li>the order total you typed in</li>
             <li>your WhatsApp number or email address</li>
           </ul>
           <p>
-            We do not ask for your location, and you do not need an account to use {BRAND_NAME}.
+            We also note which delivery app your screenshot came from, which we can see by looking
+            at it. We do not ask for your location, and you do not need an account to use{" "}
+            {BRAND_NAME}.
           </p>
         </Section>
 
@@ -63,6 +64,18 @@ export default function PrivacyPage() {
             Sending us a comparison lets us reply to you about that request. It does not sign you up
             to marketing. We only send you offers if you ticked the box asking for them, and you can
             tell us to stop at any time.
+          </p>
+        </Section>
+
+        <Section title="Your result link">
+          <p>
+            Every price check gets its own private link. It is a long random address that nobody can
+            guess, and it is the only way to open your result — we send it to you and it appears
+            nowhere else. Anyone you forward it to can see that result, so treat it as yours.
+          </p>
+          <p>
+            The page shows your basket, the two prices and the saving. It never shows your phone
+            number, your email address or your screenshots.
           </p>
         </Section>
 

@@ -21,6 +21,23 @@ export const publicEnv = {
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "",
 };
 
+/**
+ * An absolute link to somewhere on this site, for a message that leaves it.
+ *
+ * Null rather than a guess when NEXT_PUBLIC_APP_URL is unset: a result link
+ * pointing at localhost in a WhatsApp message is worse than no link, and the
+ * message reads fine without one.
+ */
+export function absoluteUrl(path: string): string | null {
+  const base = publicEnv.appUrl.trim().replace(/\/+$/, "");
+  if (!base) return null;
+  try {
+    return new URL(path, `${base}/`).toString();
+  } catch {
+    return null;
+  }
+}
+
 export function getSupabaseUrl(): string {
   return required("NEXT_PUBLIC_SUPABASE_URL", publicEnv.supabaseUrl);
 }

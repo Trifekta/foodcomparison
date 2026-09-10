@@ -127,3 +127,14 @@ export const DIAL_CODES = [
 /** Best-effort rate limit on the public submission endpoint. */
 export const RATE_LIMIT_MAX_SUBMISSIONS = 5;
 export const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * How often one browser may ask whether its result is ready.
+ *
+ * Far looser than the submission limit, because this is a page left open while
+ * somebody waits for an answer, not an upload. It still has a ceiling: the
+ * token is unguessable, so the only thing this protects against is a tab that
+ * has lost its mind.
+ */
+export const RATE_LIMIT_MAX_RESULT_CHECKS = 120;
+export const RATE_LIMIT_RESULT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes

@@ -14,7 +14,7 @@ import {
   cartItemsSchema,
   submissionFieldsSchema,
 } from "@/lib/validation/submission";
-import { generateReferenceNumber } from "@/lib/utils/reference";
+import { generateReferenceNumber, generateResultToken } from "@/lib/utils/reference";
 import { normalisePhone } from "@/lib/utils/phone";
 import { sanitiseText } from "@/lib/utils/text";
 import { formatMinorToDecimalString, parseAmountToMinor } from "@/lib/calculations/money";
@@ -29,7 +29,7 @@ import { formatMinorToDecimalString, parseAmountToMinor } from "@/lib/calculatio
  */
 
 export type CreateSubmissionResult =
-  | { ok: true; referenceNumber: string; id: string }
+  | { ok: true; referenceNumber: string; resultToken: string; id: string }
   | { ok: false; status: number; error: string; field?: string };
 
 const GENERIC_FAILURE = "We couldn't submit your order. Please try again.";
@@ -222,6 +222,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
 
   // ---- 5. Insert, retrying only on a reference-number collision ------------
   let referenceNumber = "";
+  const resultToken = generateResultToken();
   let inserted = false;
 
   for (let attempt = 0; attempt < MAX_REFERENCE_ATTEMPTS; attempt += 1) {
@@ -230,6 +231,10 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     const { error } = await supabase.from("submissions").insert({
       id: submissionId,
       reference_number: referenceNumber,
+      // Generated here rather than left to the column default, because the
+      // customer is sent straight to this address and we cannot wait to read it
+      // back. The default exists so a row can never end up without one.
+      result_token: resultToken,
       status: "new",
       // The customer is not asked which app this came from - the screenshot
       // shows it to anyone who looks, and asking costs a question. The admin
@@ -291,5 +296,5 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     },
   });
 
-  return { ok: true, referenceNumber, id: submissionId };
+  return { ok: true, referenceNumber, resultToken, id: submissionId };
 }

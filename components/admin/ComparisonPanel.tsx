@@ -19,6 +19,7 @@ interface ComparisonPanelProps {
   initial: {
     /** What the order came from, as stored. "Unknown" until someone looks. */
     sourceApp: string;
+    comparisonUrl: string;
     comparisonTotal: string;
     restaurantFound: string;
     comparisonLocationNote: string;
@@ -41,6 +42,7 @@ export function ComparisonPanel({
   initial,
 }: ComparisonPanelProps) {
   const [sourceApp, setSourceApp] = useState(initial.sourceApp);
+  const [comparisonUrl, setComparisonUrl] = useState(initial.comparisonUrl);
   const [comparisonTotal, setComparisonTotal] = useState(initial.comparisonTotal);
   const [restaurantFound, setRestaurantFound] = useState(initial.restaurantFound);
   const [locationNote, setLocationNote] = useState(initial.comparisonLocationNote);
@@ -61,6 +63,14 @@ export function ComparisonPanel({
     }
   }, [comparisonTotal, currentMinor]);
 
+  // A link that will not become a button is worth saying so before saving,
+  // not discovering when the customer's result has no button on it.
+  const trimmedUrl = comparisonUrl.trim();
+  const urlError =
+    trimmedUrl === "" || /^https:\/\/\S+$/i.test(trimmedUrl)
+      ? undefined
+      : "Paste the full https:// link from the app.";
+
   const validation = comparisonTotalSchema.safeParse(comparisonTotal);
   const inputError =
     comparisonTotal.trim() === "" ? undefined : validation.success ? undefined : validation.error.issues[0]?.message;
@@ -70,11 +80,16 @@ export function ComparisonPanel({
       setFeedback({ ok: false, message: validation.error.issues[0]?.message ?? "Check the total." });
       return;
     }
+    if (urlError) {
+      setFeedback({ ok: false, message: urlError });
+      return;
+    }
 
     const formData = new FormData();
     formData.set("submissionId", submissionId);
     formData.set("comparisonTotal", comparisonTotal.trim());
     formData.set("sourceApp", sourceApp);
+    formData.set("comparisonUrl", comparisonUrl.trim());
     formData.set("restaurantFound", restaurantFound);
     formData.set("comparisonLocationNote", locationNote);
     formData.set("adminNotes", notes);
@@ -136,6 +151,29 @@ export function ComparisonPanel({
           error={inputError}
           placeholder="63.00"
         />
+
+        {/*
+          Pasted from the page being rebuilt, not derived from anything. It
+          becomes the button at the bottom of the customer's result, so the
+          customer lands on the restaurant rather than the app's home screen.
+        */}
+        <div>
+          <label htmlFor="comparison-url" className="mb-1.5 block text-sm font-semibold text-ink-900">
+            {comparisonApp} restaurant link{" "}
+            <span className="font-normal text-ink-400">(becomes the customer&apos;s button)</span>
+          </label>
+          <input
+            id="comparison-url"
+            type="url"
+            inputMode="url"
+            className={fieldClass}
+            value={comparisonUrl}
+            onChange={(event) => setComparisonUrl(event.target.value)}
+            placeholder={`https://…  — share link from the ${comparisonApp} app`}
+            aria-invalid={urlError ? true : undefined}
+          />
+          {urlError ? <p className="mt-1.5 text-sm text-rose-700">{urlError}</p> : null}
+        </div>
 
         <div>
           <label htmlFor="restaurant-found" className="mb-1.5 block text-sm font-semibold text-ink-900">
