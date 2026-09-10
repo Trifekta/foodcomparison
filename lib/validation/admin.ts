@@ -16,6 +16,11 @@ export const comparisonTotalSchema = z
 
 export const comparisonInputSchema = z.object({
   submissionId: z.uuid(),
+  /**
+   * Which app the customer ordered from, as identified by the admin from the
+   * screenshot. Optional so an older form, or one left alone, changes nothing.
+   */
+  sourceApp: z.string().trim().max(80).optional(),
   comparisonTotal: comparisonTotalSchema,
   restaurantFound: z.string().trim().max(160).optional(),
   comparisonLocationNote: z.string().trim().max(160).optional(),

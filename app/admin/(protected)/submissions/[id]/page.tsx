@@ -20,6 +20,7 @@ import { StartReviewButton } from "@/components/admin/StartReviewButton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDecimalStringAsCurrency, formatMinorAsCurrency } from "@/lib/calculations/money";
 import { formatDubaiDateTime } from "@/lib/utils/text";
+import { LEGACY_OTHER_APP } from "@/lib/constants";
 import { maskEmail } from "@/lib/utils/phone";
 import { statusLabel } from "@/lib/utils/status";
 import type { SubmissionItemSource } from "@/types/database";
@@ -79,7 +80,7 @@ export default async function SubmissionDetailPage({
   ]);
 
   const appLabel =
-    submission.source_app === "Other" && submission.source_app_other
+    submission.source_app === LEGACY_OTHER_APP && submission.source_app_other
       ? submission.source_app_other
       : submission.source_app;
 
@@ -260,10 +261,10 @@ export default async function SubmissionDetailPage({
           <ComparisonPanel
             submissionId={submission.id}
             comparisonApp={submission.comparison_app}
-            sourceAppLabel={appLabel}
             currentTotal={submission.current_total}
             areaName={submission.areas?.name ?? "Dubai"}
             initial={{
+              sourceApp: submission.source_app,
               comparisonTotal: submission.comparison_total ?? "",
               restaurantFound: submission.restaurant_found ?? "",
               comparisonLocationNote: submission.comparison_location_note ?? "",

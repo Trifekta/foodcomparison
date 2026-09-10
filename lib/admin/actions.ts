@@ -6,7 +6,11 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAdminSession, requireAdmin } from "@/lib/supabase/auth";
 import { areaInputSchema, comparisonInputSchema } from "@/lib/validation/admin";
 import { calculateSavingFromStrings, toPersistableSaving } from "@/lib/calculations/saving";
-import { buildResultMessage, buildResultSubject } from "@/lib/notifications/messages";
+import {
+  buildResultMessage,
+  buildResultSubject,
+  sourceAppLabel,
+} from "@/lib/notifications/messages";
 import { getEmailProvider } from "@/lib/notifications/resend";
 import { sanitiseMultiline, sanitiseText } from "@/lib/utils/text";
 import { formatMinorToDecimalString, parseAmountToMinor } from "@/lib/calculations/money";
@@ -23,12 +27,6 @@ import type { SubmissionRow, SubmissionStatus } from "@/types/database";
 export interface ActionResult {
   ok: boolean;
   message?: string;
-}
-
-function sourceAppLabel(submission: Pick<SubmissionRow, "source_app" | "source_app_other">): string {
-  return submission.source_app === "Other" && submission.source_app_other
-    ? submission.source_app_other
-    : submission.source_app;
 }
 
 async function recordEvent(input: {
@@ -126,6 +124,7 @@ export async function saveComparison(formData: FormData): Promise<ActionResult> 
   const parsed = comparisonInputSchema.safeParse({
     submissionId: String(formData.get("submissionId") ?? ""),
     comparisonTotal: String(formData.get("comparisonTotal") ?? ""),
+    sourceApp: String(formData.get("sourceApp") ?? "") || undefined,
     restaurantFound: String(formData.get("restaurantFound") ?? ""),
     comparisonLocationNote: String(formData.get("comparisonLocationNote") ?? ""),
     adminNotes: String(formData.get("adminNotes") ?? ""),
@@ -148,8 +147,14 @@ export async function saveComparison(formData: FormData): Promise<ActionResult> 
   const persisted = toPersistableSaving(saving);
   const nextStatus: SubmissionStatus = saving.hasSaving ? "result_ready" : "no_saving";
 
+  // The app the admin just identified wins over whatever was stored, so the
+  // message names it correctly on the very first save.
+  const sourceApp = parsed.data.sourceApp ?? submission.source_app;
   const generated = buildResultMessage({
-    sourceAppLabel: sourceAppLabel(submission),
+    sourceAppLabel: sourceAppLabel({
+      source_app: sourceApp,
+      source_app_other: submission.source_app_other,
+    }),
     currentTotal: submission.current_total,
     comparisonTotal,
     comparisonAppLabel: submission.comparison_app,
@@ -159,6 +164,7 @@ export async function saveComparison(formData: FormData): Promise<ActionResult> 
   const { error } = await supabase
     .from("submissions")
     .update({
+      source_app: sourceApp,
       comparison_total: comparisonTotal,
       saving_amount: persisted.saving_amount,
       saving_percentage: persisted.saving_percentage,

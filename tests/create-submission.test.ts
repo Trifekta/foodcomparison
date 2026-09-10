@@ -62,8 +62,6 @@ function formData(overrides: Record<string, string> = {}): FormData {
   const fields: Record<string, string> = {
     restaurantName: "Al Safadi",
     areaId: AREA_ID,
-    sourceApp: "Talabat",
-    sourceAppOther: "",
     currentTotal: "82.00",
     contactType: "whatsapp",
     dialCode: "+971",
@@ -96,6 +94,24 @@ describe("createSubmission", () => {
     const result = await createSubmission(formData({ restaurantName: "  Al Safadi  " }));
     expect(result.ok).toBe(true);
     expect(submissionRow().restaurant_name).toBe("Al Safadi");
+  });
+
+  it("records the app as unknown, for the admin to identify", async () => {
+    // The customer is not asked. source_app is NOT NULL in the schema, so
+    // "Unknown" is stored rather than a blank - it is a truthful state, and it
+    // is what the admin's dashboard filters on to find unlabelled orders.
+    const result = await createSubmission(formData());
+    expect(result.ok).toBe(true);
+    expect(submissionRow().source_app).toBe("Unknown");
+    expect(submissionRow().source_app_other).toBeNull();
+  });
+
+  it("ignores an app posted by a client that still sends one", async () => {
+    // Nothing in the wizard sends this any more, and a crafted request must
+    // not be able to write a value the admin has not verified.
+    const result = await createSubmission(formData({ sourceApp: "Talabat" }));
+    expect(result.ok).toBe(true);
+    expect(submissionRow().source_app).toBe("Unknown");
   });
 
   it("refuses a submission with no restaurant", async () => {

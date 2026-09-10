@@ -7,8 +7,6 @@ import {
   MAX_RESTAURANT_NAME_LENGTH,
   MAX_TOTAL_AED,
   MIN_TOTAL_AED,
-  OTHER_APP_VALUE,
-  SOURCE_APPS,
 } from "@/lib/constants";
 import { isNormalisablePhone } from "@/lib/utils/phone";
 
@@ -27,8 +25,6 @@ export const ERROR_MESSAGES = {
   restaurantTooLong: `Keep the restaurant name under ${MAX_RESTAURANT_NAME_LENGTH} characters.`,
   itemsInvalid: "Please check the items you added.",
   areaMissing: "Please select your Dubai area.",
-  appMissing: "Please choose the app you're ordering from.",
-  otherAppMissing: "Please tell us the app name.",
   invalidTotal: "Enter the final amount you would pay.",
   totalTooHigh: `Enter an amount under AED ${MAX_TOTAL_AED.toLocaleString("en-AE")}.`,
   contactMissing: "Please tell us where to send your result.",
@@ -57,8 +53,6 @@ const baseFields = {
     .min(2, ERROR_MESSAGES.restaurantMissing)
     .max(MAX_RESTAURANT_NAME_LENGTH, ERROR_MESSAGES.restaurantTooLong),
   areaId: z.uuid({ message: ERROR_MESSAGES.areaMissing }),
-  sourceApp: z.string().min(1, ERROR_MESSAGES.appMissing),
-  sourceAppOther: z.string().trim().max(80),
   currentTotal: amountSchema,
   contactType: contactTypeSchema,
   dialCode: z.string(),
@@ -70,8 +64,6 @@ const baseFields = {
 type BaseValues = {
   restaurantName: string;
   areaId: string;
-  sourceApp: string;
-  sourceAppOther: string;
   currentTotal: string;
   contactType: "whatsapp" | "email";
   dialCode: string;
@@ -112,31 +104,8 @@ function checkContactRules(value: ContactValues, ctx: z.RefinementCtx): void {
   }
 }
 
-type AppValues = Pick<BaseValues, "sourceApp" | "sourceAppOther">;
-
-/** The chosen app must be one we offer, and "Other" must be named. */
-function checkAppRules(value: AppValues, ctx: z.RefinementCtx): void {
-  if (!(SOURCE_APPS as readonly string[]).includes(value.sourceApp)) {
-    ctx.addIssue({ code: "custom", path: ["sourceApp"], message: ERROR_MESSAGES.appMissing });
-  }
-
-  if (value.sourceApp === OTHER_APP_VALUE && !value.sourceAppOther.trim()) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["sourceAppOther"],
-      message: ERROR_MESSAGES.otherAppMissing,
-    });
-  }
-}
-
-/** All cross-field rules. Used for the final submit and by the API route. */
-function checkCrossFieldRules(value: BaseValues, ctx: z.RefinementCtx): void {
-  checkAppRules(value, ctx);
-  checkContactRules(value, ctx);
-}
-
 /** The whole submission, validated on the review step and again on the server. */
-export const submissionFieldsSchema = z.object(baseFields).superRefine(checkCrossFieldRules);
+export const submissionFieldsSchema = z.object(baseFields).superRefine(checkContactRules);
 
 /**
  * Per-step schemas.
@@ -148,15 +117,17 @@ export const submissionFieldsSchema = z.object(baseFields).superRefine(checkCros
  */
 export const basketStepSchema = z.object({ restaurantName: baseFields.restaurantName });
 
-export const locationStepSchema = z
-  .object({
-    areaId: baseFields.areaId,
-    sourceApp: baseFields.sourceApp,
-    sourceAppOther: baseFields.sourceAppOther,
-  })
-  .superRefine(checkAppRules);
-
-export const totalStepSchema = z.object({ currentTotal: amountSchema });
+/**
+ * Where it goes and what it costs, asked together.
+ *
+ * The area decides the delivery fee and whether the restaurant is even
+ * available, so the comparison is meaningless without it; the total is the
+ * baseline the saving is measured against. Two small fields, one screen.
+ */
+export const whereStepSchema = z.object({
+  areaId: baseFields.areaId,
+  currentTotal: amountSchema,
+});
 
 export const contactStepSchema = z
   .object({

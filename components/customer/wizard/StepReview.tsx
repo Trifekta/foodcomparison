@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { AlertCircle, Check, ChevronRight, MapPin, Minus, Receipt, Store } from "lucide-react";
-import { COMPARISON_APP, CURRENCY, OTHER_APP_VALUE } from "@/lib/constants";
-import { maskEmail, maskPhone, normalisePhone } from "@/lib/utils/phone";
+import { COMPARISON_APP, CURRENCY, DIAL_CODES } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
+import { FieldError } from "@/components/ui/FieldError";
 import { ImageLightbox } from "@/components/ui/ImageLightbox";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptNote, Sparks } from "@/components/customer/Motifs";
@@ -20,21 +20,18 @@ interface StepReviewProps {
   areaName: string;
   submitting: boolean;
   submitError: string | null;
+  /** Contact errors surface here, because contact is asked here. */
+  errors: { whatsappNumber?: string; email?: string };
   onSubmit: () => void;
   onBack: () => void;
   /** Jump back to the step that owns a value, from its row on this screen. */
   onEditBasket: () => void;
   onEditArea: () => void;
-  onEditContact: () => void;
-}
-
-function maskedContact(values: WizardValues): string {
-  if (values.contactType === "email") return maskEmail(values.email.trim());
-  try {
-    return `WhatsApp ${maskPhone(normalisePhone(values.dialCode, values.whatsappNumber).e164)}`;
-  } catch {
-    return "WhatsApp";
-  }
+  onContactTypeChange: (type: "whatsapp" | "email") => void;
+  onDialCodeChange: (code: string) => void;
+  onWhatsappNumberChange: (value: string) => void;
+  onEmailChange: (value: string) => void;
+  onMarketingConsentChange: (value: boolean) => void;
 }
 
 /** Green tick pill, or a muted one when the thing is absent. */
@@ -91,6 +88,36 @@ function EditRow({
   );
 }
 
+/**
+ * A preview URL for a picked file, released when it is replaced or the screen
+ * goes away.
+ *
+ * The URL is created inside the effect that revokes it, so the two are always
+ * the same one. Creating it in a memo beside the effect looks equivalent and is
+ * not: this screen mounts with the files already chosen, so any remount that
+ * does not re-run the memo - React's Strict Mode double-invoke among them -
+ * revokes the URL the <img> is still pointing at, and the customer is shown a
+ * broken thumbnail where their own screenshot should be.
+ *
+ * That makes the state write below deliberate rather than the render-loop
+ * mistake the rule is there to catch: it happens once per file, and the file
+ * comes from a tap.
+ */
+function useObjectUrl(file: File | null): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const created = file ? URL.createObjectURL(file) : null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
+    setUrl(created);
+    return () => {
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [file]);
+
+  return url;
+}
+
 export function StepReview({
   values,
   files,
@@ -98,37 +125,25 @@ export function StepReview({
   areaName,
   submitting,
   submitError,
+  errors,
   onSubmit,
   onBack,
   onEditBasket,
   onEditArea,
-  onEditContact,
+  onContactTypeChange,
+  onDialCodeChange,
+  onWhatsappNumberChange,
+  onEmailChange,
+  onMarketingConsentChange,
 }: StepReviewProps) {
-  const cartThumb = useMemo(
-    () => (files.cart ? URL.createObjectURL(files.cart) : null),
-    [files.cart],
-  );
-  const checkoutThumb = useMemo(
-    () => (files.checkout ? URL.createObjectURL(files.checkout) : null),
-    [files.checkout],
-  );
-
-  useEffect(() => {
-    if (!cartThumb) return;
-    return () => URL.revokeObjectURL(cartThumb);
-  }, [cartThumb]);
-  useEffect(() => {
-    if (!checkoutThumb) return;
-    return () => URL.revokeObjectURL(checkoutThumb);
-  }, [checkoutThumb]);
+  const phoneId = useId();
+  const emailId = useId();
+  const consentId = useId();
+  const cartThumb = useObjectUrl(files.cart);
+  const checkoutThumb = useObjectUrl(files.checkout);
 
   // Which screenshot, if any, is open full size.
   const [zoomed, setZoomed] = useState<"cart" | "checkout" | null>(null);
-
-  const appLabel =
-    values.sourceApp === OTHER_APP_VALUE && values.sourceAppOther.trim()
-      ? values.sourceAppOther.trim()
-      : values.sourceApp;
 
   const total = `${CURRENCY} ${Number(values.currentTotal).toFixed(2)}`;
   const hasCheckoutShot = files.checkout !== null;
@@ -145,17 +160,8 @@ export function StepReview({
 
       {/* One card holding everything the customer told us */}
       <section className="mt-4 overflow-hidden rounded-3xl bg-white shadow-[0_2px_18px_rgba(23,23,28,0.06)] ring-1 ring-ink-100">
-        <div className="flex items-center justify-between gap-3 px-4 pb-3 pt-4">
+        <div className="px-4 pb-3 pt-4">
           <h2 className="text-[1.2rem] font-extrabold text-ink-900">Your order</h2>
-          <span className="inline-flex items-center gap-2 rounded-xl bg-ink-50 py-1.5 pl-1.5 pr-3">
-            <span
-              aria-hidden="true"
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-chip-red-bg text-base font-extrabold text-chip-red-fg"
-            >
-              {appLabel.charAt(0)}
-            </span>
-            <span className="text-[0.95rem] font-bold text-ink-900">{appLabel}</span>
-          </span>
         </div>
 
         {/* The screenshots they actually sent. Nothing is read out of them
@@ -279,17 +285,119 @@ export function StepReview({
           value={areaName}
           onEdit={onEditArea}
         />
-        <div className="border-t border-ink-100" />
-        <EditRow
-          icon={
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#25d366] text-[0.6rem] font-black text-white">
-              {values.contactType === "email" ? "@" : "W"}
-            </span>
-          }
-          label="Result sent to"
-          value={maskedContact(values)}
-          onEdit={onEditContact}
-        />
+      </section>
+
+      {/* Where to send it. Asked here rather than on a screen of its own: it is
+          the last thing between the customer and the answer, and a screen that
+          exists only to collect a phone number is where people stop. */}
+      <section className="mt-4 rounded-3xl bg-white p-4 shadow-[0_2px_18px_rgba(23,23,28,0.06)] ring-1 ring-ink-100">
+        <h2 className="text-[1.1rem] font-extrabold text-ink-900">
+          Where should we send your result?
+        </h2>
+        <p className="mt-1 text-[0.88rem] leading-snug text-slate-600">
+          We reply about this request only. Nothing is ordered.
+        </p>
+
+        <div className="mt-3">
+          {values.contactType === "whatsapp" ? (
+            <>
+              <label htmlFor={phoneId} className="mb-2 block text-[0.9rem] font-bold text-ink-900">
+                WhatsApp number
+              </label>
+              <div
+                className={cn(
+                  "flex items-stretch overflow-hidden rounded-2xl border bg-white",
+                  "focus-within:outline focus-within:outline-[3px] focus-within:outline-offset-2 focus-within:outline-ink-900",
+                  errors.whatsappNumber ? "border-rose-400" : "border-ink-200",
+                )}
+              >
+                <label htmlFor={`${phoneId}-code`} className="sr-only">
+                  Country code
+                </label>
+                <select
+                  id={`${phoneId}-code`}
+                  value={values.dialCode}
+                  onChange={(event) => onDialCodeChange(event.target.value)}
+                  className="min-h-14 border-r border-ink-200 bg-ink-50 px-3 text-base font-bold text-ink-800"
+                >
+                  {DIAL_CODES.map((entry) => (
+                    <option key={entry.code} value={entry.code}>
+                      {entry.code}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  id={phoneId}
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel-national"
+                  placeholder="50 123 4567"
+                  value={values.whatsappNumber}
+                  onChange={(event) => onWhatsappNumberChange(event.target.value)}
+                  aria-describedby={errors.whatsappNumber ? `${phoneId}-error` : undefined}
+                  aria-invalid={errors.whatsappNumber ? true : undefined}
+                  className="min-h-14 w-full bg-transparent px-3.5 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400 focus:outline-none"
+                />
+              </div>
+              <FieldError id={`${phoneId}-error`} message={errors.whatsappNumber} />
+            </>
+          ) : (
+            <>
+              <label htmlFor={emailId} className="mb-2 block text-[0.9rem] font-bold text-ink-900">
+                Email address
+              </label>
+              <input
+                id={emailId}
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={values.email}
+                onChange={(event) => onEmailChange(event.target.value)}
+                aria-describedby={errors.email ? `${emailId}-error` : undefined}
+                aria-invalid={errors.email ? true : undefined}
+                className={cn(
+                  "min-h-14 w-full rounded-2xl border bg-white px-4 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400",
+                  errors.email ? "border-rose-400" : "border-ink-200",
+                )}
+              />
+              <FieldError id={`${emailId}-error`} message={errors.email} />
+            </>
+          )}
+
+          {/* One channel is shown, the other is one tap away. Choosing is work
+              too, and almost everyone wants WhatsApp. */}
+          <button
+            type="button"
+            onClick={() =>
+              onContactTypeChange(values.contactType === "whatsapp" ? "email" : "whatsapp")
+            }
+            className="mt-2.5 min-h-9 text-[0.88rem] font-bold text-ink-700 underline underline-offset-4 hover:text-ink-900"
+          >
+            {values.contactType === "whatsapp" ? "Prefer email?" : "Use WhatsApp instead"}
+          </button>
+        </div>
+
+        {/*
+          Marketing consent is separate from service communication. Submitting a
+          comparison lets us reply about THAT request; this box is the only thing
+          that opts someone into anything else, and it starts off.
+        */}
+        <label
+          htmlFor={consentId}
+          className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl bg-cream p-3.5 ring-1 ring-sand"
+        >
+          <input
+            id={consentId}
+            type="checkbox"
+            checked={values.marketingConsent}
+            onChange={(event) => onMarketingConsentChange(event.target.checked)}
+            className="mt-0.5 h-5 w-5 shrink-0 rounded accent-ink-900"
+          />
+          <span className="text-[0.85rem] leading-snug text-ink-600">
+            I&apos;d like to hear about future FindFoodae offers.
+          </span>
+        </label>
       </section>
 
       <ImageLightbox

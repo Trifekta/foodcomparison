@@ -8,7 +8,7 @@ import { TOTAL_STEPS } from "./types";
 
 interface WizardShellProps {
   step: number;
-  /** Shown instead of "Step n of 5" on the review screen. */
+  /** Overrides "Step n of 4" where a screen is better named than numbered. */
   stepLabel?: string;
   onBack: (() => void) | null;
   children: React.ReactNode;

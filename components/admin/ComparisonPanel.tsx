@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { Calculator, CheckCircle2 } from "lucide-react";
 import { saveComparison } from "@/lib/admin/actions";
+import { ADMIN_SOURCE_APPS, UNKNOWN_SOURCE_APP } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
 import { AmountInput } from "@/components/forms/AmountInput";
 import { calculateSaving } from "@/lib/calculations/saving";
@@ -13,10 +14,11 @@ import { comparisonTotalSchema } from "@/lib/validation/admin";
 interface ComparisonPanelProps {
   submissionId: string;
   comparisonApp: string;
-  sourceAppLabel: string;
   currentTotal: string;
   areaName: string;
   initial: {
+    /** What the order came from, as stored. "Unknown" until someone looks. */
+    sourceApp: string;
     comparisonTotal: string;
     restaurantFound: string;
     comparisonLocationNote: string;
@@ -34,11 +36,11 @@ interface ComparisonPanelProps {
 export function ComparisonPanel({
   submissionId,
   comparisonApp,
-  sourceAppLabel,
   currentTotal,
   areaName,
   initial,
 }: ComparisonPanelProps) {
+  const [sourceApp, setSourceApp] = useState(initial.sourceApp);
   const [comparisonTotal, setComparisonTotal] = useState(initial.comparisonTotal);
   const [restaurantFound, setRestaurantFound] = useState(initial.restaurantFound);
   const [locationNote, setLocationNote] = useState(initial.comparisonLocationNote);
@@ -72,6 +74,7 @@ export function ComparisonPanel({
     const formData = new FormData();
     formData.set("submissionId", submissionId);
     formData.set("comparisonTotal", comparisonTotal.trim());
+    formData.set("sourceApp", sourceApp);
     formData.set("restaurantFound", restaurantFound);
     formData.set("comparisonLocationNote", locationNote);
     formData.set("adminNotes", notes);
@@ -85,6 +88,11 @@ export function ComparisonPanel({
   const fieldClass =
     "min-h-11 w-full rounded-xl border border-ink-200 bg-white px-3.5 text-sm text-ink-900";
 
+  // Rows created before this was an admin field can hold anything, including a
+  // legacy "Other" plus a free-text name. Show what is stored rather than
+  // silently reassigning it to something from the list.
+  const knownApp = (ADMIN_SOURCE_APPS as readonly string[]).includes(sourceApp);
+
   return (
     <section className="rounded-2xl border border-ink-200 bg-white p-5">
       <h2 className="text-base font-semibold text-ink-900">Comparison</h2>
@@ -93,6 +101,34 @@ export function ComparisonPanel({
       </p>
 
       <div className="mt-5 space-y-4">
+        {/*
+          The customer is never asked this - the screenshots are right there on
+          the left of this page and the app is obvious from them. Set here
+          because this is where the customer's message gets written, and the
+          message names the app.
+        */}
+        <div>
+          <label htmlFor="source-app" className="mb-1.5 block text-sm font-semibold text-ink-900">
+            Ordered on{" "}
+            {sourceApp === UNKNOWN_SOURCE_APP ? (
+              <span className="font-normal text-amber-700">— check the screenshot</span>
+            ) : null}
+          </label>
+          <select
+            id="source-app"
+            className={fieldClass}
+            value={knownApp ? sourceApp : ""}
+            onChange={(event) => setSourceApp(event.target.value)}
+          >
+            {knownApp ? null : <option value="">{sourceApp}</option>}
+            {ADMIN_SOURCE_APPS.map((app) => (
+              <option key={app} value={app}>
+                {app}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <AmountInput
           label={`${comparisonApp} total`}
           value={comparisonTotal}
@@ -146,7 +182,7 @@ export function ComparisonPanel({
       {preview ? (
         <div className="mt-5">
           <PriceVerdict
-            sourceAppLabel={sourceAppLabel}
+            sourceAppLabel={sourceApp === UNKNOWN_SOURCE_APP ? "Your order" : sourceApp}
             comparisonAppLabel={comparisonApp}
             currentTotalMinor={currentMinor}
             comparisonTotalMinor={preview.minor}

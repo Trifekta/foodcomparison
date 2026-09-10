@@ -21,21 +21,40 @@ export const LAUNCH_EMIRATE = "Dubai";
 export const COMPARISON_APP = "Keeta";
 
 /**
- * Apps a customer can be ordering *from*. Keeta is deliberately absent: Phase 1
+ * Apps an order can have come *from*. Keeta is deliberately absent: Phase 1
  * compares other apps against Keeta. The database stores free text, so adding
  * Keeta (or another app) here later needs no migration.
+ *
+ * The customer is not asked this. None of the real screenshots we have carry
+ * the app's name in their text, so it cannot be read out of one - but a person
+ * looking at the screenshot knows the app at a glance, so the admin sets it
+ * while they are rebuilding the basket. Until they do it stays UNKNOWN.
  */
 export const SOURCE_APPS = [
   "Talabat",
   "Careem Food",
   "Deliveroo",
   "Noon Food",
-  "Other",
 ] as const;
 
 export type SourceApp = (typeof SOURCE_APPS)[number];
 
-export const OTHER_APP_VALUE: SourceApp = "Other";
+/**
+ * Stored when nobody has said which app an order came from.
+ *
+ * A real value rather than null: source_app is NOT NULL in the schema, and
+ * "not identified yet" is a truthful thing for a submission to say.
+ */
+export const UNKNOWN_SOURCE_APP = "Unknown";
+
+/** Every value the admin can pick, unknown included. */
+export const ADMIN_SOURCE_APPS = [...SOURCE_APPS, UNKNOWN_SOURCE_APP] as const;
+
+/**
+ * Kept for rows created before the customer stopped being asked, which may
+ * hold "Other" plus a free-text name in source_app_other.
+ */
+export const LEGACY_OTHER_APP = "Other";
 
 /** Image upload rules, enforced on the client *and* on the server. */
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB

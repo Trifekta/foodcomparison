@@ -4,8 +4,8 @@ import {
   COMPARISON_APP,
   MAX_ITEM_NAME_LENGTH,
   MAX_RESTAURANT_NAME_LENGTH,
-  OTHER_APP_VALUE,
   STORAGE_BUCKET,
+  UNKNOWN_SOURCE_APP,
 } from "@/lib/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { validateImageFile, type ImageValidationSuccess } from "@/lib/validation/image";
@@ -88,8 +88,6 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   const parsed = submissionFieldsSchema.safeParse({
     restaurantName: String(formData.get("restaurantName") ?? ""),
     areaId: String(formData.get("areaId") ?? ""),
-    sourceApp: String(formData.get("sourceApp") ?? ""),
-    sourceAppOther: String(formData.get("sourceAppOther") ?? ""),
     currentTotal: String(formData.get("currentTotal") ?? ""),
     contactType: String(formData.get("contactType") ?? ""),
     dialCode: String(formData.get("dialCode") ?? ""),
@@ -233,9 +231,11 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       id: submissionId,
       reference_number: referenceNumber,
       status: "new",
-      source_app: fields.sourceApp,
-      source_app_other:
-        fields.sourceApp === OTHER_APP_VALUE ? sanitiseText(fields.sourceAppOther, 80) : null,
+      // The customer is not asked which app this came from - the screenshot
+      // shows it to anyone who looks, and asking costs a question. The admin
+      // sets it while rebuilding the basket; until then it is unknown.
+      source_app: UNKNOWN_SOURCE_APP,
+      source_app_other: null,
       area_id: area.id,
       current_total: formatMinorToDecimalString(currentTotalMinor),
       comparison_app: COMPARISON_APP,
@@ -285,7 +285,6 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     event_type: "submission_created",
     new_status: "new",
     metadata: {
-      source_app: fields.sourceApp,
       has_checkout_image: checkoutPath !== null,
       item_count: itemsStored,
       extracted_item_count: items.value.filter((item) => item.source !== "customer").length,

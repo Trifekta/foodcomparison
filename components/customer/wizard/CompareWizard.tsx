@@ -9,17 +9,13 @@ import {
   ERROR_MESSAGES,
   basketStepSchema,
   cartItemsSchema,
-  contactStepSchema,
-  locationStepSchema,
   submissionFieldsSchema,
-  totalStepSchema,
+  whereStepSchema,
 } from "@/lib/validation/submission";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
 import { StepBasket } from "./StepBasket";
-import { StepLocation } from "./StepLocation";
-import { StepTotal } from "./StepTotal";
-import { StepContact } from "./StepContact";
+import { StepWhereAndTotal } from "./StepWhereAndTotal";
 import { StepReview } from "./StepReview";
 import {
   WIZARD_DEFAULTS,
@@ -37,10 +33,8 @@ import {
 
 const STEP_UPLOAD = 1;
 const STEP_BASKET = 2;
-const STEP_LOCATION = 3;
-const STEP_TOTAL = 4;
-const STEP_CONTACT = 5;
-const STEP_REVIEW = 6;
+const STEP_WHERE = 3;
+const STEP_REVIEW = 4;
 
 /**
  * The customer wizard.
@@ -238,25 +232,11 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   };
 
   const handleBasketContinue = () => {
-    if (validateStep(basketStepSchema, ["restaurantName"])) goTo(STEP_LOCATION);
+    if (validateStep(basketStepSchema, ["restaurantName"])) goTo(STEP_WHERE);
   };
 
-  const handleLocationContinue = () => {
-    if (validateStep(locationStepSchema, ["areaId", "sourceApp", "sourceAppOther"])) {
-      goTo(STEP_TOTAL);
-    }
-  };
-
-  const handleTotalContinue = () => {
-    if (validateStep(totalStepSchema, ["currentTotal"])) goTo(STEP_CONTACT);
-  };
-
-  const handleContactContinue = () => {
-    if (
-      validateStep(contactStepSchema, ["contactType", "dialCode", "whatsappNumber", "email"])
-    ) {
-      goTo(STEP_REVIEW);
-    }
+  const handleWhereContinue = () => {
+    if (validateStep(whereStepSchema, ["areaId", "currentTotal"])) goTo(STEP_REVIEW);
   };
 
   const handleSubmit = async () => {
@@ -275,11 +255,10 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
         if (field) setError(field, { type: "manual", message: issue.message });
       }
       // Send the customer back to the earliest step that still needs attention.
+      // Contact is asked on this screen, so a contact problem stays here.
       const bad = parsed.error.issues[0]?.path[0];
       if (bad === "restaurantName") goTo(STEP_BASKET);
-      else if (bad === "areaId" || bad === "sourceApp" || bad === "sourceAppOther") goTo(STEP_LOCATION);
-      else if (bad === "currentTotal") goTo(STEP_TOTAL);
-      else goTo(STEP_CONTACT);
+      else if (bad === "areaId" || bad === "currentTotal") goTo(STEP_WHERE);
       return;
     }
 
@@ -326,7 +305,6 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   return (
     <WizardShell
       step={step}
-      stepLabel={step === STEP_REVIEW ? "Review" : undefined}
       onBack={step === STEP_UPLOAD ? null : () => goTo(step - 1)}
     >
       {step === STEP_UPLOAD ? (
@@ -365,60 +343,22 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
         />
       ) : null}
 
-      {step === STEP_LOCATION ? (
-        <StepLocation
+      {step === STEP_WHERE ? (
+        <StepWhereAndTotal
           areas={areas}
           areaId={values.areaId}
-          sourceApp={values.sourceApp}
-          sourceAppOther={values.sourceAppOther}
-          errors={{
-            areaId: errors.areaId?.message,
-            sourceApp: errors.sourceApp?.message,
-            sourceAppOther: errors.sourceAppOther?.message,
-          }}
-          onAreaChange={(areaId) => setField("areaId", areaId)}
-          onSourceAppChange={(app) => setField("sourceApp", app)}
-          onSourceAppOtherChange={(name) => setField("sourceAppOther", name)}
-          onContinue={handleLocationContinue}
-        />
-      ) : null}
-
-      {step === STEP_TOTAL ? (
-        <StepTotal
           currentTotal={values.currentTotal}
-          onCurrentTotalChange={(value) => setField("currentTotal", value)}
-          totalError={errors.currentTotal?.message}
+          errors={{ areaId: errors.areaId?.message, currentTotal: errors.currentTotal?.message }}
           hasCheckoutScreenshot={files.checkout !== null}
           readTotal={readTotals?.finalTotal || null}
           totalFromCheckout={totalsFromCheckout && checkoutTotals.finalTotal !== ""}
+          onAreaChange={(areaId) => setField("areaId", areaId)}
+          onCurrentTotalChange={(value) => setField("currentTotal", value)}
           onUseReadTotal={() => {
             const total = readTotals?.finalTotal;
             if (total) setField("currentTotal", total);
           }}
-          onContinue={handleTotalContinue}
-        />
-      ) : null}
-
-      {step === STEP_CONTACT ? (
-        <StepContact
-          contactType={values.contactType}
-          dialCode={values.dialCode}
-          whatsappNumber={values.whatsappNumber}
-          email={values.email}
-          marketingConsent={values.marketingConsent}
-          errors={{
-            whatsappNumber: errors.whatsappNumber?.message,
-            email: errors.email?.message,
-          }}
-          onContactTypeChange={(type) => {
-            setField("contactType", type);
-            clearErrors(["whatsappNumber", "email"]);
-          }}
-          onDialCodeChange={(code) => setField("dialCode", code)}
-          onWhatsappNumberChange={(value) => setField("whatsappNumber", value)}
-          onEmailChange={(value) => setField("email", value)}
-          onMarketingConsentChange={(value) => setField("marketingConsent", value)}
-          onContinue={handleContactContinue}
+          onContinue={handleWhereContinue}
         />
       ) : null}
 
@@ -430,11 +370,22 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           areaName={areaName}
           submitting={submitting}
           submitError={submitError}
+          errors={{
+            whatsappNumber: errors.whatsappNumber?.message,
+            email: errors.email?.message,
+          }}
           onSubmit={() => void handleSubmit()}
-          onBack={() => goTo(STEP_CONTACT)}
+          onBack={() => goTo(STEP_WHERE)}
           onEditBasket={() => goTo(STEP_BASKET)}
-          onEditArea={() => goTo(STEP_LOCATION)}
-          onEditContact={() => goTo(STEP_CONTACT)}
+          onEditArea={() => goTo(STEP_WHERE)}
+          onContactTypeChange={(type) => {
+            setField("contactType", type);
+            clearErrors(["whatsappNumber", "email"]);
+          }}
+          onDialCodeChange={(code) => setField("dialCode", code)}
+          onWhatsappNumberChange={(value) => setField("whatsappNumber", value)}
+          onEmailChange={(value) => setField("email", value)}
+          onMarketingConsentChange={(value) => setField("marketingConsent", value)}
         />
       ) : null}
     </WizardShell>

@@ -4,6 +4,7 @@ import {
   buildResultMessage,
   buildResultSubject,
   buildWhatsAppLink,
+  sourceAppLabel,
 } from "@/lib/notifications/messages";
 
 describe("buildResultMessage", () => {
@@ -108,5 +109,26 @@ describe("delivery links", () => {
   it("titles the email according to the outcome", () => {
     expect(buildResultSubject(true, "FFA-260910-0042")).toContain("could save");
     expect(buildResultSubject(false, "FFA-260910-0042")).toContain("We checked");
+  });
+});
+
+describe("sourceAppLabel", () => {
+  it("names the app once the admin has identified it", () => {
+    expect(sourceAppLabel({ source_app: "Talabat" })).toBe("Talabat");
+  });
+
+  it("reads correctly when nobody has said which app it was", () => {
+    // The customer is not asked, so this is the normal state of a fresh
+    // submission. "Your order - AED 34.65" is a message we can send as it is.
+    expect(sourceAppLabel({ source_app: "Unknown" })).toBe("Your order");
+    expect(sourceAppLabel({ source_app: "" })).toBe("Your order");
+  });
+
+  it("still uses the free-text name on rows created when Other was offered", () => {
+    expect(sourceAppLabel({ source_app: "Other", source_app_other: "Smiles" })).toBe("Smiles");
+  });
+
+  it("does not leave a bare Other in a customer message", () => {
+    expect(sourceAppLabel({ source_app: "Other", source_app_other: null })).toBe("Your order");
   });
 });

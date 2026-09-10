@@ -4,10 +4,9 @@ import {
   basketStepSchema,
   cartItemsSchema,
   contactStepSchema,
-  locationStepSchema,
   submissionFieldsSchema,
-  totalStepSchema,
   validateImageClientSide,
+  whereStepSchema,
 } from "@/lib/validation/submission";
 import { comparisonTotalSchema } from "@/lib/validation/admin";
 
@@ -17,8 +16,6 @@ function baseSubmission(overrides: Record<string, unknown> = {}) {
   return {
     restaurantName: "Al Safadi",
     areaId: VALID_AREA_ID,
-    sourceApp: "Talabat",
-    sourceAppOther: "",
     currentTotal: "82.00",
     contactType: "whatsapp",
     dialCode: "+971",
@@ -30,20 +27,22 @@ function baseSubmission(overrides: Record<string, unknown> = {}) {
 }
 
 describe("amount validation", () => {
+  const where = (currentTotal: string) =>
+    whereStepSchema.safeParse({ areaId: VALID_AREA_ID, currentTotal });
+
   it("accepts a normal Dubai order total", () => {
-    expect(totalStepSchema.safeParse({ currentTotal: "72.50" }).success).toBe(true);
-    expect(totalStepSchema.safeParse({ currentTotal: "8" }).success).toBe(true);
+    expect(where("72.50").success).toBe(true);
+    expect(where("8").success).toBe(true);
   });
 
   it("rejects negative, zero, over-precise and oversized amounts", () => {
     for (const bad of ["-5", "0", "0.00", "82.505", "5001", "abc", ""]) {
-      const result = totalStepSchema.safeParse({ currentTotal: bad });
-      expect(result.success, `expected ${bad} to be rejected`).toBe(false);
+      expect(where(bad).success, `expected ${bad} to be rejected`).toBe(false);
     }
   });
 
   it("explains what to do when the amount is missing", () => {
-    const result = totalStepSchema.safeParse({ currentTotal: "" });
+    const result = where("");
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].message).toBe(ERROR_MESSAGES.invalidTotal);
@@ -51,48 +50,33 @@ describe("amount validation", () => {
   });
 });
 
-describe("location step", () => {
+describe("where step", () => {
   it("requires an area", () => {
-    const result = locationStepSchema.safeParse({
-      areaId: "",
-      sourceApp: "Talabat",
-      sourceAppOther: "",
-    });
+    // The area is not a formality: Keeta's fee, its menu and whether the
+    // restaurant delivers at all change with the zone, so a comparison quoted
+    // without one is not a comparison.
+    const result = whereStepSchema.safeParse({ areaId: "", currentTotal: "82.00" });
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].message).toBe(ERROR_MESSAGES.areaMissing);
     }
   });
 
-  it("requires an app name when the customer picks Other", () => {
-    const result = locationStepSchema.safeParse({
-      areaId: VALID_AREA_ID,
-      sourceApp: "Other",
-      sourceAppOther: "   ",
-    });
+  it("asks for the area and the total together", () => {
+    const result = whereStepSchema.safeParse({ areaId: "", currentTotal: "" });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0].path[0]).toBe("sourceAppOther");
+      const fields = result.error.issues.map((issue) => issue.path[0]);
+      expect(fields).toContain("areaId");
+      expect(fields).toContain("currentTotal");
     }
   });
 
-  it("accepts Other once it is named", () => {
-    expect(
-      locationStepSchema.safeParse({
-        areaId: VALID_AREA_ID,
-        sourceApp: "Other",
-        sourceAppOther: "Smiles",
-      }).success,
-    ).toBe(true);
-  });
-
-  it("rejects an app that is not on the list", () => {
-    const result = locationStepSchema.safeParse({
-      areaId: VALID_AREA_ID,
-      sourceApp: "NotAnApp",
-      sourceAppOther: "",
-    });
-    expect(result.success).toBe(false);
+  it("does not ask which app the customer is ordering from", () => {
+    // The screenshot shows it to anyone who looks, so the admin sets it. A
+    // submission that never mentions an app is complete.
+    expect(submissionFieldsSchema.safeParse(baseSubmission()).success).toBe(true);
+    expect(Object.keys(submissionFieldsSchema.parse(baseSubmission()))).not.toContain("sourceApp");
   });
 });
 

@@ -54,13 +54,18 @@ export interface ReadTotals {
   finalTotal: string;
 }
 
-export const TOTAL_STEPS = 5;
+/**
+ * Four screens: upload, confirm the basket, where and how much, then review.
+ *
+ * Review is a step rather than an epilogue because it is where the customer
+ * says how to reach them - the last screen does real work, so it gets a real
+ * number on the progress bar.
+ */
+export const TOTAL_STEPS = 4;
 
 export const WIZARD_DEFAULTS: WizardValues = {
   restaurantName: "",
   areaId: "",
-  sourceApp: "",
-  sourceAppOther: "",
   currentTotal: "",
   contactType: "whatsapp",
   dialCode: "+971",

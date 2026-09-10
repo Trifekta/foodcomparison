@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Search, X } from "lucide-react";
-import { SOURCE_APPS } from "@/lib/constants";
+import { ADMIN_SOURCE_APPS } from "@/lib/constants";
 import { STATUS_ORDER, statusLabel } from "@/lib/utils/status";
 import type { PublicArea } from "@/types/database";
 
@@ -83,7 +83,7 @@ export function SubmissionFilters({ areas }: { areas: PublicArea[] }) {
           onChange={(event) => apply("app", event.target.value)}
         >
           <option value="">All apps</option>
-          {SOURCE_APPS.map((app) => (
+          {ADMIN_SOURCE_APPS.map((app) => (
             <option key={app} value={app}>
               {app}
             </option>

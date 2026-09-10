@@ -1,4 +1,4 @@
-import { BRAND_NAME, COMPARISON_APP } from "@/lib/constants";
+import { BRAND_NAME, COMPARISON_APP, LEGACY_OTHER_APP, UNKNOWN_SOURCE_APP } from "@/lib/constants";
 import { calculateSaving } from "@/lib/calculations/saving";
 import { formatMinorAsCurrency, parseAmountToMinor } from "@/lib/calculations/money";
 
@@ -8,6 +8,25 @@ import { formatMinorAsCurrency, parseAmountToMinor } from "@/lib/calculations/mo
  * Wording is deliberately careful: prices move, so we say what we checked and
  * when, and never promise a guaranteed saving.
  */
+
+/**
+ * How the customer's own total is named in the message we send them.
+ *
+ * The customer is never asked which app they ordered from - the screenshot
+ * shows it - so this has to read correctly when nobody has said. "Your order -
+ * AED 34.65" does, which is what lets the question be dropped: an admin who
+ * forgets to label a submission costs an analytics row, not a broken message.
+ */
+export function sourceAppLabel(source: {
+  source_app: string;
+  source_app_other?: string | null;
+}): string {
+  // "Other" was a customer choice once, and always came with a name beside it.
+  // Without one it is not a label anybody would recognise in a message.
+  if (source.source_app === LEGACY_OTHER_APP) return source.source_app_other || "Your order";
+  if (!source.source_app || source.source_app === UNKNOWN_SOURCE_APP) return "Your order";
+  return source.source_app;
+}
 
 export interface ResultMessageInput {
   sourceAppLabel: string;
