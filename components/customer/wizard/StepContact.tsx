@@ -42,10 +42,10 @@ export function StepContact({
 
   return (
     <>
-      <h1 className="text-[1.75rem] font-extrabold leading-tight text-ink-900">
+      <h1 className="text-[1.9rem] font-extrabold leading-tight text-ink-900">
         Where should we send your result?
       </h1>
-      <p className="mt-2 text-[0.95rem] leading-relaxed text-ink-500">
+      <p className="mt-1.5 text-[0.95rem] leading-relaxed text-slate-600">
         We only need one way to reach you. Your result arrives there — nothing is ordered.
       </p>
 
@@ -148,8 +148,10 @@ export function StepContact({
         </label>
       </div>
 
-      <div className="mt-auto pt-7">
-        <Button onClick={onContinue}>Continue</Button>
+      <div className="mt-5">
+        <Button onClick={onContinue} arrow>
+          Continue
+        </Button>
       </div>
     </>
   );

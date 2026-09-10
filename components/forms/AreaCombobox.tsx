@@ -13,6 +13,8 @@ interface AreaComboboxProps {
   error?: string | null;
   label: string;
   hint?: string;
+  /** Visually hide the label when the surrounding card already names the field. */
+  hideLabel?: boolean;
 }
 
 /**
@@ -22,7 +24,15 @@ interface AreaComboboxProps {
  * Implemented as an ARIA combobox with keyboard support rather than a native
  * <select> so a customer can type "mar" and land on Dubai Marina in one tap.
  */
-export function AreaCombobox({ areas, value, onChange, error, label, hint }: AreaComboboxProps) {
+export function AreaCombobox({
+  areas,
+  value,
+  onChange,
+  error,
+  label,
+  hint,
+  hideLabel = false,
+}: AreaComboboxProps) {
   const inputId = useId();
   const listId = `${inputId}-list`;
   const errorId = `${inputId}-error`;
@@ -99,14 +109,17 @@ export function AreaCombobox({ areas, value, onChange, error, label, hint }: Are
 
   return (
     <div ref={containerRef} className="relative">
-      <label htmlFor={inputId} className="mb-2 block text-[0.95rem] font-bold text-ink-900">
+      <label
+        htmlFor={inputId}
+        className={hideLabel ? "sr-only" : "mb-2 block text-[0.95rem] font-bold text-ink-900"}
+      >
         {label}
       </label>
 
       <div className="relative">
         <MapPin
           aria-hidden="true"
-          className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-ink-500"
+          className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500"
         />
         <input
           ref={inputRef}
@@ -135,8 +148,8 @@ export function AreaCombobox({ areas, value, onChange, error, label, hint }: Are
           }}
           onKeyDown={onKeyDown}
           className={cn(
-            "min-h-14 w-full rounded-2xl border bg-white pl-11 pr-11 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400",
-            error ? "border-rose-400" : "border-ink-200",
+            "min-h-14 w-full rounded-2xl bg-white pl-11 pr-11 text-base font-semibold text-ink-900 shadow-sm placeholder:font-normal placeholder:text-slate-400",
+            error ? "ring-2 ring-rose-400" : "ring-1 ring-black/5",
           )}
         />
         {selected && !open ? (

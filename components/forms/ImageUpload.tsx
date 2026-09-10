@@ -1,37 +1,37 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Camera, CheckCircle2, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Camera, Check, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/constants";
 import { validateImageClientSide } from "@/lib/validation/submission";
 import { downscaleImage } from "@/lib/utils/image-client";
 import { FieldError } from "@/components/ui/FieldError";
-import { FoodIcon, type FoodName } from "@/components/customer/FoodArt";
+import { CartDocArt, ReceiptArt } from "@/components/customer/FoodArt";
+import { Sparks } from "@/components/customer/Motifs";
 import { cn } from "@/lib/utils/cn";
 
 interface ImageUploadProps {
   /** Position in the upload list, shown as a numbered badge. */
-  step?: number;
+  step: number;
   label: string;
   hint?: string;
   file: File | null;
   onChange: (file: File | null) => void;
   error?: string | null;
-  optional?: boolean;
+  /** Drives the pill: Required is red, Optional is green, as in the designs. */
+  requirement: "required" | "optional";
   allowRemove?: boolean;
-  /** "required" marks the slot the customer cannot skip. */
-  accent?: "required" | "optional";
-  /** Decorative food mark shown in the empty state. */
-  emptyArt?: FoodName;
+  /** Which illustration fills the empty dropzone. */
+  art?: "cart" | "receipt";
 }
 
 /**
  * One numbered upload slot.
  *
- * Each slot carries its own state - Required, Optional, or Added - so a
- * customer can see at a glance what is still needed and what is genuinely
- * their choice. The preview shows their real screenshot; food art appears only
- * in the empty state, where it cannot be mistaken for something we detected.
+ * Each slot states whether it is required or optional and shows its own filled
+ * state, so a customer can see at a glance what is still needed. The preview is
+ * their real screenshot; the illustration appears only in the empty state,
+ * where it cannot be mistaken for something we read out of their image.
  */
 export function ImageUpload({
   step,
@@ -40,10 +40,9 @@ export function ImageUpload({
   file,
   onChange,
   error,
-  optional = false,
+  requirement,
   allowRemove = false,
-  accent,
-  emptyArt = "burger",
+  art = "cart",
 }: ImageUploadProps) {
   const inputId = useId();
   const errorId = `${inputId}-error`;
@@ -77,55 +76,40 @@ export function ImageUpload({
     }
   };
 
-  const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setDragging(false);
-    void accept(event.dataTransfer.files?.[0]);
-  };
-
   const message = error ?? localError;
   const filled = Boolean(file && previewUrl);
+  const Art = art === "receipt" ? ReceiptArt : CartDocArt;
 
   return (
-    <div
-      className={cn(
-        "rounded-3xl p-3.5 transition-colors",
-        filled ? "bg-emerald-50/70 ring-1 ring-emerald-200" : "bg-beige/70",
-      )}
-    >
-      <div className="flex items-start gap-3 px-1 pb-3 pt-1">
+    <section className="rounded-3xl bg-white p-4 shadow-[0_2px_14px_rgba(23,23,28,0.05)] ring-1 ring-ink-100">
+      <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
           className={cn(
-            "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold",
-            filled ? "bg-emerald-600 text-white" : "bg-white text-ink-900 ring-1 ring-sand",
+            "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-extrabold",
+            filled ? "bg-emerald-500 text-white" : "bg-brand-300 text-ink-900",
           )}
         >
-          {step}
+          {filled ? <Check className="h-4 w-4" strokeWidth={3} /> : step}
         </span>
 
         <div className="min-w-0 flex-1">
-          <label htmlFor={inputId} className="block text-[0.95rem] font-bold text-ink-900">
-            {label}
-            {optional ? (
-              <span className="ml-2 whitespace-nowrap rounded-full bg-white px-2 py-0.5 align-middle text-[0.6rem] font-extrabold uppercase tracking-wide text-ink-400 ring-1 ring-sand">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <label htmlFor={inputId} className="text-[1.02rem] font-extrabold text-ink-900">
+              {label}
+            </label>
+            {requirement === "required" ? (
+              <span className="rounded-full bg-chip-red-bg px-2.5 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-wide text-chip-red-fg">
+                Required
+              </span>
+            ) : (
+              <span className="rounded-full bg-chip-green-bg px-2.5 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-wide text-chip-green-fg">
                 Optional
               </span>
-            ) : null}
-          </label>
-          {hint ? <p className="mt-0.5 text-sm leading-snug text-ink-500">{hint}</p> : null}
+            )}
+          </div>
+          {hint ? <p className="mt-0.5 text-sm leading-snug text-slate-500">{hint}</p> : null}
         </div>
-
-        {filled ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">
-            <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
-            Added
-          </span>
-        ) : accent === "required" ? (
-          <span className="shrink-0 rounded-full bg-flame-100 px-2.5 py-1 text-[0.65rem] font-extrabold uppercase tracking-wide text-flame-700">
-            Required
-          </span>
-        ) : null}
       </div>
 
       <input
@@ -144,24 +128,24 @@ export function ImageUpload({
       />
 
       {filled ? (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-ink-100">
+        <div className="mt-3 overflow-hidden rounded-2xl ring-1 ring-ink-100">
           {/*
             Cropped to the top of the screenshot, where the restaurant and items
-            sit. "Change" reopens the picker; the admin always sees the full image.
+            sit. "Change" reopens the picker; the admin sees the full image.
           */}
           {/* Local object URL: the Next image optimiser does not apply. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={previewUrl ?? ""}
             alt={`Preview of your ${label.toLowerCase()}`}
-            className="h-40 w-full bg-ink-50 object-cover object-top"
+            className="h-36 w-full bg-ink-50 object-cover object-top"
           />
-          <div className="flex items-center justify-end gap-1.5 border-t border-ink-100 px-2 py-1.5">
+          <div className="flex items-center justify-end gap-1.5 bg-white px-2 py-1.5">
             {allowRemove ? (
               <button
                 type="button"
                 onClick={() => onChange(null)}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-bold text-ink-600 hover:bg-ink-100"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-bold text-slate-600 hover:bg-ink-100"
               >
                 <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
                 Remove
@@ -170,7 +154,7 @@ export function ImageUpload({
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-bold text-ink-600 hover:bg-ink-100"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-bold text-slate-600 hover:bg-ink-100"
             >
               <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
               Change
@@ -179,39 +163,43 @@ export function ImageUpload({
         </div>
       ) : (
         <div
+          className="mt-3"
           onDragOver={(event) => {
             event.preventDefault();
             setDragging(true);
           }}
           onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragging(false);
+            void accept(event.dataTransfer.files?.[0]);
+          }}
         >
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={processing}
             className={cn(
-              "flex min-h-32 w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed bg-white px-4 py-6 text-center transition-colors",
-              dragging
-                ? "border-flame-400 bg-flame-50"
-                : "border-sand hover:border-flame-300 hover:bg-flame-50/40",
+              "flex min-h-[9.5rem] w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed px-4 py-5 text-center transition-colors",
+              dragging ? "border-brand-500 bg-brand-50" : "border-ink-200 hover:border-brand-400 hover:bg-brand-50/40",
             )}
           >
             {processing ? (
               <>
-                <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-ink-400" />
-                <span className="text-sm font-bold text-ink-700">Preparing your image…</span>
+                <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-slate-400" />
+                <span className="text-sm font-bold text-ink-900">Preparing your image…</span>
               </>
             ) : (
               <>
-                <span aria-hidden="true" className="relative mb-1 inline-flex items-center">
-                  <FoodIcon name={emptyArt} className="h-9 w-9" />
-                  <span className="ml-2 flex h-8 w-8 items-center justify-center rounded-full bg-ink-900">
-                    <Camera className="h-4 w-4 text-brand-400" />
+                <span aria-hidden="true" className="relative mb-1 block h-16 w-20">
+                  <Art className="absolute inset-0 h-full w-full" />
+                  <span className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full bg-brand-400 shadow-sm">
+                    <Camera className="h-4.5 w-4.5 text-ink-900" strokeWidth={2.2} />
                   </span>
+                  <Sparks className="absolute -right-4 top-0 h-5 w-5" />
                 </span>
-                <span className="text-sm font-bold text-ink-900">Tap to upload</span>
-                <span className="text-xs text-ink-400">JPG, PNG or WEBP · up to 10 MB</span>
+                <span className="text-[0.95rem] font-extrabold text-ink-900">Tap to upload</span>
+                <span className="text-xs text-slate-400">JPG, PNG or WEBP · up to 10 MB</span>
               </>
             )}
           </button>
@@ -219,6 +207,6 @@ export function ImageUpload({
       )}
 
       <FieldError id={errorId} message={message} />
-    </div>
+    </section>
   );
 }

@@ -2,7 +2,8 @@
 
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/forms/ImageUpload";
-import { FoodStrip } from "@/components/customer/FoodArt";
+import { FoodSpread } from "@/components/customer/FoodArt";
+import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
 
 interface StepUploadProps {
   cartFile: File | null;
@@ -30,23 +31,44 @@ export function StepUpload({
 }: StepUploadProps) {
   return (
     <>
-      <FoodStrip className="mb-5 h-24" />
+      {/* Hero banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4">
+        <div className="relative z-10 max-w-[52%]">
+          <ScriptNote underline className="text-[1.35rem] text-ink-900">
+            Same Food
+            <br />
+            Lower Prices
+          </ScriptNote>
+          <p className="mt-2 text-[0.82rem] font-semibold leading-snug text-slate-600">
+            Upload. Compare.
+            <br />
+            Save more.
+          </p>
+        </div>
+        <FoodSpread className="absolute inset-y-0 right-0 w-[62%]" />
+        <ScriptBubble className="absolute right-3 top-2.5 z-10 text-[0.72rem]">
+          Good
+          <br />
+          Deals Ahead <span aria-hidden="true">&hearts;</span>
+        </ScriptBubble>
+      </div>
 
-      <h1 className="text-[1.75rem] font-extrabold leading-tight text-ink-900">
+      <h1 className="relative mt-4 inline-flex items-start text-[1.9rem] font-extrabold leading-tight text-ink-900">
         Upload your order
+        <Sparks className="ml-1 h-5 w-5 shrink-0" />
       </h1>
-      <p className="mt-2 text-[0.95rem] leading-relaxed text-ink-500">
+      <p className="mt-1.5 text-[0.95rem] leading-relaxed text-slate-600">
         Upload your cart screenshot. Adding the checkout screen helps us compare the final price
         more accurately.
       </p>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-4 space-y-3">
         <ImageUpload
           step={1}
           label="Order details"
           hint="Restaurant and selected items"
-          accent="required"
-          emptyArt="burger"
+          requirement="required"
+          art="cart"
           file={cartFile}
           onChange={onCartChange}
           error={error}
@@ -56,20 +78,20 @@ export function StepUpload({
           step={2}
           label="Final checkout total"
           hint="Helps us include fees, discounts and delivery charges."
-          optional
+          requirement="optional"
+          art="receipt"
           allowRemove
-          emptyArt="fries"
           file={checkoutFile}
           onChange={onCheckoutChange}
         />
       </div>
 
-      <div className="mt-auto pt-7">
-        <Button onClick={onContinue} disabled={!cartFile}>
+      <div className="mt-5">
+        <Button onClick={onContinue} disabled={!cartFile} arrow>
           Continue
         </Button>
         {!cartFile ? (
-          <p className="mt-2.5 text-center text-xs text-ink-400">
+          <p className="mt-2.5 text-center text-sm text-slate-500">
             Add your cart screenshot to continue.
           </p>
         ) : null}

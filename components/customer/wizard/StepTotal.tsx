@@ -21,14 +21,14 @@ export function StepTotal({
 }: StepTotalProps) {
   return (
     <>
-      <h1 className="text-[1.75rem] font-extrabold leading-tight text-ink-900">
+      <h1 className="text-[1.9rem] font-extrabold leading-tight text-ink-900">
         What&apos;s your final total?
       </h1>
-      <p className="mt-2 text-[0.95rem] leading-relaxed text-ink-500">
+      <p className="mt-1.5 text-[0.95rem] leading-relaxed text-slate-600">
         Open the checkout screen in your delivery app and enter the amount you would actually pay.
       </p>
 
-      <div className="mt-6 rounded-3xl bg-cream p-4 ring-1 ring-sand">
+      <div className="mt-5 rounded-3xl bg-linear-to-b from-brand-100 to-beige p-3.5">
         <AmountInput
           label="Total paid price"
           scale="lg"
@@ -47,8 +47,10 @@ export function StepTotal({
         </span>
       </p>
 
-      <div className="mt-auto pt-7">
-        <Button onClick={onContinue}>Continue</Button>
+      <div className="mt-5">
+        <Button onClick={onContinue} arrow>
+          Continue
+        </Button>
       </div>
     </>
   );

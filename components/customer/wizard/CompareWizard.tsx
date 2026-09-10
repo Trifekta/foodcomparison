@@ -250,6 +250,8 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           submitError={submitError}
           onSubmit={() => void handleSubmit()}
           onBack={() => goTo(STEP_CONTACT)}
+          onEditArea={() => goTo(STEP_LOCATION)}
+          onEditContact={() => goTo(STEP_CONTACT)}
         />
       ) : null}
     </WizardShell>
