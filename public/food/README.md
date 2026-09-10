@@ -1,35 +1,13 @@
-# Food imagery
+# FindFood UAE visual assets
 
-Drop the AI-generated food renders here as **transparent PNGs**, then the
-vector illustrations in `components/customer/FoodArt.tsx` get swapped out for
-them.
+These files were cropped from the ChatGPT-generated FindFood reference screens from this conversation.
 
-Transparency matters: every one of these sits on a coloured or gradient panel,
-so an image with a baked-in background will show as a visible rectangle.
+- spread.png — main food group for landing/upload hero
+- celebration.png — alternate food group for confirmation hero
+- bag-cluster.png — Keeta price-card cluster; its warm panel background is intentionally retained because the yellow bag edge blends into the panel
+- bowl.png — location-screen food bowl
+- burger.png — location promo burger
+- cart-doc.png — upload-state cart/order document icon
+- receipt.png — checkout receipt upload icon
 
-## Files needed
-
-| Filename | Used on | Contents |
-| --- | --- | --- |
-| `spread.png` | Landing hero, Upload hero | The group shot: fries, burger, pizza slice, grain bowl, wrap |
-| `celebration.png` | Confirmation | Fries, burger, bowl and the kraft paper bag |
-| `bag-cluster.png` | Review — price challenge card | Delivery bag with fries, drink and burger |
-| `bowl.png` | Location — heading vignette | Single grain bowl |
-| `burger.png` | Location — reassurance strip | Single burger |
-| `cart-doc.png` | Upload — slot 1 empty state | Order document with a food mark |
-| `receipt.png` | Upload — slot 2 empty state | Receipt marked AED |
-
-## Specs
-
-- **Format:** PNG with alpha. Trim the canvas to the artwork, no padding.
-- **Size:** roughly 3x the display size, so they stay sharp on phones.
-  - `spread.png`, `celebration.png`, `bag-cluster.png`: about 1200px wide
-  - `bowl.png`, `burger.png`, `cart-doc.png`, `receipt.png`: about 600px tall
-- **Weight:** keep each under ~250 KB. Run them through a PNG optimiser if
-  needed — they are bundled and served from the edge on every page load.
-
-## One thing to check before adding
-
-The delivery bag in the reference carries a competitor's logo. This app
-reproduces no third-party mark anywhere else, so `bag-cluster.png` should use a
-plain, unbranded bag. Same for any packaging in `celebration.png`.
+Use the supplied PNG assets directly. Do not redraw, vectorize, or substitute them. Reference screens are included in reference-screens/.
