@@ -1,4 +1,4 @@
--- FindFoodae (Trifekta) - initial schema
+-- FindFoodae - initial schema
 -- Phase 1: manual comparison. One submission per customer request, compared by
 -- an admin against Keeta, with a lightweight audit trail.
 

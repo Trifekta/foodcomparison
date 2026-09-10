@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Trifekta">
-  <rect width="64" height="64" rx="14" fill="#fbc51b"/>
-  <path d="M16 20h32v8H36v20h-8V28H16z" fill="#17171c"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="FindFoodae">
+  <rect width="64" height="64" rx="16" fill="#ffd84d"/>
+  <path d="M20 17h24v9H33v9h9v9H33v11h-9V17z" fill="#12121a"/>
+  <rect x="20" y="47" width="24" height="4" rx="2" fill="#12121a" opacity="0.35"/>
 </svg>

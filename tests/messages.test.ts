@@ -21,7 +21,7 @@ describe("buildResultMessage", () => {
     expect(result.message).toContain("AED 19.00");
     expect(result.message).toContain("That's about 23% less.");
     expect(result.message).toContain("Prices and promotions can change");
-    expect(result.message.trimEnd().endsWith("— Trifekta")).toBe(true);
+    expect(result.message.trimEnd().endsWith("— FindFoodae")).toBe(true);
   });
 
   it("never claims a guaranteed saving", () => {
@@ -106,7 +106,7 @@ describe("delivery links", () => {
   });
 
   it("titles the email according to the outcome", () => {
-    expect(buildResultSubject(true, "TRI-260910-0042")).toContain("could save");
-    expect(buildResultSubject(false, "TRI-260910-0042")).toContain("We checked");
+    expect(buildResultSubject(true, "FFA-260910-0042")).toContain("could save");
+    expect(buildResultSubject(false, "FFA-260910-0042")).toContain("We checked");
   });
 });

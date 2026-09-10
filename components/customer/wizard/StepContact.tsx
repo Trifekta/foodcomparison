@@ -42,15 +42,14 @@ export function StepContact({
 
   return (
     <>
-      <h1 className="text-2xl font-extrabold tracking-tight text-ink-900">
+      <h1 className="text-[1.75rem] font-extrabold leading-tight text-ink-900">
         Where should we send your result?
       </h1>
-      <p className="mt-2 text-base text-ink-600">We only need one way to reach you.</p>
+      <p className="mt-1.5 text-[0.95rem] text-ink-500">We only need one way to reach you.</p>
 
-      <div className="mt-6 space-y-6">
+      <div className="mt-5 space-y-6">
         <RadioCardGroup
           legend="Send my result by"
-          columns={2}
           options={[
             { value: "whatsapp", label: "WhatsApp" },
             { value: "email", label: "Email" },
@@ -61,12 +60,13 @@ export function StepContact({
 
         {contactType === "whatsapp" ? (
           <div>
-            <label htmlFor={phoneId} className="mb-2 block text-sm font-semibold text-ink-900">
+            <label htmlFor={phoneId} className="mb-2 block text-[0.95rem] font-bold text-ink-900">
               Mobile number
             </label>
             <div
               className={cn(
-                "flex items-stretch rounded-xl border bg-white",
+                "flex items-stretch overflow-hidden rounded-2xl border bg-white",
+                "focus-within:outline focus-within:outline-[3px] focus-within:outline-offset-2 focus-within:outline-ink-900",
                 errors.whatsappNumber ? "border-rose-400" : "border-ink-200",
               )}
             >
@@ -77,7 +77,7 @@ export function StepContact({
                 id={`${phoneId}-code`}
                 value={dialCode}
                 onChange={(event) => onDialCodeChange(event.target.value)}
-                className="min-h-13 rounded-l-xl border-r border-ink-200 bg-ink-50 px-3 text-base font-medium text-ink-800"
+                className="min-h-14 border-r border-ink-200 bg-ink-50 px-3 text-base font-bold text-ink-800"
               >
                 {DIAL_CODES.map((entry) => (
                   <option key={entry.code} value={entry.code}>
@@ -95,14 +95,14 @@ export function StepContact({
                 onChange={(event) => onWhatsappNumberChange(event.target.value)}
                 aria-describedby={errors.whatsappNumber ? `${phoneId}-error` : undefined}
                 aria-invalid={errors.whatsappNumber ? true : undefined}
-                className="min-h-13 w-full rounded-r-xl bg-transparent px-3 text-base text-ink-900 placeholder:text-ink-400"
+                className="min-h-14 w-full bg-transparent px-3.5 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400 focus:outline-none"
               />
             </div>
             <FieldError id={`${phoneId}-error`} message={errors.whatsappNumber} />
           </div>
         ) : (
           <div>
-            <label htmlFor={emailId} className="mb-2 block text-sm font-semibold text-ink-900">
+            <label htmlFor={emailId} className="mb-2 block text-[0.95rem] font-bold text-ink-900">
               Email address
             </label>
             <input
@@ -116,7 +116,7 @@ export function StepContact({
               aria-describedby={errors.email ? `${emailId}-error` : undefined}
               aria-invalid={errors.email ? true : undefined}
               className={cn(
-                "min-h-13 w-full rounded-xl border bg-white px-4 text-base text-ink-900 placeholder:text-ink-400",
+                "min-h-14 w-full rounded-2xl border bg-white px-4 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400",
                 errors.email ? "border-rose-400" : "border-ink-200",
               )}
             />
@@ -131,22 +131,22 @@ export function StepContact({
         */}
         <label
           htmlFor={consentId}
-          className="flex cursor-pointer items-start gap-3 rounded-xl border border-ink-200 bg-white p-4"
+          className="flex cursor-pointer items-start gap-3 rounded-2xl bg-ink-50 p-4"
         >
           <input
             id={consentId}
             type="checkbox"
             checked={marketingConsent}
             onChange={(event) => onMarketingConsentChange(event.target.checked)}
-            className="mt-0.5 h-5 w-5 shrink-0 rounded border-ink-300 accent-brand-500"
+            className="mt-0.5 h-5 w-5 shrink-0 rounded accent-ink-900"
           />
-          <span className="text-sm text-ink-700">
-            I&apos;d like to hear about future Trifekta offers.
+          <span className="text-sm text-ink-600">
+            I&apos;d like to hear about future FindFoodae offers.
           </span>
         </label>
       </div>
 
-      <div className="mt-auto pt-8">
+      <div className="mt-auto pt-7">
         <Button onClick={onContinue}>Continue</Button>
       </div>
     </>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandHeader } from "@/components/customer/BrandHeader";
 import { Disclaimer } from "@/components/customer/Disclaimer";
-import { SCREENSHOT_RETENTION_DAYS } from "@/lib/constants";
+import { BRAND_NAME, SCREENSHOT_RETENTION_DAYS } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Privacy",
@@ -25,7 +25,7 @@ export default function PrivacyPage() {
       <main className="flex-1 pb-10">
         <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-ink-900">Privacy</h1>
         <p className="mt-3 text-sm leading-relaxed text-ink-600">
-          Trifekta compares the basket you send us against another delivery app and sends you the
+          {BRAND_NAME} compares the basket you send us against another delivery app and sends you the
           result. This page explains, in plain language, what we hold and why.
         </p>
 
@@ -39,7 +39,7 @@ export default function PrivacyPage() {
             <li>your WhatsApp number or email address</li>
           </ul>
           <p>
-            We do not ask for your location, and you do not need an account to use Trifekta.
+            We do not ask for your location, and you do not need an account to use {BRAND_NAME}.
           </p>
         </Section>
 
@@ -66,7 +66,7 @@ export default function PrivacyPage() {
 
         <Section title="Who can see it">
           <p>
-            Screenshots are stored privately and are not publicly accessible. Only Trifekta staff
+            Screenshots are stored privately and are not publicly accessible. Only {BRAND_NAME} staff
             carrying out your comparison can open them, through short-lived links that expire.
           </p>
         </Section>
@@ -92,7 +92,7 @@ export default function PrivacyPage() {
 
         <p className="mt-10 text-sm">
           <Link href="/" className="font-semibold text-ink-800 underline underline-offset-2">
-            Back to Trifekta
+            Back to {BRAND_NAME}
           </Link>
         </p>
       </main>

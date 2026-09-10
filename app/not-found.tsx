@@ -10,9 +10,9 @@ export default function NotFound() {
         <p className="mt-2 text-base text-ink-600">That link doesn&apos;t lead anywhere.</p>
         <Link
           href="/"
-          className="mt-6 inline-flex min-h-13 items-center justify-center rounded-xl border border-brand-500/40 bg-brand-400 px-6 text-base font-semibold text-ink-900"
+          className="mt-6 inline-flex min-h-14 items-center justify-center rounded-full bg-brand-400 px-7 text-base font-bold text-ink-900"
         >
-          Back to Trifekta
+          Back home
         </Link>
       </main>
     </div>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { signOut } from "@/lib/admin/actions";
-import { BRAND_NAME } from "@/lib/constants";
+import { Wordmark } from "@/components/customer/Wordmark";
 
 const LINKS = [
   { href: "/admin", label: "Submissions" },
@@ -13,8 +13,9 @@ export function AdminNav({ displayName }: { displayName: string }) {
   return (
     <header className="border-b border-ink-200 bg-white">
       <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
-        <Link href="/admin" className="text-sm font-black tracking-[0.2em] text-ink-900">
-          {BRAND_NAME} <span className="font-semibold tracking-normal text-ink-400">Admin</span>
+        <Link href="/admin" className="flex items-baseline gap-2 rounded-lg">
+          <Wordmark size="sm" />
+          <span className="text-sm font-bold text-ink-400">Admin</span>
         </Link>
 
         <nav aria-label="Admin sections" className="flex items-center gap-1">

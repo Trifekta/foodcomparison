@@ -155,6 +155,7 @@ export default async function SubmissionDetailPage({
             comparisonApp={submission.comparison_app}
             sourceAppLabel={appLabel}
             currentTotal={submission.current_total}
+            areaName={submission.areas?.name ?? "Dubai"}
             initial={{
               comparisonTotal: submission.comparison_total ?? "",
               restaurantFound: submission.restaurant_found ?? "",

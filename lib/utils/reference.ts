@@ -1,14 +1,14 @@
 import { randomInt } from "node:crypto";
 
 /**
- * Customer-facing reference, e.g. TRI-260910-0042.
+ * Customer-facing reference, e.g. FFA-260910-0042.
  *
- * TRI + YYMMDD + a random 4-digit suffix. The suffix is random rather than a
+ * FFA (FindFoodae) + YYMMDD + a random 4-digit suffix. The suffix is random rather than a
  * running sequence so references cannot be walked; the UUID primary key remains
  * the real identifier and nothing is authorised by reference alone.
  */
-export const REFERENCE_PREFIX = "TRI";
-export const REFERENCE_PATTERN = /^TRI-\d{6}-\d{4}$/;
+export const REFERENCE_PREFIX = "FFA";
+export const REFERENCE_PATTERN = /^FFA-\d{6}-\d{4}$/;
 
 export function formatReferenceDate(date: Date): string {
   const yy = String(date.getUTCFullYear()).slice(-2);

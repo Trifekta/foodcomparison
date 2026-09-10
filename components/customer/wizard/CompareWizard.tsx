@@ -13,14 +13,14 @@ import {
   totalStepSchema,
 } from "@/lib/validation/submission";
 import { WizardShell } from "./WizardShell";
-import { StepCart } from "./StepCart";
+import { StepUpload } from "./StepUpload";
 import { StepLocation } from "./StepLocation";
 import { StepTotal } from "./StepTotal";
 import { StepContact } from "./StepContact";
 import { StepReview } from "./StepReview";
 import { WIZARD_DEFAULTS, type WizardFiles, type WizardValues } from "./types";
 
-const STEP_CART = 1;
+const STEP_UPLOAD = 1;
 const STEP_LOCATION = 2;
 const STEP_TOTAL = 3;
 const STEP_CONTACT = 4;
@@ -50,7 +50,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   // handing the React Compiler an unmemoizable function.
   const values = useWatch({ control, defaultValue: WIZARD_DEFAULTS }) as WizardValues;
 
-  const [step, setStep] = useState<number>(STEP_CART);
+  const [step, setStep] = useState<number>(STEP_UPLOAD);
   const [files, setFiles] = useState<WizardFiles>({ cart: null, checkout: null });
   const [cartError, setCartError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -84,7 +84,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
 
-  const handleCartContinue = () => {
+  const handleUploadContinue = () => {
     if (!files.cart) {
       setCartError(ERROR_MESSAGES.cartMissing);
       return;
@@ -116,7 +116,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
 
     if (!files.cart) {
       setCartError(ERROR_MESSAGES.cartMissing);
-      goTo(STEP_CART);
+      goTo(STEP_UPLOAD);
       return;
     }
 
@@ -172,17 +172,21 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     <WizardShell
       step={step}
       stepLabel={step === STEP_REVIEW ? "Review" : undefined}
-      onBack={step === STEP_CART ? null : () => goTo(step - 1)}
+      onBack={step === STEP_UPLOAD ? null : () => goTo(step - 1)}
     >
-      {step === STEP_CART ? (
-        <StepCart
-          file={files.cart}
-          onFileChange={(file) => {
+      {step === STEP_UPLOAD ? (
+        <StepUpload
+          cartFile={files.cart}
+          checkoutFile={files.checkout}
+          onCartChange={(file: File | null) => {
             setFiles((current) => ({ ...current, cart: file }));
             setCartError(null);
           }}
+          onCheckoutChange={(file: File | null) =>
+            setFiles((current) => ({ ...current, checkout: file }))
+          }
           error={cartError}
-          onContinue={handleCartContinue}
+          onContinue={handleUploadContinue}
         />
       ) : null}
 
@@ -209,8 +213,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           currentTotal={values.currentTotal}
           onCurrentTotalChange={(value) => setField("currentTotal", value)}
           totalError={errors.currentTotal?.message}
-          checkoutFile={files.checkout}
-          onCheckoutFileChange={(file) => setFiles((current) => ({ ...current, checkout: file }))}
+          hasCheckoutScreenshot={files.checkout !== null}
           onContinue={handleTotalContinue}
         />
       ) : null}

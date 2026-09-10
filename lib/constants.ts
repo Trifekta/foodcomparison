@@ -3,8 +3,15 @@
  * place rather than being scattered through UI components.
  */
 
-export const BRAND_NAME = "TRIFEKTA";
+/**
+ * The wordmark is "FindFoodae" set as FindFood + ae, where "ae" is the UAE
+ * country code rendered as "UAE". Keep the two halves separate so the lockup
+ * can be styled consistently wherever it appears.
+ */
+export const BRAND_NAME = "FindFoodae";
 export const PRODUCT_NAME = "FindFoodae";
+export const WORDMARK_PRIMARY = "FindFood";
+export const WORDMARK_SUFFIX = "UAE";
 
 /** Phase 1 launches in Dubai only. */
 export const LAUNCH_CITY = "Dubai";

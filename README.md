@@ -1,4 +1,4 @@
-# FindFoodae — by Trifekta
+# FindFoodae
 
 Before you order, check if you can save.
 
@@ -38,6 +38,7 @@ The MVP exists to answer four questions:
 - [How it is put together](#how-it-is-put-together)
 - [Security model](#security-model)
 - [Screenshot retention](#screenshot-retention)
+- [Design notes](#design-notes)
 - [What comes next](#what-comes-next)
 
 ---
@@ -54,11 +55,24 @@ The MVP exists to answer four questions:
 | Validation | Zod (shared between browser and server) |
 | Forms | React Hook Form |
 | Icons | Lucide React |
+| Type | Plus Jakarta Sans (self-hosted via `next/font`) |
 | Tests | Vitest |
 | Hosting | Vercel |
 
 Dependencies are kept lean on purpose. Email (Resend) is optional and the app
 works fully without it.
+
+### Brand
+
+The wordmark is **FindFoodae**, set as **FindFood** + **UAE** — the "ae" is the
+UAE country code — with a golden rule under "Food". It lives in one place,
+`components/customer/Wordmark.tsx`, and the strings come from
+`lib/constants.ts` (`BRAND_NAME`, `WORDMARK_PRIMARY`, `WORDMARK_SUFFIX`).
+
+Customer references are `FFA-YYMMDD-NNNN`. Palette and type are tokens in
+`app/globals.css`: golden yellow `--color-brand-400` for primary actions,
+near-black `--color-ink-900` for text and high-emphasis buttons, green for
+savings, white ground.
 
 ---
 
@@ -187,7 +201,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # Optional — leave blank and the dashboard falls back to "Copy email message"
 RESEND_API_KEY=
-EMAIL_FROM=Trifekta <results@yourdomain.com>
+EMAIL_FROM=FindFoodae <results@yourdomain.com>
 ```
 
 `.env.local` is git-ignored. Never commit real credentials.
@@ -285,12 +299,14 @@ non-admin sessions, and an admin cannot grant admin rights from inside the app.
 **Customer (do this on a phone):**
 
 1. Open the homepage, tap **Check my order**.
-2. Upload a cart screenshot → **Continue**.
+2. Upload a cart screenshot into slot 1; leave slot 2 (marked **Optional**)
+   empty → **Check my order**.
 3. Choose **Al Karama**, choose **Talabat** → **Continue**.
-4. Enter **82** and skip the optional checkout screenshot → **Continue**.
+4. Enter **82** → **Continue**. (The optional checkout screenshot lives on
+   screen 1, alongside the required cart screenshot.)
 5. Enter a WhatsApp number → **Continue**.
-6. Review, then **Submit for comparison**.
-7. You land on the success screen with a reference like `TRI-260910-0042`.
+6. Review, then **Get a Keeta price**.
+7. You land on the success screen with a reference like `FFA-260910-0042`.
 
 **Admin:**
 
@@ -329,6 +345,7 @@ app/
       areas/page.tsx
       analytics/page.tsx
 components/
+  customer/                    wordmark, disclaimer, success burst
   customer/wizard/             one step per file, plus the orchestrator
   admin/                       comparison panel, result panel, table, filters
   forms/                       image upload, area combobox, amount input
@@ -415,6 +432,32 @@ images will not break old submissions.
 
 ---
 
+## Design notes
+
+The customer screens follow the FindFoodae mockup: numbered upload slots with
+Uploaded / Optional state, a "Delivery area in Dubai" type-ahead, a review that
+ends in a golden "Can Keeta beat AED X?" panel, and a yellow celebration on the
+confirmation screen. The admin's verdict card is the same "Keeta beats the
+price" layout the customer's message describes — struck-through competitor
+price, large alternative price, green saving.
+
+Two things in that mockup are **Phase 2**, and this build does not fake them:
+
+- **Parsed order items.** The mockup shows the restaurant, each item and its
+  price read off the screenshot. That needs vision-model parsing, which Phase 1
+  explicitly excludes. Here the customer types the total, and the admin reads
+  the screenshot. The seam is `CartParserService`.
+- **An instant Keeta price.** The mockup's result screen implies a live Keeta
+  lookup. Phase 1 has no Keeta integration: an admin rebuilds the basket by hand
+  and the result reaches the customer by WhatsApp or email, not in-app. The seam
+  is `DeliveryComparisonProvider`.
+
+The checkout screenshot sits beside the cart screenshot on screen 1, as the
+mockup shows, but stays clearly marked **Optional** — it buys a more accurate
+comparison and never blocks a submission.
+
+---
+
 ## What comes next
 
 The seams are in place; none of them are wired to anything yet, and none of them
@@ -442,5 +485,5 @@ market outside Dubai.
 
 ---
 
-Trifekta is an independent comparison service and is not affiliated with Talabat,
-Keeta, Careem, Deliveroo or Noon Food.
+FindFoodae is an independent comparison service and is not affiliated with
+Talabat, Keeta, Careem, Deliveroo or Noon Food.

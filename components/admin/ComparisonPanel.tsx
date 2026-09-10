@@ -1,16 +1,13 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Calculator, CheckCircle2, Info } from "lucide-react";
+import { Calculator, CheckCircle2 } from "lucide-react";
 import { saveComparison } from "@/lib/admin/actions";
 import { Button } from "@/components/ui/Button";
 import { AmountInput } from "@/components/forms/AmountInput";
 import { calculateSaving } from "@/lib/calculations/saving";
-import {
-  MoneyParseError,
-  formatMinorAsCurrency,
-  parseAmountToMinor,
-} from "@/lib/calculations/money";
+import { MoneyParseError, parseAmountToMinor } from "@/lib/calculations/money";
+import { PriceVerdict } from "@/components/admin/PriceVerdict";
 import { comparisonTotalSchema } from "@/lib/validation/admin";
 
 interface ComparisonPanelProps {
@@ -18,6 +15,7 @@ interface ComparisonPanelProps {
   comparisonApp: string;
   sourceAppLabel: string;
   currentTotal: string;
+  areaName: string;
   initial: {
     comparisonTotal: string;
     restaurantFound: string;
@@ -38,6 +36,7 @@ export function ComparisonPanel({
   comparisonApp,
   sourceAppLabel,
   currentTotal,
+  areaName,
   initial,
 }: ComparisonPanelProps) {
   const [comparisonTotal, setComparisonTotal] = useState(initial.comparisonTotal);
@@ -145,48 +144,19 @@ export function ComparisonPanel({
       </div>
 
       {preview ? (
-        <div
-          className={`mt-5 rounded-2xl border p-4 ${
-            preview.saving.hasSaving
-              ? "border-emerald-300 bg-emerald-50"
-              : "border-ink-200 bg-ink-50"
-          }`}
-        >
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <dt className="text-ink-500">{sourceAppLabel}</dt>
-              <dd className="mt-0.5 text-base font-semibold tabular-nums text-ink-900">
-                {formatMinorAsCurrency(currentMinor)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-ink-500">{comparisonApp}</dt>
-              <dd className="mt-0.5 text-base font-semibold tabular-nums text-ink-900">
-                {formatMinorAsCurrency(preview.minor)}
-              </dd>
-            </div>
-          </dl>
-
-          <div className="mt-4 border-t border-ink-200/70 pt-3">
-            {preview.saving.hasSaving ? (
-              <>
-                <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">
-                  You found
-                </p>
-                <p className="mt-0.5 text-2xl font-extrabold tabular-nums text-emerald-800">
-                  {formatMinorAsCurrency(preview.saving.savingMinor)} saving
-                </p>
-                <p className="text-sm font-semibold text-emerald-700">
-                  {preview.saving.savingPercentage.toFixed(1)}%
-                </p>
-              </>
-            ) : (
-              <p className="flex items-start gap-2 text-sm font-semibold text-ink-700">
-                <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
-                No cheaper option found on {comparisonApp}.
-              </p>
-            )}
-          </div>
+        <div className="mt-5">
+          <PriceVerdict
+            sourceAppLabel={sourceAppLabel}
+            comparisonAppLabel={comparisonApp}
+            currentTotalMinor={currentMinor}
+            comparisonTotalMinor={preview.minor}
+            saving={preview.saving}
+            checks={[
+              restaurantFound.trim() || "Same restaurant",
+              "Same items",
+              locationNote.trim() || areaName,
+            ].filter(Boolean)}
+          />
         </div>
       ) : null}
 

@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "dark" | "secondary" | "ghost" | "danger";
 type Size = "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -15,18 +15,17 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANTS: Record<Variant, string> = {
-  primary:
-    "bg-brand-400 text-ink-900 hover:bg-brand-300 active:bg-brand-500 border border-brand-500/40 shadow-sm",
-  secondary:
-    "bg-white text-ink-800 hover:bg-ink-50 border border-ink-200",
-  ghost: "bg-transparent text-ink-700 hover:bg-ink-100 border border-transparent",
-  danger: "bg-rose-600 text-white hover:bg-rose-700 border border-rose-700",
+  primary: "bg-brand-400 text-ink-900 hover:bg-brand-300 active:bg-brand-500",
+  dark: "bg-ink-900 text-white hover:bg-ink-800 active:bg-black",
+  secondary: "bg-white text-ink-800 border border-ink-200 hover:bg-ink-50",
+  ghost: "bg-transparent text-ink-600 hover:bg-ink-100",
+  danger: "bg-rose-600 text-white hover:bg-rose-700",
 };
 
 const SIZES: Record<Size, string> = {
   // Comfortable thumb targets on a 360px phone.
-  md: "min-h-11 px-4 text-sm",
-  lg: "min-h-13 px-5 text-base",
+  md: "min-h-11 px-5 text-sm",
+  lg: "min-h-14 px-6 text-base",
 };
 
 export function Button({
@@ -46,8 +45,8 @@ export function Button({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        "inline-flex w-full items-center justify-center gap-2 rounded-xl font-semibold transition-colors",
-        "disabled:cursor-not-allowed disabled:opacity-55",
+        "inline-flex w-full items-center justify-center gap-2 rounded-full font-bold transition-colors",
+        "disabled:cursor-not-allowed disabled:opacity-45",
         VARIANTS[variant],
         SIZES[size],
         className,

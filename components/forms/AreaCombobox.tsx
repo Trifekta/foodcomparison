@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 import type { PublicArea } from "@/types/database";
 import { FieldError } from "@/components/ui/FieldError";
 import { cn } from "@/lib/utils/cn";
@@ -12,19 +12,21 @@ interface AreaComboboxProps {
   onChange: (areaId: string) => void;
   error?: string | null;
   label: string;
+  hint?: string;
 }
 
 /**
- * Searchable single-select for Dubai areas.
+ * Type-ahead for Dubai areas.
  *
- * Options come from the database, never from a hard-coded list in this file.
+ * Options come from the database, never a hard-coded list in this file.
  * Implemented as an ARIA combobox with keyboard support rather than a native
- * <select> so a customer can type "kar" and land on Al Karama in one tap.
+ * <select> so a customer can type "mar" and land on Dubai Marina in one tap.
  */
-export function AreaCombobox({ areas, value, onChange, error, label }: AreaComboboxProps) {
+export function AreaCombobox({ areas, value, onChange, error, label, hint }: AreaComboboxProps) {
   const inputId = useId();
   const listId = `${inputId}-list`;
   const errorId = `${inputId}-error`;
+  const hintId = `${inputId}-hint`;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +57,13 @@ export function AreaCombobox({ areas, value, onChange, error, label }: AreaCombo
     setQuery("");
     setOpen(false);
     inputRef.current?.blur();
+  };
+
+  const clear = () => {
+    onChange("");
+    setQuery("");
+    setOpen(true);
+    inputRef.current?.focus();
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -90,14 +99,14 @@ export function AreaCombobox({ areas, value, onChange, error, label }: AreaCombo
 
   return (
     <div ref={containerRef} className="relative">
-      <label htmlFor={inputId} className="mb-2 block text-sm font-semibold text-ink-900">
+      <label htmlFor={inputId} className="mb-2 block text-[0.95rem] font-bold text-ink-900">
         {label}
       </label>
 
       <div className="relative">
-        <Search
+        <MapPin
           aria-hidden="true"
-          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400"
+          className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-ink-500"
         />
         <input
           ref={inputRef}
@@ -108,10 +117,12 @@ export function AreaCombobox({ areas, value, onChange, error, label }: AreaCombo
           aria-expanded={open}
           aria-controls={listId}
           aria-autocomplete="list"
-          aria-activedescendant={open && filtered[activeIndex] ? `${listId}-${filtered[activeIndex].id}` : undefined}
-          aria-describedby={error ? errorId : undefined}
+          aria-activedescendant={
+            open && filtered[activeIndex] ? `${listId}-${filtered[activeIndex].id}` : undefined
+          }
+          aria-describedby={cn(hint ? hintId : "", error ? errorId : "").trim() || undefined}
           aria-invalid={error ? true : undefined}
-          placeholder={selected ? selected.name : "Search your area"}
+          placeholder="Start typing your area"
           value={open ? query : selected?.name ?? ""}
           onFocus={() => {
             setOpen(true);
@@ -124,14 +135,20 @@ export function AreaCombobox({ areas, value, onChange, error, label }: AreaCombo
           }}
           onKeyDown={onKeyDown}
           className={cn(
-            "min-h-13 w-full rounded-xl border bg-white pl-10 pr-10 text-base text-ink-900 placeholder:text-ink-400",
+            "min-h-14 w-full rounded-2xl border bg-white pl-11 pr-11 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400",
             error ? "border-rose-400" : "border-ink-200",
           )}
         />
-        <ChevronDown
-          aria-hidden="true"
-          className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400"
-        />
+        {selected && !open ? (
+          <button
+            type="button"
+            onClick={clear}
+            aria-label={`Clear ${selected.name}`}
+            className="absolute right-2.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+          >
+            <X aria-hidden="true" className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
 
       {open ? (
@@ -139,7 +156,7 @@ export function AreaCombobox({ areas, value, onChange, error, label }: AreaCombo
           id={listId}
           role="listbox"
           aria-label={label}
-          className="absolute z-20 mt-1.5 max-h-64 w-full overflow-y-auto overscroll-contain rounded-xl border border-ink-200 bg-white py-1 shadow-lg"
+          className="absolute z-20 mt-2 max-h-64 w-full overflow-hidden overflow-y-auto overscroll-contain rounded-2xl border border-ink-200 bg-white py-1.5 shadow-lg shadow-ink-900/10"
         >
           {filtered.length === 0 ? (
             <li className="px-4 py-3 text-sm text-ink-500">
@@ -157,19 +174,25 @@ export function AreaCombobox({ areas, value, onChange, error, label }: AreaCombo
                     onClick={() => commit(area)}
                     onMouseEnter={() => setActiveIndex(index)}
                     className={cn(
-                      "flex min-h-11 w-full items-center justify-between gap-2 px-4 text-left text-base",
-                      index === activeIndex ? "bg-brand-50" : "bg-white",
-                      isSelected ? "font-semibold text-ink-900" : "text-ink-700",
+                      "flex min-h-12 w-full items-center gap-3 px-4 text-left text-base",
+                      index === activeIndex ? "bg-ink-50" : "bg-white",
+                      isSelected ? "font-bold text-ink-900" : "font-medium text-ink-700",
                     )}
                   >
+                    <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-400" />
                     <span>{area.name}</span>
-                    {isSelected ? <Check aria-hidden="true" className="h-4 w-4 text-brand-700" /> : null}
                   </button>
                 </li>
               );
             })
           )}
         </ul>
+      ) : null}
+
+      {hint ? (
+        <p id={hintId} className="mt-2 text-xs text-ink-400">
+          {hint}
+        </p>
       ) : null}
 
       <FieldError id={errorId} message={error} />

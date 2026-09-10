@@ -6,9 +6,9 @@ import {
 } from "@/lib/utils/reference";
 
 describe("reference numbers", () => {
-  it("uses the TRI-YYMMDD-NNNN shape", () => {
+  it("uses the FFA-YYMMDD-NNNN shape", () => {
     const reference = generateReferenceNumber(new Date("2026-09-10T08:00:00Z"), () => 42);
-    expect(reference).toBe("TRI-260910-0042");
+    expect(reference).toBe("FFA-260910-0042");
     expect(isValidReferenceNumber(reference)).toBe(true);
   });
 
@@ -17,7 +17,7 @@ describe("reference numbers", () => {
   });
 
   it("rejects malformed references", () => {
-    for (const bad of ["TRI-2609-0042", "tri-260910-0042", "TRI-260910-42", "", "0042"]) {
+    for (const bad of ["FFA-2609-0042", "ffa-260910-0042", "FFA-260910-42", "", "0042"]) {
       expect(isValidReferenceNumber(bad)).toBe(false);
     }
   });

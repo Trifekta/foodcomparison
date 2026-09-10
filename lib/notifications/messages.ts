@@ -1,4 +1,4 @@
-import { COMPARISON_APP } from "@/lib/constants";
+import { BRAND_NAME, COMPARISON_APP } from "@/lib/constants";
 import { calculateSaving } from "@/lib/calculations/saving";
 import { formatMinorAsCurrency, parseAmountToMinor } from "@/lib/calculations/money";
 
@@ -53,7 +53,7 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
         "",
         "Prices and promotions can change, so please confirm the final amount in the delivery app before ordering.",
         "",
-        "— Trifekta",
+        `— ${BRAND_NAME}`,
       ].join("\n")
     : [
         "We checked your order, but we couldn't find a better price this time.",
@@ -68,7 +68,7 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
         "",
         "We'll keep working to help you catch the orders where switching actually makes sense.",
         "",
-        "— Trifekta",
+        `— ${BRAND_NAME}`,
       ].join("\n");
 
   return {

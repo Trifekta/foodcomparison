@@ -1,16 +1,18 @@
 import Link from "next/link";
-import { BRAND_NAME } from "@/lib/constants";
+import { Wordmark } from "@/components/customer/Wordmark";
 
 /** Wordmark only. There is no navigation menu in the customer experience. */
-export function BrandHeader({ href = "/" }: { href?: string }) {
+export function BrandHeader({
+  href = "/",
+  align = "center",
+}: {
+  href?: string;
+  align?: "center" | "left";
+}) {
   return (
-    <header className="flex items-center justify-center py-6">
-      <Link
-        href={href}
-        className="text-lg font-black tracking-[0.28em] text-ink-900"
-        aria-label={`${BRAND_NAME} home`}
-      >
-        {BRAND_NAME}
+    <header className={`flex py-6 ${align === "center" ? "justify-center" : "justify-start"}`}>
+      <Link href={href} className="rounded-lg">
+        <Wordmark size="md" />
       </Link>
     </header>
   );

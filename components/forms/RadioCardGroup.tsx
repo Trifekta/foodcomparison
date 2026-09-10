@@ -20,21 +20,21 @@ interface RadioCardGroupProps {
   columns?: 1 | 2;
 }
 
-/** Thumb-sized radio group rendered as cards, using real radio inputs. */
+/** Selectable chips backed by real radio inputs, sized for thumbs. */
 export function RadioCardGroup({
   legend,
   options,
   value,
   onChange,
   error,
-  columns = 1,
+  columns = 2,
 }: RadioCardGroupProps) {
   const name = useId();
   const errorId = `${name}-error`;
 
   return (
     <fieldset aria-describedby={error ? errorId : undefined} aria-invalid={error ? true : undefined}>
-      <legend className="mb-2 text-sm font-semibold text-ink-900">{legend}</legend>
+      <legend className="mb-2 text-[0.95rem] font-bold text-ink-900">{legend}</legend>
       <div className={cn("grid gap-2", columns === 2 ? "grid-cols-2" : "grid-cols-1")}>
         {options.map((option) => {
           const checked = option.value === value;
@@ -42,16 +42,23 @@ export function RadioCardGroup({
             <label
               key={option.value}
               className={cn(
-                "flex min-h-13 cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors",
+                "flex min-h-13 cursor-pointer items-center justify-between gap-2 rounded-2xl border px-4 py-3 transition-colors",
                 checked
-                  ? "border-brand-500 bg-brand-50 ring-1 ring-brand-500"
-                  : "border-ink-200 bg-white hover:border-ink-300",
+                  ? "border-ink-900 bg-ink-900 text-white"
+                  : "border-ink-200 bg-white text-ink-800 hover:border-ink-300",
               )}
             >
               <span>
-                <span className="block text-base font-medium text-ink-900">{option.label}</span>
+                <span className="block text-[0.95rem] font-bold">{option.label}</span>
                 {option.description ? (
-                  <span className="mt-0.5 block text-xs text-ink-500">{option.description}</span>
+                  <span
+                    className={cn(
+                      "mt-0.5 block text-xs",
+                      checked ? "text-white/70" : "text-ink-500",
+                    )}
+                  >
+                    {option.description}
+                  </span>
                 ) : null}
               </span>
               <input
@@ -62,15 +69,9 @@ export function RadioCardGroup({
                 onChange={() => onChange(option.value)}
                 className="sr-only"
               />
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
-                  checked ? "border-brand-600 bg-brand-500" : "border-ink-300 bg-white",
-                )}
-              >
-                {checked ? <Check className="h-3 w-3 text-ink-900" /> : null}
-              </span>
+              {checked ? (
+                <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-400" />
+              ) : null}
             </label>
           );
         })}
