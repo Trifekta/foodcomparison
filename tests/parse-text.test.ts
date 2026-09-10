@@ -153,6 +153,61 @@ describe("parseOcrText, edge cases", () => {
     expect(basket.items[0]?.line_total).toBe("");
   });
 
+  it("places a fee's lost decimal point when the arithmetic proves it", () => {
+    const { basket } = parseOcrText(
+      "Subtotal AED 35.00\nDelivery fee 5490\nTotal amount AED 39.90",
+    );
+    expect(basket.delivery_fee).toBe("4.90");
+  });
+
+  it("leaves the row off when nothing reconciles", () => {
+    // 35.00 with any reading of "5490" - 54.90 or 4.90 - misses 50.00. A fee
+    // nobody can place is worth less to the customer than a blank row, and far
+    // less than AED 5,490.
+    const { basket } = parseOcrText(
+      "Subtotal AED 35.00\nDelivery fee 5490\nTotal amount AED 50.00",
+    );
+    expect(basket.delivery_fee).toBe("");
+  });
+
+  it("leaves the rows off when two readings both reconcile", () => {
+    // Both fees came through as "500", and 35.00 reaches 40.00 whether it is
+    // the delivery that costs 5.00 or the service. Two answers means guessing,
+    // so neither is taken.
+    const { basket } = parseOcrText(
+      "Subtotal AED 35.00\nDelivery fee 500\nService fee 500\nTotal amount AED 40.00",
+    );
+    expect(basket.delivery_fee).toBe("");
+    expect(basket.service_fee).toBe("");
+  });
+
+  it("does not reconstruct a fee with no total to check it against", () => {
+    const { basket } = parseOcrText("Al Safadi\nBurger AED 30.00\nDelivery fee 5490");
+    expect(basket.delivery_fee).toBe("");
+  });
+
+  it("flags a figure it reconstructed, and leaves the ones it read alone", () => {
+    const { basket } = parseOcrText(
+      "Subtotal AED 35.00\nDelivery fee 5490\nTotal amount AED 39.90",
+    );
+    expect(basket.uncertain_fields).toContain("delivery_fee");
+    expect(basket.uncertain_fields).not.toContain("subtotal");
+  });
+
+  it("does not read an offer of free delivery as the delivery fee", () => {
+    // "Add AED 2.00 to get free delivery" has a fee word, a price and the word
+    // free. It is still an offer the customer has not taken.
+    const { basket } = parseOcrText(
+      "Subtotal AED 35.00\nAdd AED 2.00 to get free delivery\nDelivery fee AED 4.90\nTotal AED 39.90",
+    );
+    expect(basket.delivery_fee).toBe("4.90");
+  });
+
+  it("still reads a delivery that really is free", () => {
+    const { basket } = parseOcrText("Subtotal AED 35.00\nYour delivery is FREE\nTotal AED 35.00");
+    expect(basket.delivery_fee).toBe("0.00");
+  });
+
   it("uses the gaps between rows to tell items from their descriptions", () => {
     // Without blank lines there is nothing to separate a second item from the
     // first item's description, so this is the signal the parser leans on.

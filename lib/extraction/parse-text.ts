@@ -157,6 +157,23 @@ const PROMO = [
 const VAT_WORDS = ["vat", "tax", "ضريبة"];
 
 /**
+ * Banners that name a fee you are not being charged.
+ *
+ * "Add AED 2.00 to get free delivery" carries the word delivery, a price and
+ * the word free, so the fee rules read it as delivery costing nothing - on a
+ * screen that goes on to charge 4.90 for it. What separates it from "Your
+ * delivery is FREE", which really is the fee, is that it is conditional: it
+ * describes what you would have to do, not what you are paying.
+ */
+const OFFER_CONDITIONS = [
+  "to get free",
+  "to unlock",
+  "to maximize",
+  "to maximise",
+  "away from free",
+];
+
+/**
  * Above this, a single line item is worth a second look.
  *
  * Not a correction - the value is left exactly as read. It is a flag, because
@@ -322,65 +339,79 @@ function financialKey(lower: string): FinancialKey | null {
 }
 
 /**
- * Undoes a currency glyph that OCR merged into the number.
+ * Undoes what OCR did to the numbers, using the receipt's own arithmetic.
  *
- * The AED mark renders as a shape Tesseract has no letter for, so reading in
- * English it becomes a digit stuck to the front: "36.00" comes back as "836.00",
- * "1.80" as "51.80". Silently showing a customer a 836 dirham subtotal is far
- * worse than showing nothing.
+ * Two things go wrong in a payment summary, and they go wrong together. The AED
+ * mark renders as a shape Tesseract has no letter for, so read in English it
+ * becomes a digit stuck to the front: "36.00" comes back as "836.00". And in
+ * the thin right-hand column the decimal point is simply lost: "4.90" comes
+ * back as "490", or "5490" once the glyph is counted too.
  *
- * The fix is only applied when it can be PROVEN, not guessed. A receipt states
- * its own arithmetic - components add up to the total - so every combination of
- * "drop the leading digit" is tried and one is accepted only if it makes the
- * sum reconcile and no other combination does. If nothing reconciles, or the
- * answer is ambiguous, everything is left exactly as it was read.
+ * Neither is fixed by guessing. A receipt states its own arithmetic - the parts
+ * add up to the total - so every reading of every field is tried against it,
+ * and one is accepted only if it reconciles and no other reading does. Where
+ * nothing reconciles, or two answers do, everything is left exactly as read and
+ * a fee nobody could place stays off the screen rather than becoming AED 5,490.
  *
  * Returns the paths it changed, so they can be flagged for a human to check.
  */
-function repairMergedCurrency(basket: StructuredBasket): string[] {
+function repairMergedCurrency(
+  basket: StructuredBasket,
+  lostDecimals: Partial<Record<MoneyField, string>>,
+): string[] {
   const total = Number(basket.final_total);
   if (!Number.isFinite(total) || total <= 0) return [];
 
-  const fields = ["subtotal", "delivery_fee", "service_fee", "discount"] as const;
-  type MoneyField = (typeof fields)[number];
-  const present = fields.filter((field) => basket[field] !== "");
-  if (present.length === 0) return [];
+  const asRead = Object.fromEntries(
+    MONEY_FIELDS.map((field) => [field, basket[field]]),
+  ) as Record<MoneyField, string>;
 
-  const sum = (values: Record<string, number>) =>
-    (values.subtotal ?? 0) + (values.delivery_fee ?? 0) + (values.service_fee ?? 0) -
-    (values.discount ?? 0);
+  // Nothing was read and nothing was set aside: there is nothing to reconcile.
+  const anything = MONEY_FIELDS.some(
+    (field) => asRead[field] !== "" || lostDecimals[field] !== undefined,
+  );
+  if (!anything) return [];
 
-  const asRead: Record<string, number> = {};
-  for (const field of present) asRead[field] = Number(basket[field]);
+  const value = (money: string) => (money === "" ? 0 : Number(money));
+  const sum = (values: Record<MoneyField, string>) =>
+    value(values.subtotal) + value(values.delivery_fee) + value(values.service_fee) -
+    value(values.discount);
+
   // Already consistent: nothing to repair, and nothing to risk.
   if (Math.abs(sum(asRead) - total) < 0.02) return [];
 
-  const reconciling: Array<{ values: Record<string, number>; changed: MoneyField[] }> = [];
+  const readings = MONEY_FIELDS.map((field) => readingsOf(asRead[field], lostDecimals[field]));
+  const reconciling: Array<{ values: Record<MoneyField, string>; changed: MoneyField[] }> = [];
+  // Two paths can land on the same set of figures - one field left absent reads
+  // the same as that field read as zero. Counting it twice would make a single
+  // answer look like an ambiguous one.
+  const seen = new Set<string>();
 
-  for (let mask = 1; mask < 1 << present.length; mask += 1) {
-    const values = { ...asRead };
-    const changed: MoneyField[] = [];
-    let viable = true;
+  const walk = (index: number, values: Record<MoneyField, string>) => {
+    if (index === MONEY_FIELDS.length) {
+      const signature = MONEY_FIELDS.map((field) => value(values[field]).toFixed(2)).join("|");
+      if (seen.has(signature)) return;
+      seen.add(signature);
 
-    present.forEach((field, index) => {
-      if (!(mask & (1 << index))) return;
-      const stripped = stripLeadingDigit(basket[field]);
-      if (stripped === null) {
-        viable = false;
-        return;
-      }
-      values[field] = Number(stripped);
-      changed.push(field);
-    });
+      if (Math.abs(sum(values) - total) >= 0.02) return;
+      const changed = MONEY_FIELDS.filter(
+        (field) => value(values[field]) !== value(asRead[field]),
+      );
+      if (changed.length > 0) reconciling.push({ values: { ...values }, changed });
+      return;
+    }
 
-    if (viable && Math.abs(sum(values) - total) < 0.02) reconciling.push({ values, changed });
-  }
+    for (const option of readings[index]) {
+      walk(index + 1, { ...values, [MONEY_FIELDS[index]]: option });
+    }
+  };
+  walk(0, { ...asRead });
 
   // Exactly one answer, or none. Two would mean guessing.
   if (reconciling.length !== 1) return [];
 
   const [{ values, changed }] = reconciling;
-  for (const field of changed) basket[field] = values[field].toFixed(2);
+  for (const field of changed) basket[field] = value(values[field]).toFixed(2);
   return changed;
 }
 
@@ -403,6 +434,47 @@ function stripLeadingDigit(value: string): string | null {
   return match ? match[1] : null;
 }
 
+/**
+ * The run of digits at the end of a fee line whose decimal point is gone.
+ *
+ * A payment summary prints its fees in a thin right-hand column, and the point
+ * is the first thing to be lost there: "Delivery fee 4.90" comes back as
+ * "5490", the glyph read as a 5 and the point missing entirely. Nothing on the
+ * line can say where the point belongs, so this only collects the digits -
+ * placing them is left to arithmetic.
+ */
+function bareDigitRun(line: string): string | null {
+  const match = line.match(/(\d{3,6})\s*$/);
+  return match ? match[1] : null;
+}
+
+/** "490" -> "4.90". Null when the run is too short to place a point in. */
+function withLostDecimal(digits: string | null): string | null {
+  if (digits === null || !/^\d{3,6}$/.test(digits)) return null;
+  return (Number(digits) / 100).toFixed(2);
+}
+
+/**
+ * Every reading of one field worth trying, most trusted first.
+ *
+ * A field read cleanly offers itself, and itself without its leading digit if
+ * it has one to spare. A field that arrived as a run of digits offers the two
+ * places its point could go back - and offers to stay absent, because digits
+ * nobody can place are worth less than a blank row.
+ */
+function readingsOf(read: string, lost: string | undefined): string[] {
+  if (read !== "") {
+    const stripped = stripLeadingDigit(read);
+    return stripped === null ? [read] : [read, stripped];
+  }
+
+  const placed = [withLostDecimal(lost ?? null), withLostDecimal(stripLeadingDigit(lost ?? ""))];
+  return ["", ...placed.filter((option): option is string => option !== null)];
+}
+
+const MONEY_FIELDS = ["subtotal", "delivery_fee", "service_fee", "discount"] as const;
+type MoneyField = (typeof MONEY_FIELDS)[number];
+
 export interface ParseResult {
   basket: StructuredBasket;
   /** True when nothing recognisable came out, so the caller can stay quiet. */
@@ -412,6 +484,8 @@ export interface ParseResult {
 export function parseOcrText(raw: string): ParseResult {
   const basket = emptyBasket();
   const uncertain = new Set<string>();
+  /** Fee amounts that arrived as digits with no point, held until proven. */
+  const lostDecimals: Partial<Record<MoneyField, string>> = {};
 
   // Blank lines are KEPT. They are the only signal separating an item from its
   // own description: a delivery app prints the name, the contents, the price as
@@ -472,6 +546,13 @@ export function parseOcrText(raw: string): ParseResult {
     const priced = extractPrice(line);
     const isFree = /\bfree\b|مجان/.test(lower) && key !== "final_total";
 
+    // An offer, not a fee. Checked before the fee rules because it satisfies
+    // every one of them: a fee word, a price, and the word free.
+    if (matches(lower, OFFER_CONDITIONS)) {
+      flush();
+      continue;
+    }
+
     // ---- fees, subtotal, total --------------------------------------------
     // Checked before the banner filter: "Congrats! Your delivery is FREE" is
     // both a marketing banner and the delivery fee, and the fee has to win.
@@ -483,6 +564,20 @@ export function parseOcrText(raw: string): ParseResult {
       const value = isFree ? "0.00" : (priced as { price: string }).price;
       if (key === "final_total" || basket[key] === "") basket[key] = value;
       continue;
+    }
+
+    // ---- a fee whose decimal point did not survive ------------------------
+    // "Delivery fee 5490" is 4.90 read through the currency glyph, but nothing
+    // on the line says so. The digits are set aside and shown only if the
+    // receipt's own arithmetic later picks them out; otherwise the row simply
+    // does not appear, which is better than charging the customer 5,490.
+    if (key && key !== "final_total" && !priced && !isFree && basket[key] === "") {
+      const digits = bareDigitRun(line);
+      if (digits !== null && lostDecimals[key] === undefined) {
+        flush();
+        lostDecimals[key] = digits;
+        continue;
+      }
     }
 
     // Marketing banners carry money and read like items. Never food.
@@ -576,7 +671,7 @@ export function parseOcrText(raw: string): ParseResult {
   flush();
 
   basket.items = items;
-  for (const field of repairMergedCurrency(basket)) uncertain.add(field);
+  for (const field of repairMergedCurrency(basket, lostDecimals)) uncertain.add(field);
 
   // Flag what there is evidence against, not everything. Marking every price
   // uncertain is the same as marking none: the customer stops looking.

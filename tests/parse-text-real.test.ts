@@ -341,12 +341,28 @@ describe("Mandarin Oak payment screen, upsell heading scrolled away", () => {
     expect(names).not.toContain("straw");
   });
 
-  it("reads the totals it can, and does not invent the ones it cannot", () => {
+  it("reads the totals", () => {
     expect(basket.subtotal).toBe("35.00");
     expect(basket.final_total).toBe("34.65");
-    // "-8700", "5490" and "B175" lost their decimal points entirely. Nothing
-    // reconciles, so they stay empty rather than becoming 8700 and 5490.
-    expect(basket.delivery_fee).not.toBe("5490.00");
-    expect(basket.service_fee).not.toBe("175.00");
+  });
+
+  it("puts back the decimal points OCR dropped from the fee column", () => {
+    // The three fee lines came through as "-8700", "5490" and "B175": the
+    // currency glyph read as a digit and the point gone. The receipt's own
+    // arithmetic is what places them - 35.00 - 7.00 + 4.90 + 1.75 is 34.65,
+    // and no other reading of those digits reaches the stated total.
+    expect(basket.discount).toBe("7.00");
+    expect(basket.delivery_fee).toBe("4.90");
+    expect(basket.service_fee).toBe("1.75");
+  });
+
+  it("flags the figures it had to reconstruct", () => {
+    expect(basket.uncertain_fields).toEqual(
+      expect.arrayContaining(["discount", "delivery_fee", "service_fee"]),
+    );
+    // The two it read outright are not flagged: marking everything is the same
+    // as marking nothing.
+    expect(basket.uncertain_fields).not.toContain("subtotal");
+    expect(basket.uncertain_fields).not.toContain("final_total");
   });
 });
