@@ -1,0 +1,100 @@
+/**
+ * Hand-maintained database types. Regenerate with the Supabase CLI once the
+ * project is linked:
+ *   supabase gen types typescript --linked > types/database.ts
+ */
+
+export type SubmissionStatus =
+  | "new"
+  | "reviewing"
+  | "comparison_found"
+  | "no_saving"
+  | "result_ready"
+  | "result_sent"
+  | "cancelled";
+
+export type ContactType = "whatsapp" | "email";
+
+export type SubmissionEventType =
+  | "submission_created"
+  | "review_started"
+  | "comparison_added"
+  | "status_changed"
+  | "result_generated"
+  | "result_sent";
+
+export type AdminRole = "admin" | "reviewer" | "manager";
+
+export interface AreaRow {
+  id: string;
+  name: string;
+  city: string;
+  emirate: string;
+  active: boolean;
+  sort_order: number;
+  /** Internal only — never expose these to customers. */
+  test_location_label: string | null;
+  test_latitude: number | null;
+  test_longitude: number | null;
+  admin_location_notes: string | null;
+  created_at: string;
+}
+
+/** The subset of an area that is safe to send to a customer's browser. */
+export interface PublicArea {
+  id: string;
+  name: string;
+}
+
+export interface SubmissionRow {
+  id: string;
+  reference_number: string;
+  created_at: string;
+  updated_at: string;
+  status: SubmissionStatus;
+  source_app: string;
+  source_app_other: string | null;
+  area_id: string | null;
+  current_total: string;
+  comparison_app: string;
+  comparison_total: string | null;
+  saving_amount: string | null;
+  saving_percentage: string | null;
+  cart_image_path: string;
+  checkout_image_path: string | null;
+  contact_type: ContactType;
+  whatsapp_number: string | null;
+  email: string | null;
+  marketing_consent: boolean;
+  admin_notes: string | null;
+  restaurant_found: string | null;
+  comparison_location_note: string | null;
+  result_message: string | null;
+  result_sent_at: string | null;
+  review_started_at: string | null;
+  completed_at: string | null;
+  customer_latitude: number | null;
+  customer_longitude: number | null;
+}
+
+export interface SubmissionWithArea extends SubmissionRow {
+  areas: { id: string; name: string; test_location_label: string | null; admin_location_notes: string | null } | null;
+}
+
+export interface SubmissionEventRow {
+  id: string;
+  submission_id: string;
+  event_type: SubmissionEventType;
+  previous_status: SubmissionStatus | null;
+  new_status: SubmissionStatus | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  created_by: string | null;
+}
+
+export interface AdminProfileRow {
+  id: string;
+  display_name: string | null;
+  role: AdminRole;
+  created_at: string;
+}
