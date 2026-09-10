@@ -115,10 +115,12 @@ describe("parseOcrText, edge cases", () => {
     expect(basket.items[0]?.line_total).toBe("32.50");
   });
 
-  it("treats a bare number with no currency marker as a quantity, not a price", () => {
-    // "Coke 2" is a quantity beside a name, not a two-dirham drink.
+  it("never prices an item from a bare number with no currency marker", () => {
+    // "Coke 2" is a quantity beside a name, not a two-dirham drink. The item is
+    // still worth listing - it just arrives without a price for the customer to
+    // fill in or ignore.
     const { basket } = parseOcrText("Al Safadi\nCoke 2");
-    expect(basket.items).toHaveLength(0);
+    expect(basket.items[0]?.line_total).toBe("");
   });
 
   it("ignores app chrome at the top of the screenshot", () => {
@@ -138,10 +140,22 @@ describe("parseOcrText, edge cases", () => {
     expect(basket.items[0]?.modifiers.length).toBeLessThanOrEqual(6);
   });
 
-  it("survives a screenshot with no prices at all", () => {
+  it("still finds the restaurant and an item when no price survives OCR", () => {
     const { basket, empty } = parseOcrText("Al Safadi\nChicken Shawarma\nHummus");
     expect(empty).toBe(false);
     expect(basket.restaurant_name).toBe("Al Safadi");
-    expect(basket.items).toHaveLength(0);
+    expect(basket.items[0]?.name).toBe("Chicken Shawarma");
+    expect(basket.items[0]?.line_total).toBe("");
+  });
+
+  it("uses the gaps between rows to tell items from their descriptions", () => {
+    // Without blank lines there is nothing to separate a second item from the
+    // first item's description, so this is the signal the parser leans on.
+    const { basket } = parseOcrText(
+      "Al Safadi\n\nBurger AED 30.00\nNo onions\n\nFries AED 12.00",
+    );
+    expect(basket.items).toHaveLength(2);
+    expect(basket.items[0]?.modifiers).toEqual(["No onions"]);
+    expect(basket.items[1]?.name).toBe("Fries");
   });
 });
