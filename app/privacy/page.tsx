@@ -9,6 +9,12 @@ export const metadata: Metadata = {
   title: "Privacy",
 };
 
+// Rendered per request, not prerendered. The screenshot-reading disclosure below
+// depends on whether an API key is present, and that key is a runtime secret -
+// at build time it does not exist, so a prerendered page would permanently claim
+// we do not read screenshots while the deployed app quietly does.
+export const dynamic = "force-dynamic";
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-8">

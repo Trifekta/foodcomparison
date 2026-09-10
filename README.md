@@ -534,9 +534,37 @@ The image leaves our infrastructure at this point, which `/privacy` discloses -
 and discloses only when a key is actually configured, so the page always matches
 what the deployment does. Read that section before changing what is sent.
 
-Costs run to roughly a cent or two per screenshot on the default model. Set
+### Measuring it on your own screenshots
+
+Accuracy on real Talabat and Careem carts is the thing worth knowing before you
+trust this, and it is not something the test suite can tell you. Collect a
+folder of real screenshots and run them through the live endpoint:
+
+```bash
+npm run dev                                  # one terminal
+npm run extract:try -- shots/*.png           # another
+```
+
+It prints what came back for each image. Nothing is written to the database,
+and it posts to the running app rather than importing the extractor, so what
+you see is exactly what a customer's browser would receive.
+
+Point it at a deployed environment with `EXTRACT_URL`:
+
+```bash
+EXTRACT_URL=https://your-domain npm run extract:try -- shots/*.png
+```
+
+Judge it on the right question. A perfect read is not the bar - the customer
+corrects it either way. The bar is whether correcting it is less work than
+typing the basket from scratch.
+
+### Cost and model
+
+Roughly a cent or two per screenshot on the default `claude-opus-5`. Set
 `EXTRACTION_MODEL=claude-sonnet-5` or `claude-haiku-4-5` to trade accuracy for
-cost once you have measured both against your own screenshots.
+cost - but measure both with `extract:try` on your own screenshots first, rather
+than assuming the cheaper one is good enough or that the dearer one is needed.
 
 ---
 
