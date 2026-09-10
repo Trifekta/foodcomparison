@@ -38,18 +38,20 @@ export function StepLocation({
       <h1 className="text-[1.75rem] font-extrabold leading-tight text-ink-900">
         Where are you ordering?
       </h1>
-      <p className="mt-1.5 text-[0.95rem] text-ink-500">
-        The same food can cost more or less depending on the delivery location.
+      <p className="mt-2 text-[0.95rem] leading-relaxed text-ink-500">
+        The same food can cost more or less depending on where it is delivered.
       </p>
 
-      <div className="mt-5 space-y-6">
-        <AreaCombobox
-          label="Delivery area in Dubai"
-          areas={areas}
-          value={areaId}
-          onChange={onAreaChange}
-          error={errors.areaId}
-        />
+      <div className="mt-5 space-y-5">
+        <div className="rounded-3xl bg-cream p-4 ring-1 ring-sand">
+          <AreaCombobox
+            label="Delivery area in Dubai"
+            areas={areas}
+            value={areaId}
+            onChange={onAreaChange}
+            error={errors.areaId}
+          />
+        </div>
 
         <RadioCardGroup
           legend="Which app are you ordering from?"

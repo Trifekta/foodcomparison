@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ImagePlus, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Camera, CheckCircle2, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/constants";
 import { validateImageClientSide } from "@/lib/validation/submission";
 import { downscaleImage } from "@/lib/utils/image-client";
 import { FieldError } from "@/components/ui/FieldError";
+import { FoodIcon, type FoodName } from "@/components/customer/FoodArt";
 import { cn } from "@/lib/utils/cn";
 
 interface ImageUploadProps {
@@ -18,13 +19,19 @@ interface ImageUploadProps {
   error?: string | null;
   optional?: boolean;
   allowRemove?: boolean;
+  /** "required" marks the slot the customer cannot skip. */
+  accent?: "required" | "optional";
+  /** Decorative food mark shown in the empty state. */
+  emptyArt?: FoodName;
 }
 
 /**
  * One numbered upload slot.
  *
- * Shows its own state - Optional, Uploaded, or waiting - so a customer can see
- * at a glance what is still needed and what is genuinely their choice.
+ * Each slot carries its own state - Required, Optional, or Added - so a
+ * customer can see at a glance what is still needed and what is genuinely
+ * their choice. The preview shows their real screenshot; food art appears only
+ * in the empty state, where it cannot be mistaken for something we detected.
  */
 export function ImageUpload({
   step,
@@ -35,6 +42,8 @@ export function ImageUpload({
   error,
   optional = false,
   allowRemove = false,
+  accent,
+  emptyArt = "burger",
 }: ImageUploadProps) {
   const inputId = useId();
   const errorId = `${inputId}-error`;
@@ -75,34 +84,46 @@ export function ImageUpload({
   };
 
   const message = error ?? localError;
+  const filled = Boolean(file && previewUrl);
 
   return (
-    <div className="rounded-3xl bg-ink-50 p-3.5">
+    <div
+      className={cn(
+        "rounded-3xl p-3.5 transition-colors",
+        filled ? "bg-emerald-50/70 ring-1 ring-emerald-200" : "bg-beige/70",
+      )}
+    >
       <div className="flex items-start gap-3 px-1 pb-3 pt-1">
-        {step ? (
-          <span
-            aria-hidden="true"
-            className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-extrabold text-ink-900 ring-1 ring-ink-200"
-          >
-            {step}
-          </span>
-        ) : null}
+        <span
+          aria-hidden="true"
+          className={cn(
+            "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold",
+            filled ? "bg-emerald-600 text-white" : "bg-white text-ink-900 ring-1 ring-sand",
+          )}
+        >
+          {step}
+        </span>
 
         <div className="min-w-0 flex-1">
           <label htmlFor={inputId} className="block text-[0.95rem] font-bold text-ink-900">
             {label}
+            {optional ? (
+              <span className="ml-2 whitespace-nowrap rounded-full bg-white px-2 py-0.5 align-middle text-[0.6rem] font-extrabold uppercase tracking-wide text-ink-400 ring-1 ring-sand">
+                Optional
+              </span>
+            ) : null}
           </label>
-          {hint ? <p className="mt-0.5 text-sm text-ink-500">{hint}</p> : null}
+          {hint ? <p className="mt-0.5 text-sm leading-snug text-ink-500">{hint}</p> : null}
         </div>
 
-        {file ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+        {filled ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">
             <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
-            Uploaded
+            Added
           </span>
-        ) : optional ? (
-          <span className="shrink-0 rounded-full bg-ink-200/80 px-2.5 py-1 text-[0.65rem] font-extrabold uppercase tracking-wide text-ink-500">
-            Optional
+        ) : accent === "required" ? (
+          <span className="shrink-0 rounded-full bg-flame-100 px-2.5 py-1 text-[0.65rem] font-extrabold uppercase tracking-wide text-flame-700">
+            Required
           </span>
         ) : null}
       </div>
@@ -122,41 +143,38 @@ export function ImageUpload({
         }}
       />
 
-      {previewUrl && file ? (
-        <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white">
+      {filled ? (
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-ink-100">
           {/*
-            Cropped to the top of the screenshot, which is where the restaurant
-            and items sit. Tapping "Change" is the way to review it in full, and
-            the admin always sees the whole image.
+            Cropped to the top of the screenshot, where the restaurant and items
+            sit. "Change" reopens the picker; the admin always sees the full image.
           */}
           {/* Local object URL: the Next image optimiser does not apply. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={previewUrl}
+            src={previewUrl ?? ""}
             alt={`Preview of your ${label.toLowerCase()}`}
             className="h-40 w-full bg-ink-50 object-cover object-top"
           />
-          <div className="flex items-center justify-end gap-2 border-t border-ink-100 px-2 py-1.5">
-            <div className="flex gap-1.5">
-              {allowRemove ? (
-                <button
-                  type="button"
-                  onClick={() => onChange(null)}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-bold text-ink-600 hover:bg-ink-100"
-                >
-                  <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
-                  Remove
-                </button>
-              ) : null}
+          <div className="flex items-center justify-end gap-1.5 border-t border-ink-100 px-2 py-1.5">
+            {allowRemove ? (
               <button
                 type="button"
-                onClick={() => inputRef.current?.click()}
+                onClick={() => onChange(null)}
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-bold text-ink-600 hover:bg-ink-100"
               >
-                <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
-                Change
+                <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+                Remove
               </button>
-            </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-bold text-ink-600 hover:bg-ink-100"
+            >
+              <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
+              Change
+            </button>
           </div>
         </div>
       ) : (
@@ -173,8 +191,10 @@ export function ImageUpload({
             onClick={() => inputRef.current?.click()}
             disabled={processing}
             className={cn(
-              "flex min-h-36 w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed bg-white px-4 py-7 text-center transition-colors",
-              dragging ? "border-brand-500 bg-brand-50" : "border-ink-200 hover:border-brand-400",
+              "flex min-h-32 w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed bg-white px-4 py-6 text-center transition-colors",
+              dragging
+                ? "border-flame-400 bg-flame-50"
+                : "border-sand hover:border-flame-300 hover:bg-flame-50/40",
             )}
           >
             {processing ? (
@@ -184,11 +204,11 @@ export function ImageUpload({
               </>
             ) : (
               <>
-                <span
-                  aria-hidden="true"
-                  className="mb-0.5 flex h-11 w-11 items-center justify-center rounded-full bg-brand-100"
-                >
-                  <ImagePlus className="h-5 w-5 text-brand-700" />
+                <span aria-hidden="true" className="relative mb-1 inline-flex items-center">
+                  <FoodIcon name={emptyArt} className="h-9 w-9" />
+                  <span className="ml-2 flex h-8 w-8 items-center justify-center rounded-full bg-ink-900">
+                    <Camera className="h-4 w-4 text-brand-400" />
+                  </span>
                 </span>
                 <span className="text-sm font-bold text-ink-900">Tap to upload</span>
                 <span className="text-xs text-ink-400">JPG, PNG or WEBP · up to 10 MB</span>

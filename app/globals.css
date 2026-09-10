@@ -30,6 +30,21 @@
   --color-ink-800: #22222a;
   --color-ink-900: #12121a;
 
+  /* Warm accent, used for food moments and the price-challenge card. */
+  --color-flame-50:  #fff5ed;
+  --color-flame-100: #ffe8d7;
+  --color-flame-200: #ffcda9;
+  --color-flame-300: #ffab74;
+  --color-flame-400: #ff8a3d;
+  --color-flame-500: #f56d18;
+  --color-flame-600: #d4530a;
+  --color-flame-700: #a63f08;
+
+  /* Soft neutral grounds so cards can sit on something other than flat white. */
+  --color-cream: #fffaf1;
+  --color-beige: #f7efe2;
+  --color-sand:  #efe3d0;
+
   --color-canvas: #ffffff;
 
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system,

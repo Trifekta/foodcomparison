@@ -45,7 +45,9 @@ export function StepContact({
       <h1 className="text-[1.75rem] font-extrabold leading-tight text-ink-900">
         Where should we send your result?
       </h1>
-      <p className="mt-1.5 text-[0.95rem] text-ink-500">We only need one way to reach you.</p>
+      <p className="mt-2 text-[0.95rem] leading-relaxed text-ink-500">
+        We only need one way to reach you. Your result arrives there — nothing is ordered.
+      </p>
 
       <div className="mt-5 space-y-6">
         <RadioCardGroup
@@ -131,7 +133,7 @@ export function StepContact({
         */}
         <label
           htmlFor={consentId}
-          className="flex cursor-pointer items-start gap-3 rounded-2xl bg-ink-50 p-4"
+          className="flex cursor-pointer items-start gap-3 rounded-2xl bg-cream p-4 ring-1 ring-sand"
         >
           <input
             id={consentId}

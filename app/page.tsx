@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Camera, PiggyBank, Search } from "lucide-react";
 import { BrandHeader } from "@/components/customer/BrandHeader";
+import { FoodStrip } from "@/components/customer/FoodArt";
 import { Disclaimer } from "@/components/customer/Disclaimer";
 
 const STEPS = [
@@ -15,7 +16,9 @@ export default function LandingPage() {
       <BrandHeader align="left" />
 
       <main className="flex flex-1 flex-col">
-        <h1 className="mt-5 text-[2.15rem] font-extrabold leading-[1.1] text-ink-900">
+        <FoodStrip className="mt-1 h-28" items={["fries", "burger", "pizza", "wrap"]} />
+
+        <h1 className="mt-6 text-[2.15rem] font-extrabold leading-[1.1] text-ink-900">
           Before you order,
           <br />
           check if you can save.
@@ -28,7 +31,7 @@ export default function LandingPage() {
 
         <Link
           href="/compare"
-          className="mt-7 inline-flex min-h-14 w-full items-center justify-center rounded-full bg-brand-400 px-6 text-base font-bold text-ink-900 transition-colors hover:bg-brand-300 active:bg-brand-500"
+          className="mt-6 inline-flex min-h-14 w-full items-center justify-center rounded-full bg-brand-400 px-6 text-base font-bold text-ink-900 transition-colors hover:bg-brand-300 active:bg-brand-500"
         >
           Check my order
         </Link>
@@ -37,12 +40,17 @@ export default function LandingPage() {
           Free to check · No account needed
         </p>
 
-        <ol className="mt-9 space-y-2.5">
+        <ol className="mt-8 space-y-2.5">
           {STEPS.map((step, index) => (
-            <li key={step.title} className="flex items-start gap-3.5 rounded-3xl bg-ink-50 p-4">
+            <li
+              key={step.title}
+              className="flex items-start gap-3.5 rounded-3xl bg-cream p-4 ring-1 ring-sand"
+            >
               <span
                 aria-hidden="true"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-200 text-brand-800"
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                  index === 2 ? "bg-emerald-100 text-emerald-700" : "bg-brand-200 text-brand-800"
+                }`}
               >
                 <step.icon className="h-4.5 w-4.5" />
               </span>
