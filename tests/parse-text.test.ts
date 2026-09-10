@@ -77,9 +77,14 @@ describe("parseOcrText, on real OCR output", () => {
     expect(names.some((name) => name.includes("total"))).toBe(false);
   });
 
-  it("flags what it guessed, because rules guess more than a model does", () => {
+  it("flags the restaurant, which rules can never be sure of", () => {
     expect(basket.uncertain_fields).toContain("restaurant_name");
-    expect(basket.uncertain_fields).toContain("items[0].line_total");
+  });
+
+  it("does not flag prices it has no evidence against", () => {
+    // Flagging every price is the same as flagging none - the customer stops
+    // looking. These three all sit under the stated total, so they stand.
+    expect(basket.uncertain_fields).not.toContain("items[0].line_total");
   });
 });
 

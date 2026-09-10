@@ -75,6 +75,9 @@ const NOISE = [
 const ITEM_SECTION_ENDS = [
   "you might also like",
   "you may also like",
+  "pairs well with",
+  "goes well with",
+  "others also ordered",
   "recommended",
   "frequently bought",
   "popular with",
@@ -93,7 +96,7 @@ const ITEM_SECTION_ENDS = [
 const STATUS_BAR = /^\s*\d{1,2}[:.]\d{2}\b/;
 
 /** Leading back-arrow glyphs OCR leaves on a header line. */
-const NAV_GLYPHS = /^[\s<>«»‹›|:;.,*+~^`'"-]+/;
+const NAV_GLYPHS = /^[\s<>«»‹›|:;.,*+~^`'"&€£©®@#()\[\]{}-]+/;
 
 /**
  * Punctuation OCR leaves dangling at the end of a wrapped line, usually the
@@ -105,7 +108,38 @@ function tidy(text: string): string {
   return text.replace(TRAILING_JUNK, "").trim();
 }
 
+/**
+ * Marketing and page furniture that carries a price.
+ *
+ * "Congrats! You saved AED 4.90" reads exactly like an item to a rules parser:
+ * words, then money. Unlike NOISE these are matched at any line length, because
+ * a banner is a sentence.
+ */
+const PROMO = [
+  "congrats",
+  "you saved",
+  "cashback",
+  "get extra",
+  "no coupons apply",
+  "place order",
+  "delivering in",
+  "yearly plan",
+  "% off",
+  "مبروك",
+];
+
 const VAT_WORDS = ["vat", "tax", "ضريبة"];
+
+/**
+ * Above this, a single line item is worth a second look.
+ *
+ * Not a correction - the value is left exactly as read. It is a flag, because
+ * the commonest way a price goes wrong is the AED glyph being read as a digit
+ * welded to the front: 39.00 arriving as 539.00. When there is a total to
+ * reconcile against that gets repaired outright; when there is not, saying
+ * "check this" is the honest alternative to guessing.
+ */
+const IMPLAUSIBLE_ITEM_PRICE = 300;
 
 /** Letters only - digits and glyphs do not make a line a name. */
 function letterCount(text: string): number {
@@ -315,6 +349,8 @@ export function parseOcrText(raw: string): ParseResult {
   let pending: StructuredItem | null = null;
   /** Set once an upsell or settings heading is passed; items stop, money does not. */
   let itemsClosed = false;
+  /** A gap before this line means a new row started; no gap means it continues. */
+  let afterGap = true;
 
   const flush = () => {
     if (pending && letterCount(pending.name) >= 2) {
@@ -332,12 +368,39 @@ export function parseOcrText(raw: string): ParseResult {
     // A gap ends whatever row we were assembling.
     if (original === "") {
       flush();
+      afterGap = true;
       continue;
     }
 
     const line = original.replace(NAV_GLYPHS, "").trim();
+    const startsNewRow = afterGap;
+    afterGap = false;
+
     if (line === "") continue;
     const lower = line.toLowerCase();
+
+    const key = financialKey(lower);
+    const priced = extractPrice(line);
+    const isFree = /\bfree\b|مجان/.test(lower) && key !== "final_total";
+
+    // ---- fees, subtotal, total --------------------------------------------
+    // Checked before the banner filter: "Congrats! Your delivery is FREE" is
+    // both a marketing banner and the delivery fee, and the fee has to win.
+    if (key && (priced || isFree)) {
+      flush();
+      if (matches(lower, VAT_WORDS) && key !== "final_total") continue;
+      // "Free delivery" with the old price struck through beside it is zero,
+      // not 2.90 - and often the struck price does not survive OCR at all.
+      const value = isFree ? "0.00" : (priced as { price: string }).price;
+      if (key === "final_total" || basket[key] === "") basket[key] = value;
+      continue;
+    }
+
+    // Marketing banners carry money and read like items. Never food.
+    if (matches(lower, PROMO)) {
+      flush();
+      continue;
+    }
 
     if (matches(lower, ITEM_SECTION_ENDS)) {
       flush();
@@ -349,20 +412,6 @@ export function parseOcrText(raw: string): ParseResult {
     // survives.
     if (line.length <= 24 && matches(lower, NOISE)) continue;
 
-    const key = financialKey(lower);
-    const priced = extractPrice(line);
-    const isFree = /\bfree\b|مجان/.test(lower) && key !== "final_total";
-
-    // ---- fees, subtotal, total --------------------------------------------
-    if (key && (priced || isFree)) {
-      flush();
-      if (matches(lower, VAT_WORDS) && key !== "final_total") continue;
-      // "Free delivery" with the old price struck through beside it is zero,
-      // not 2.90 - and often the struck price does not survive OCR at all.
-      const value = isFree ? "0.00" : (priced as { price: string }).price;
-      if (key === "final_total" || basket[key] === "") basket[key] = value;
-      continue;
-    }
     if (key) continue;
 
     if (itemsClosed) continue;
@@ -375,6 +424,18 @@ export function parseOcrText(raw: string): ParseResult {
       // Unless it is nothing but a price, which belongs to the item above.
       if (priced && pending && pending.line_total === "" && letterCount(priced.rest) < 3) {
         pending.line_total = priced.price;
+      }
+      continue;
+    }
+
+    // ---- a price printed beside a description line ------------------------
+    // Some apps put the price level with the item's description rather than its
+    // name, and OCR then reports them as one line. With no gap since the item
+    // opened, this is still that item's row - not a second item.
+    if (priced && pending !== null && pending.line_total === "" && !startsNewRow) {
+      pending.line_total = priced.price;
+      if (letterCount(priced.rest) >= 2 && pending.modifiers.length < 4) {
+        pending.modifiers.push(priced.rest);
       }
       continue;
     }
@@ -419,12 +480,23 @@ export function parseOcrText(raw: string): ParseResult {
   basket.items = items;
   for (const field of repairMergedCurrency(basket)) uncertain.add(field);
 
-  // A rules parser guesses more than a model does, so it says so. Prices it
-  // found are worth a glance; a basket with no total is worth more of one.
-  for (const [index] of items.entries()) {
-    uncertain.add(`items[${index}].line_total`);
+  // Flag what there is evidence against, not everything. Marking every price
+  // uncertain is the same as marking none: the customer stops looking.
+  const total = Number(basket.final_total);
+  if (Number.isFinite(total) && total > 0) {
+    items.forEach((item, index) => {
+      const price = Number(item.line_total);
+      // A single line costing more than the whole order is impossible.
+      if (Number.isFinite(price) && price > total) uncertain.add(`items[${index}].line_total`);
+    });
   }
   if (basket.final_total === "") uncertain.add("final_total");
+  items.forEach((item, index) => {
+    if (item.line_total === "") uncertain.add(`items[${index}].line_total`);
+    if (Number(item.line_total) > IMPLAUSIBLE_ITEM_PRICE) {
+      uncertain.add(`items[${index}].line_total`);
+    }
+  });
 
   basket.uncertain_fields = [...uncertain];
 

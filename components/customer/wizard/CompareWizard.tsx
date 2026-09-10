@@ -152,14 +152,17 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           applied = true;
         }
 
+        const flagged = new Set(basket.uncertain_fields);
+
         setItems((current) => {
           if (current.length > 0 || basket.items.length === 0) return current;
           applied = true;
-          return basket.items.map((item) => ({
+          return basket.items.map((item, index) => ({
             key: crypto.randomUUID(),
             name: [item.name, ...item.modifiers].join(" · ").slice(0, 120),
             quantity: item.quantity,
             linePrice: item.line_total || null,
+            priceUncertain: flagged.has(`items[${index}].line_total`) && item.line_total !== "",
             proposed: {
               name: [item.name, ...item.modifiers].join(" · ").slice(0, 120),
               quantity: item.quantity,

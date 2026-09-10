@@ -33,6 +33,12 @@ export interface CartItemDraft {
   quantity: number;
   /** Fixed-2 decimal string, or null when no price was read for this row. */
   linePrice: string | null;
+  /**
+   * The read flagged this price as not trustworthy - usually a currency glyph
+   * OCR welded onto the number, turning 39.00 into 539.00. Only ever set where
+   * there is evidence, so it stays a signal rather than decoration.
+   */
+  priceUncertain?: boolean;
   proposed: ProposedItem | null;
 }
 

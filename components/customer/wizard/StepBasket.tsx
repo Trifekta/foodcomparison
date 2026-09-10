@@ -90,7 +90,11 @@ export function StepBasket({
   const setPrice = (item: CartItemDraft, raw: string) => {
     const cleaned = raw.replace(/[^\d.]/g, "");
     if (cleaned !== "" && !/^\d{0,7}(\.\d{0,2})?$/.test(cleaned)) return;
-    updateItem(item.key, { linePrice: cleaned === "" ? null : cleaned });
+    // Touching the field answers the question the flag was asking.
+    updateItem(item.key, {
+      linePrice: cleaned === "" ? null : cleaned,
+      priceUncertain: false,
+    });
   };
 
   return (
@@ -264,7 +268,19 @@ export function StepBasket({
                       </button>
                     </span>
 
-                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-ink-50 px-2.5 py-1">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1",
+                        item.priceUncertain
+                          ? "bg-amber-50 ring-1 ring-amber-400"
+                          : "bg-ink-50",
+                      )}
+                    >
+                      {item.priceUncertain ? (
+                        <span className="text-[0.62rem] font-extrabold uppercase tracking-wide text-amber-700">
+                          check
+                        </span>
+                      ) : null}
                       <span aria-hidden="true" className="text-[0.78rem] font-bold text-ink-400">
                         {CURRENCY}
                       </span>
@@ -274,7 +290,11 @@ export function StepBasket({
                         autoComplete="off"
                         value={item.linePrice ?? ""}
                         onChange={(event) => setPrice(item, event.target.value)}
-                        aria-label={`Price shown for item ${index + 1}`}
+                        aria-label={
+                          item.priceUncertain
+                            ? `Price shown for item ${index + 1} - please check this one`
+                            : `Price shown for item ${index + 1}`
+                        }
                         className="min-h-9 w-16 bg-transparent text-right text-[0.95rem] font-extrabold tabular-nums text-ink-900 placeholder:font-medium placeholder:text-ink-300 focus:outline-none"
                         placeholder="—"
                       />
