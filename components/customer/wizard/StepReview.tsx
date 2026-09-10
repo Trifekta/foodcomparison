@@ -5,8 +5,8 @@ import { AlertCircle, Check, ChevronRight, MapPin, Minus, Receipt } from "lucide
 import { COMPARISON_APP, CURRENCY, OTHER_APP_VALUE } from "@/lib/constants";
 import { maskEmail, maskPhone, normalisePhone } from "@/lib/utils/phone";
 import { Button } from "@/components/ui/Button";
-import { Burger, DeliveryBag, DrinkCup, Fries } from "@/components/customer/FoodArt";
-import { ScriptNote, Sparks } from "@/components/customer/Motifs";
+import { FoodPhoto } from "@/components/customer/FoodPhoto";
+import { Sparks } from "@/components/customer/Motifs";
 import { cn } from "@/lib/utils/cn";
 import type { WizardFiles, WizardValues } from "./types";
 
@@ -240,32 +240,34 @@ export function StepReview({
       ) : null}
 
       {/* The price challenge - the most prominent element on the screen */}
-      <section className="relative mt-4 overflow-hidden rounded-3xl bg-linear-to-r from-brand-100 to-brand-200 px-4 pb-4 pt-4">
-        <div className="relative z-10 max-w-[62%]">
-          <h2 className="text-[1.45rem] font-extrabold leading-tight text-ink-900">
-            Can {COMPARISON_APP} beat
-            <br />
-            <span className="marker">{total}?</span>
-          </h2>
-          <p className="mt-2 text-[0.85rem] leading-snug text-slate-600">
-            We&apos;ll rebuild the same food and delivery location, then send you the price.
-          </p>
+      {/*
+        The price challenge. The supplied cluster carries its own warm panel
+        background and the handwritten line, so the card is flat #fdefc9 to
+        match it and the render bleeds into the top-right corner - no seam, and
+        no second copy of the script.
+      */}
+      <section
+        className="mt-4 overflow-hidden rounded-3xl p-4"
+        style={{ backgroundColor: "#fdefc9" }}
+      >
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[1.4rem] font-extrabold leading-tight text-ink-900">
+              Can {COMPARISON_APP} beat
+              <br />
+              <span className="marker">{total}?</span>
+            </h2>
+            <p className="mt-2 text-[0.82rem] leading-snug text-slate-600">
+              We&apos;ll rebuild the same food and delivery location, then send you the price.
+            </p>
+          </div>
+          <FoodPhoto
+            name="bagCluster"
+            className="pointer-events-none -mr-4 -mt-4 w-[46%] shrink-0 select-none"
+          />
         </div>
 
-        {/* Unbranded delivery bag: no third-party mark is reproduced. */}
-        <div aria-hidden="true" className="pointer-events-none absolute right-1 top-3 h-28 w-[42%] select-none">
-          <DeliveryBag className="absolute bottom-2 left-[18%] h-[78%] w-auto drop-shadow-sm" />
-          <Fries className="absolute bottom-3 left-0 h-[54%] w-auto drop-shadow-sm" />
-          <DrinkCup className="absolute bottom-1 right-1 h-[56%] w-auto drop-shadow-sm" />
-          <Burger className="absolute -bottom-1 right-3 h-[44%] w-auto drop-shadow" />
-          <ScriptNote className="absolute -top-1 right-0 text-[0.68rem] text-ink-800">
-            Same Food
-            <br />
-            Lower Prices
-          </ScriptNote>
-        </div>
-
-        <div className="relative z-10 mt-4">
+        <div className="mt-4">
           <Button onClick={onSubmit} loading={submitting} loadingLabel="Sending…" arrow>
             Get a {COMPARISON_APP} price
           </Button>

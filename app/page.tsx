@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Camera, ChevronRight, PiggyBank, Search } from "lucide-react";
 import { Wordmark } from "@/components/customer/Wordmark";
 import { Disclaimer } from "@/components/customer/Disclaimer";
-import { FoodSpread } from "@/components/customer/FoodArt";
+import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import {
   BrandTagline,
   ScriptBubble,
@@ -46,8 +46,8 @@ export default function LandingPage() {
 
       <main className="flex flex-1 flex-col">
         {/* Hero banner */}
-        <div className="relative mt-3 overflow-hidden rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4">
-          <div className="relative z-10 max-w-[52%]">
+        <div className="relative mt-3 rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4">
+          <div className="relative z-10 max-w-[50%]">
             <ScriptNote className="text-[1.35rem] text-ink-900">
               Good Food
               <br />
@@ -59,8 +59,12 @@ export default function LandingPage() {
             </p>
             <span aria-hidden="true" className="mt-1.5 block h-[3px] w-14 rounded-full bg-brand-400" />
           </div>
-          <FoodSpread className="absolute inset-y-0 right-0 w-[60%]" />
-          <ScriptBubble className="absolute right-3 top-3 z-10 text-[0.72rem]">
+          <FoodPhoto
+            name="spread"
+            eager
+            className="pointer-events-none absolute -top-3 right-1 w-[58%] select-none"
+          />
+          <ScriptBubble className="absolute -right-1 -top-2 z-10 text-[0.64rem] leading-tight">
             Save
             <br />
             more

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { AreaCombobox } from "@/components/forms/AreaCombobox";
 import { RadioCardGroup } from "@/components/forms/RadioCardGroup";
 import { FieldError } from "@/components/ui/FieldError";
-import { Burger, GrainBowl } from "@/components/customer/FoodArt";
+import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote } from "@/components/customer/Motifs";
 
 interface StepLocationProps {
@@ -64,14 +64,22 @@ export function StepLocation({
           <span aria-hidden="true" className="mt-1.5 block h-[3px] w-16 rounded-full bg-brand-400" />
         </div>
 
-        <div aria-hidden="true" className="pointer-events-none absolute -top-2 right-0 h-32 w-[42%] select-none">
-          <GrainBowl className="absolute bottom-1 right-0 h-[62%] w-auto drop-shadow-sm" />
-          <MapPin className="absolute bottom-[38%] right-[26%] h-9 w-9 fill-[#e2483a] text-[#e2483a] drop-shadow-sm" />
-          <ScriptBubble className="absolute -top-1 right-0 text-[0.68rem]">
+        {/* Bowl vignette on a soft blob that bleeds off the right edge */}
+        <div aria-hidden="true" className="pointer-events-none absolute -top-3 -right-2 h-40 w-[46%] select-none">
+          <span className="absolute inset-x-0 top-2 bottom-6 rounded-[2.5rem] bg-linear-to-br from-brand-100/80 to-beige" />
+          <FoodPhoto name="bowl" eager className="absolute bottom-4 right-4 w-[74%]" />
+          <ScriptBubble className="absolute right-1 top-0 text-[0.66rem]">
             Good
             <br />
             Food Nearby
           </ScriptBubble>
+          <ScriptNote className="absolute bottom-0 right-2 text-right text-[0.62rem] text-slate-600">
+            Dubai
+            <br />
+            Tastes Better
+            <br />
+            Together
+          </ScriptNote>
         </div>
       </div>
 
@@ -139,8 +147,9 @@ export function StepLocation({
               Compare across apps and keep more for what really matters.
             </p>
           </div>
-          <Burger
-            className="pointer-events-none absolute -bottom-2 right-1 h-16 w-auto select-none drop-shadow-sm"
+          <FoodPhoto
+            name="burger"
+            className="pointer-events-none absolute -bottom-1 -right-1 w-[34%] select-none"
           />
         </div>
       </div>

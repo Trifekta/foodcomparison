@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/forms/ImageUpload";
-import { FoodSpread } from "@/components/customer/FoodArt";
+import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
 
 interface StepUploadProps {
@@ -31,9 +31,9 @@ export function StepUpload({
 }: StepUploadProps) {
   return (
     <>
-      {/* Hero banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4">
-        <div className="relative z-10 max-w-[52%]">
+      {/* Hero banner. The spread bleeds past the top edge, as in the reference. */}
+      <div className="relative rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4">
+        <div className="relative z-10 max-w-[50%]">
           <ScriptNote underline className="text-[1.35rem] text-ink-900">
             Same Food
             <br />
@@ -45,8 +45,12 @@ export function StepUpload({
             Save more.
           </p>
         </div>
-        <FoodSpread className="absolute inset-y-0 right-0 w-[62%]" />
-        <ScriptBubble className="absolute right-3 top-2.5 z-10 text-[0.72rem]">
+        <FoodPhoto
+          name="spread"
+          eager
+          className="pointer-events-none absolute -top-3 right-1 w-[58%] select-none"
+        />
+        <ScriptBubble className="absolute -right-1 -top-2 z-10 text-[0.64rem] leading-tight">
           Good
           <br />
           Deals Ahead <span aria-hidden="true">&hearts;</span>
@@ -68,7 +72,7 @@ export function StepUpload({
           label="Order details"
           hint="Restaurant and selected items"
           requirement="required"
-          art="cart"
+          art="cartDoc"
           file={cartFile}
           onChange={onCartChange}
           error={error}

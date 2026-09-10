@@ -4,13 +4,8 @@ import { ArrowRight } from "lucide-react";
 import { Wordmark } from "@/components/customer/Wordmark";
 import { CopyReference } from "@/components/customer/CopyReference";
 import { Disclaimer } from "@/components/customer/Disclaimer";
-import {
-  Burger,
-  Fries,
-  GrainBowl,
-  PaperBag,
-  TickBadge,
-} from "@/components/customer/FoodArt";
+import { TickBadge } from "@/components/customer/FoodArt";
+import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import {
   BrandTagline,
   ScriptBubble,
@@ -56,30 +51,21 @@ export default async function SuccessPage({
       </header>
 
       {/* Celebration scene */}
-      <div className="relative mt-3 h-56">
+      <div className="relative mt-3 h-64">
         <div
           aria-hidden="true"
           className="absolute inset-x-2 bottom-2 top-8 rounded-[3rem] bg-linear-to-b from-brand-100 to-beige"
         />
-        <TickBadge className="absolute left-1/2 top-0 h-28 w-28 -translate-x-1/2 drop-shadow" />
-        <Sparks className="absolute left-[26%] top-3 h-7 w-7" />
-        <Sparks className="absolute right-[26%] top-3 h-7 w-7 -scale-x-100" />
-
-        <Fries className="absolute bottom-6 left-[12%] h-[46%] w-auto drop-shadow-sm" />
-        <Burger className="absolute bottom-3 left-[24%] h-[42%] w-auto drop-shadow" />
-        <GrainBowl className="absolute bottom-4 left-1/2 h-[34%] w-auto -translate-x-1/4 drop-shadow-sm" />
-        <PaperBag
-          className="absolute bottom-4 right-[10%] h-[54%] w-auto"
-          note={
-            <>
-              Good
-              <br />
-              Food Better
-              <br />
-              Deals
-            </>
-          }
+        <FoodPhoto
+          name="celebration"
+          eager
+          className="pointer-events-none absolute inset-x-4 bottom-0 select-none"
         />
+
+        {/* Badge sits in front of the spread, as in the reference */}
+        <TickBadge className="absolute left-1/2 top-0 z-10 h-24 w-24 -translate-x-1/2 drop-shadow-lg" />
+        <Sparks className="absolute left-[28%] top-2 z-10 h-7 w-7" />
+        <Sparks className="absolute right-[28%] top-2 z-10 h-7 w-7 -scale-x-100" />
 
         <ScriptBubble className="absolute left-0 top-[38%] text-[0.72rem]">
           You&apos;re

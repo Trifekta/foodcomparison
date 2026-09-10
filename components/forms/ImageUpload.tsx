@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Camera, Check, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Check, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/constants";
 import { validateImageClientSide } from "@/lib/validation/submission";
 import { downscaleImage } from "@/lib/utils/image-client";
 import { FieldError } from "@/components/ui/FieldError";
-import { CartDocArt, ReceiptArt } from "@/components/customer/FoodArt";
-import { Sparks } from "@/components/customer/Motifs";
+import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { cn } from "@/lib/utils/cn";
 
 interface ImageUploadProps {
@@ -21,8 +20,8 @@ interface ImageUploadProps {
   /** Drives the pill: Required is red, Optional is green, as in the designs. */
   requirement: "required" | "optional";
   allowRemove?: boolean;
-  /** Which illustration fills the empty dropzone. */
-  art?: "cart" | "receipt";
+  /** Which supplied render fills the empty dropzone. */
+  art?: "cartDoc" | "receipt";
 }
 
 /**
@@ -42,7 +41,7 @@ export function ImageUpload({
   error,
   requirement,
   allowRemove = false,
-  art = "cart",
+  art = "cartDoc",
 }: ImageUploadProps) {
   const inputId = useId();
   const errorId = `${inputId}-error`;
@@ -78,7 +77,6 @@ export function ImageUpload({
 
   const message = error ?? localError;
   const filled = Boolean(file && previewUrl);
-  const Art = art === "receipt" ? ReceiptArt : CartDocArt;
 
   return (
     <section className="rounded-3xl bg-white p-4 shadow-[0_2px_14px_rgba(23,23,28,0.05)] ring-1 ring-ink-100">
@@ -191,13 +189,7 @@ export function ImageUpload({
               </>
             ) : (
               <>
-                <span aria-hidden="true" className="relative mb-1 block h-16 w-20">
-                  <Art className="absolute inset-0 h-full w-full" />
-                  <span className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full bg-brand-400 shadow-sm">
-                    <Camera className="h-4.5 w-4.5 text-ink-900" strokeWidth={2.2} />
-                  </span>
-                  <Sparks className="absolute -right-4 top-0 h-5 w-5" />
-                </span>
+                <FoodPhoto name={art} className="mb-1 h-[4.5rem] w-auto object-contain" />
                 <span className="text-[0.95rem] font-extrabold text-ink-900">Tap to upload</span>
                 <span className="text-xs text-slate-400">JPG, PNG or WEBP · up to 10 MB</span>
               </>
