@@ -6,8 +6,20 @@
  * Divergence between the two would make the accuracy numbers meaningless.
  */
 
-/** English and Arabic together: Dubai menus routinely mix both on one row. */
-export const OCR_LANGUAGES = ["eng", "ara"] as const;
+/**
+ * Which languages to load, and it is not the same answer in both places.
+ *
+ * Customers get English only. The language files dominate the download - Arabic
+ * is 1.6 MB of a 6 MB first load - and every megabyte is paid for on a phone,
+ * on mobile data, at the exact moment we are trying to convince someone the
+ * product is worth using. A single-script model is also faster and often more
+ * accurate, because the engine is not weighing two alphabets against each other.
+ *
+ * Staff get both. They are on a desk, on wifi, and the Arabic screenshots are
+ * precisely the ones that reach a human because nothing else could read them.
+ */
+export const OCR_LANGUAGES_CUSTOMER = ["eng"] as const;
+export const OCR_LANGUAGES_STAFF = ["eng", "ara"] as const;
 
 /**
  * LSTM only. The legacy engine is faster but markedly worse on the small,
@@ -19,7 +31,9 @@ export const OCR_ENGINE_MODE = 1;
  * Recorded against every extraction so a change in reading behaviour is
  * traceable. Bump it whenever anything in this file changes.
  */
-export const OCR_ENGINE_VERSION = "tesseract.js@7 lstm eng+ara v1";
+export function ocrEngineVersion(languages: readonly string[]): string {
+  return `tesseract.js@7 lstm ${languages.join("+")} v1`;
+}
 
 export const OCR_PARAMETERS: Record<string, string> = {
   // Keeps the run of spaces between an item and its price, which is most of

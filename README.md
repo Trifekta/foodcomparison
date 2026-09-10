@@ -537,8 +537,30 @@ Two things that look like details and are not:
 The engine's WASM and language files are served from `/tesseract` on our own
 origin, copied out of `node_modules` at build time by
 `scripts/copy-ocr-assets.mjs`. tesseract.js would otherwise fetch them from a
-public CDN, which would undercut "nothing leaves the device". The cost is a
-~7 MB download the first time a customer uploads, cached thereafter.
+public CDN, which would undercut "nothing leaves the device".
+
+**Customers load English only; staff load Arabic too.** The language files
+dominate the download - Arabic is 1.6 MB - and ad traffic is overwhelmingly
+English-speaking. A single-script model is also faster. An Arabic screenshot on
+the customer side therefore reads as noise, which the customer deletes; staff
+still have Arabic for exactly those cases.
+
+The engine starts downloading when the upload step appears, not when a file is
+chosen, so most of it arrives while the customer is in their photo gallery.
+
+Measured, first visit, from choosing a photo to seeing the table:
+
+| Connection | Time |
+| --- | --- |
+| Wifi / 5G | ~1s |
+| 4G, 12 Mbps | ~5s |
+| Slow 4G, 4 Mbps | ~18s |
+
+About 4.3 MB over the wire, cached afterwards, so a second upload on the same
+phone is 1-2s on any connection. Every visitor from an ad campaign is a first
+visit, so the first-load row is the one that matters. If the funnel drops at
+this step, that download is the first suspect - see the `$5` note under
+**Cost and model** for the alternative that removes it entirely.
 
 ### Staff can ask a model, when a key is configured
 

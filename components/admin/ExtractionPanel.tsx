@@ -107,7 +107,7 @@ export function ExtractionPanel({
       const response = await fetch(cartImageUrl);
       if (!response.ok) throw new Error("The screenshot could not be downloaded.");
 
-      const ocr = await readImageInBrowser(await response.blob(), setProgress);
+      const ocr = await readImageInBrowser(await response.blob(), setProgress, "staff");
       if (!ocr.ok) {
         setError(`${ocr.error} Try the vision fallback.`);
         setPhase("idle");

@@ -164,7 +164,9 @@ if (images.length === 0) {
 const { createWorker } = await import("tesseract.js");
 const { default: Anthropic } = await import("@anthropic-ai/sdk");
 const { zodOutputFormat } = await import("@anthropic-ai/sdk/helpers/zod");
-const { OCR_LANGUAGES, OCR_ENGINE_MODE, OCR_PARAMETERS } = await import("../lib/ocr/config.ts");
+const { OCR_LANGUAGES_STAFF, OCR_ENGINE_MODE, OCR_PARAMETERS } = await import(
+  "../lib/ocr/config.ts"
+);
 const { structuredBasketSchema } = await import("../lib/extraction/schema.ts");
 const {
   OCR_SYSTEM_PROMPT,
@@ -212,7 +214,7 @@ async function structure(system, content) {
 const worker = useVision
   ? null
   : await (async () => {
-      const created = await createWorker([...OCR_LANGUAGES], OCR_ENGINE_MODE, {
+      const created = await createWorker([...OCR_LANGUAGES_STAFF], OCR_ENGINE_MODE, {
         langPath: resolve("public/tesseract/lang"),
         logger: () => {},
       });

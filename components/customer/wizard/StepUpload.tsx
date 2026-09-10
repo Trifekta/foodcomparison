@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/forms/ImageUpload";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
@@ -29,6 +30,19 @@ export function StepUpload({
   error,
   onContinue,
 }: StepUploadProps) {
+  // Start fetching the reading engine now, while they are in their gallery
+  // choosing a photo. Waiting until they have chosen puts several megabytes
+  // directly in front of the screen meant to impress them.
+  useEffect(() => {
+    let cancelled = false;
+    void import("@/lib/ocr/browser").then(({ warmOcr }) => {
+      if (!cancelled) warmOcr("customer");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <>
       {/* Hero banner. The spread bleeds past the top edge, as in the reference. */}
