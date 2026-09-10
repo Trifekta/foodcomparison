@@ -11,6 +11,8 @@ const eslintConfig = [
       ".open-next/**",
       ".wrangler/**",
       "node_modules/**",
+      // Vendored OCR engine, copied from node_modules at build time.
+      "public/tesseract/**",
       "next-env.d.ts",
       "cloudflare-env.d.ts",
     ],

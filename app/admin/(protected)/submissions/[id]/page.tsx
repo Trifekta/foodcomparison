@@ -3,12 +3,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, MapPin } from "lucide-react";
 import {
+  getLatestExtraction,
   getSignedImageUrl,
   getSubmission,
   getSubmissionEvents,
   getSubmissionItems,
 } from "@/lib/admin/queries";
 import { isEmailConfigured } from "@/lib/notifications/resend";
+import { isExtractionConfigured } from "@/lib/env";
+import { ExtractionPanel } from "@/components/admin/ExtractionPanel";
+import type { StructuredBasket } from "@/lib/extraction/schema";
 import { ScreenshotViewer } from "@/components/admin/ScreenshotViewer";
 import { ComparisonPanel } from "@/components/admin/ComparisonPanel";
 import { ResultPanel } from "@/components/admin/ResultPanel";
@@ -66,11 +70,12 @@ export default async function SubmissionDetailPage({
   const submission = await getSubmission(id);
   if (!submission) notFound();
 
-  const [cartUrl, checkoutUrl, events, items] = await Promise.all([
+  const [cartUrl, checkoutUrl, events, items, extraction] = await Promise.all([
     getSignedImageUrl(submission.cart_image_path),
     getSignedImageUrl(submission.checkout_image_path),
     getSubmissionEvents(submission.id),
     getSubmissionItems(submission.id),
+    getLatestExtraction(submission.id),
   ]);
 
   const appLabel =
@@ -204,6 +209,24 @@ export default async function SubmissionDetailPage({
               </p>
             )}
           </section>
+
+          <ExtractionPanel
+            submissionId={submission.id}
+            cartImageUrl={cartUrl}
+            configured={isExtractionConfigured()}
+            previous={
+              extraction
+                ? {
+                    id: extraction.id,
+                    method: extraction.method,
+                    structured: (extraction.structured as StructuredBasket | null) ?? null,
+                    confirmedAt: extraction.confirmed_at,
+                    ocrConfidence:
+                      extraction.ocr_confidence === null ? null : Number(extraction.ocr_confidence),
+                  }
+                : null
+            }
+          />
 
           <section className="rounded-2xl border border-ink-200 bg-white p-5">
             <h2 className="text-base font-semibold text-ink-900">Cart screenshot</h2>

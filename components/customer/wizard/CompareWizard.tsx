@@ -21,12 +21,10 @@ import { StepLocation } from "./StepLocation";
 import { StepTotal } from "./StepTotal";
 import { StepContact } from "./StepContact";
 import { StepReview } from "./StepReview";
-import type { ExtractionResponse } from "@/lib/extraction/schema";
 import {
   WIZARD_DEFAULTS,
   usableItems,
   type CartItemDraft,
-  type ExtractionStatus,
   type WizardFiles,
   type WizardValues,
 } from "./types";
@@ -67,13 +65,6 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   // Items are an array of objects, so they live here rather than in
   // react-hook-form, whose values all travel as single FormData entries.
   const [items, setItems] = useState<CartItemDraft[]>([]);
-  const [extractionStatus, setExtractionStatus] = useState<ExtractionStatus>("idle");
-  // The total printed on the screenshot, offered as a hint on the total step.
-  // Never filled in silently: that number is the baseline for the saving we
-  // quote, so the customer states it themselves.
-  const [readTotal, setReadTotal] = useState<string | null>(null);
-  // Identifies the newest read, so a slow reply for a replaced screenshot loses.
-  const extractionRun = useRef(0);
   const [cartError, setCartError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -99,65 +90,6 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       if (field) setError(field, { type: "manual", message: issue.message });
     }
     return false;
-  };
-
-  /**
-   * Reads the cart screenshot in the background while the customer walks to the
-   * confirm step. Failure is silent by design: the feature is a convenience, and
-   * the wizard works exactly as it did before it existed.
-   */
-  const startExtraction = (file: File) => {
-    const run = extractionRun.current + 1;
-    extractionRun.current = run;
-    setExtractionStatus("reading");
-    setReadTotal(null);
-
-    const body = new FormData();
-    body.append("cartImage", file);
-
-    void fetch("/api/extract", { method: "POST", body })
-      .then((response) => (response.ok ? (response.json() as Promise<ExtractionResponse>) : null))
-      .then((data) => {
-        if (run !== extractionRun.current) return;
-
-        if (!data || !data.readable) {
-          setExtractionStatus("empty");
-          return;
-        }
-
-        setReadTotal(data.orderTotal);
-
-        // Never overwrite something the customer has already entered - they may
-        // have typed ahead while the read was in flight.
-        let applied = false;
-
-        if (data.restaurantName && !getValues("restaurantName").trim()) {
-          setValue("restaurantName", data.restaurantName);
-          clearErrors("restaurantName");
-          applied = true;
-        }
-
-        setItems((current) => {
-          if (current.length > 0 || data.items.length === 0) return current;
-          applied = true;
-          return data.items.map((item) => ({
-            key: crypto.randomUUID(),
-            name: item.name,
-            quantity: item.quantity,
-            linePrice: item.linePrice,
-            proposed: {
-              name: item.name,
-              quantity: item.quantity,
-              linePrice: item.linePrice,
-            },
-          }));
-        });
-
-        setExtractionStatus(applied ? "applied" : "empty");
-      })
-      .catch(() => {
-        if (run === extractionRun.current) setExtractionStatus("failed");
-      });
   };
 
   const goTo = (next: number) => {
@@ -273,13 +205,6 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           onCartChange={(file: File | null) => {
             setFiles((current) => ({ ...current, cart: file }));
             setCartError(null);
-            if (file) {
-              startExtraction(file);
-            } else {
-              extractionRun.current += 1;
-              setExtractionStatus("idle");
-              setReadTotal(null);
-            }
           }}
           onCheckoutChange={(file: File | null) =>
             setFiles((current) => ({ ...current, checkout: file }))
@@ -294,7 +219,6 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           restaurantName={values.restaurantName}
           items={items}
           restaurantError={errors.restaurantName?.message}
-          extractionStatus={extractionStatus}
           onRestaurantNameChange={(value) => setField("restaurantName", value)}
           onItemsChange={setItems}
           onContinue={handleBasketContinue}
@@ -325,10 +249,6 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           onCurrentTotalChange={(value) => setField("currentTotal", value)}
           totalError={errors.currentTotal?.message}
           hasCheckoutScreenshot={files.checkout !== null}
-          readTotal={readTotal}
-          onUseReadTotal={() => {
-            if (readTotal) setField("currentTotal", readTotal);
-          }}
           onContinue={handleTotalContinue}
         />
       ) : null}

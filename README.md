@@ -6,9 +6,10 @@ FindFoodae lets a Dubai food-delivery customer send the basket they are about to
 order, and get back an answer: is the same order cheaper on another app?
 
 **Phase 1 is deliberately manual.** A customer submits a cart screenshot, the
-restaurant it is from, their area, their app and their checkout total. A vision
-model reads the screenshot to pre-fill the basket, but it only ever proposes:
-the customer corrects it and what they confirm is what gets stored. An admin opens Keeta, rebuilds the same
+restaurant it is from, their area, their app and their checkout total, all typed
+by them. In the admin dashboard, staff can have the screenshot read for them -
+OCR in their own browser, then a model to structure the text - but that is an
+assist they trigger and confirm, never something that happens to a customer. An admin opens Keeta, rebuilds the same
 basket by hand, types the total, and the system does the rest — calculates the
 saving, writes the customer message, and hands the admin a prefilled WhatsApp
 link. Nothing is scraped, no platform APIs are called, and no AI reads the
@@ -111,7 +112,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 
 ## 2. Run the migrations
 
-Open **SQL Editor → New query** in the Supabase dashboard and run these five
+Open **SQL Editor → New query** in the Supabase dashboard and run these six
 files **in order**, one at a time:
 
 | Order | File | What it does |
@@ -121,6 +122,7 @@ files **in order**, one at a time:
 | 3 | `supabase/migrations/0003_storage.sql` | Creates the private bucket and its policies |
 | 4 | `supabase/migrations/0004_cart_items.sql` | Adds `submissions.restaurant_name` and the optional `submission_items` table |
 | 5 | `supabase/migrations/0005_item_prices.sql` | Adds row prices and where each row came from |
+| 6 | `supabase/migrations/0006_extractions.sql` | The extraction audit trail (`submission_extractions`) |
 
 Each file is safe to run more than once.
 
@@ -137,7 +139,8 @@ supabase db push
 ```sql
 select table_name from information_schema.tables
 where table_schema = 'public' order by 1;
--- expect: admin_profiles, areas, submission_events, submission_items, submissions
+-- expect: admin_profiles, areas, submission_events, submission_extractions,
+--         submission_items, submissions
 ```
 
 ---
@@ -419,10 +422,8 @@ non-admin sessions, and an admin cannot grant admin rights from inside the app.
 1. Open the homepage, tap **Check my order**.
 2. Upload a cart screenshot into slot 1; leave slot 2 (marked **Optional**)
    empty → **Continue**.
-3. If a reading key is configured, the restaurant, items and prices are already
-   filled in from your screenshot — correct anything wrong, delete what you do
-   not want. Otherwise type **Al Safadi** as the restaurant; the item list is
-   optional and a blank row is simply dropped → **Continue**.
+3. Type **Al Safadi** as the restaurant. The item list is optional and a blank
+   row is simply dropped → **Continue**.
 4. Choose **Al Karama**, choose **Talabat** → **Continue**.
 5. Enter **82** → **Continue**. (The optional checkout screenshot lives on
    screen 1, alongside the required cart screenshot.)
@@ -435,6 +436,9 @@ non-admin sessions, and an admin cannot grant admin rights from inside the app.
 9. Sign in at `/admin/login`. The submission is at the top of the table.
 10. Open it. You see Al Safadi, Al Karama, Talabat, AED 82.00, whatever items
     the customer listed, and the cart screenshot (click to enlarge).
+    With a key configured, press **Extract basket**: the screenshot is read in
+    your browser, the text is structured, and the result appears for you to
+    correct. Nothing is stored until you press **Confirm and save basket**.
 11. **Start review** → status becomes Reviewing.
 12. Type **63** as the Keeta total. The card shows **AED 19.00 saving, 23.2%**
     live as you type.
@@ -501,70 +505,83 @@ Everything else renders on the server.
 
 ## Reading the screenshot
 
-With `ANTHROPIC_API_KEY` set, the cart screenshot is read by a vision model as
-soon as the customer picks it, and the confirm step arrives pre-filled with the
-restaurant, the items, their quantities and the price printed on each row. The
-order total is offered on the total step as a "use this" button.
+With `ANTHROPIC_API_KEY` set, the submission detail page gains an **Extract
+basket** button. It is an assist for whoever is doing the comparison, not a
+customer-facing feature: the customer types their own basket and nothing they do
+sends a screenshot anywhere.
 
-Four rules hold this together, and none of them should be relaxed without
-thinking hard:
+### The flow
 
-1. **It proposes, the customer disposes.** Every value lands in an editable
-   field. What reaches the database is the customer's confirmed version, so a
-   misread costs a correction, never a wrong price.
-2. **The total is never filled in silently.** That number is the baseline for
-   the saving we quote back, so the customer puts it there themselves - the
-   screenshot's total is a suggestion behind an explicit tap.
-3. **Failure is invisible and harmless.** No key, a timeout, a rate limit, an
-   unreadable image: all of them land on an empty confirm step, which is exactly
-   what the wizard did before this feature existed. `/api/extract` never returns
-   an error status for a failed read.
-4. **Nothing a model returns is trusted.** Prices, quantities and names go
-   through the same bounds a typed basket does, and the image is magic-byte
-   checked before it is sent anywhere.
-
-`submission_items.source` records whether each row was typed (`customer`),
-proposed and accepted unchanged (`extracted`), or proposed and then corrected
-(`edited`). The `edited` rows are worth watching: each one is a labelled example
-of the model getting something wrong, collected as a side effect of ordinary
-use, and they are the raw material for measuring whether a cheaper model would
-do just as well.
-
-The image leaves our infrastructure at this point, which `/privacy` discloses -
-and discloses only when a key is actually configured, so the page always matches
-what the deployment does. Read that section before changing what is sent.
-
-### Measuring it on your own screenshots
-
-Accuracy on real Talabat and Careem carts is the thing worth knowing before you
-trust this, and it is not something the test suite can tell you. Collect a
-folder of real screenshots and run them through the live endpoint:
-
-```bash
-npm run dev                                  # one terminal
-npm run extract:try -- shots/*.png           # another
+```
+screenshot → OCR (admin's browser) → raw text → Claude → structured JSON → admin review → confirm
 ```
 
-It prints what came back for each image. Nothing is written to the database,
-and it posts to the running app rather than importing the extractor, so what
-you see is exactly what a customer's browser would receive.
+The screenshot is already in the admin's browser, because they are looking at
+it. OCR runs there, on their machine, with tesseract.js. Only the resulting
+**text** is sent to be structured. The image itself never reaches the model and
+never reaches our own server for this purpose.
 
-Point it at a deployed environment with `EXTRACT_URL`:
+The OCR engine's WASM and language files are served from `/tesseract` on our own
+origin, copied out of `node_modules` at build time by
+`scripts/copy-ocr-assets.mjs`. tesseract.js would otherwise fetch them from a
+public CDN on first use, which would undercut the whole point.
+
+### The vision fallback
+
+**Use AI vision fallback** sends the screenshot itself. It exists because Arabic
+OCR and low-contrast screenshots defeat Tesseract often enough to need an escape
+hatch. It is a separate button behind a confirmation, it is never an automatic
+retry after a poor read, and no customer action can reach it. Use it when OCR
+output is unusable, the restaurant cannot be found, items are missing, Arabic is
+unreadable, or prices cannot be tied to rows.
+
+### Nothing is saved until a person says so
+
+The model proposes. `submission_extractions` records the run - raw OCR text,
+confidence, engine, model, prompt version, timings, the structured result, and
+any error - but the submission itself is untouched until the admin presses
+**Confirm and save basket**.
+
+Fields the model was unsure about come back in `uncertain_fields` and are
+outlined in the review form. The prompt tells it to flag generously: a wrong
+value that was flagged costs a glance, one that was not costs a wrong
+comparison.
+
+Confirming writes items with `source = 'extracted'` and stores the confirmed
+basket alongside the model's original, so the two stay comparable. It replaces
+only rows a previous extraction created - anything the customer typed is left
+alone, and `submissions.restaurant_name` and `current_total` are never
+overwritten. Those are what the customer said, and they stay that way.
+
+### Measuring accuracy
+
+Label a folder of real screenshots and run:
 
 ```bash
-EXTRACT_URL=https://your-domain npm run extract:try -- shots/*.png
+npm run extract:eval -- eval/shots            # the OCR route
+npm run extract:eval -- eval/shots --vision   # the fallback, for comparison
 ```
 
-Judge it on the right question. A perfect read is not the bar - the customer
-corrects it either way. The bar is whether correcting it is less work than
-typing the basket from scratch.
+Each screenshot needs a sibling `.json` naming the app and language and stating
+what a human reads off the screen; the format is documented at the top of
+`scripts/eval-extraction.mjs`. It reports restaurant accuracy, item recall and
+precision, quantity accuracy, price accuracy and total accuracy - overall, per
+app (Talabat, Careem Food, Deliveroo, Noon Food) and per language (English,
+Arabic, mixed).
+
+It imports the same OCR settings, schema and prompt the dashboard uses, so the
+numbers describe the real thing. Every screenshot costs one model call.
+
+`PROMPT_VERSION` in `lib/extraction/prompt.ts` is stored against every
+extraction. Bump it whenever the prompt changes, or last month's measurement
+cannot be compared with today's.
 
 ### Cost and model
 
-Roughly a cent or two per screenshot on the default `claude-opus-5`. Set
-`EXTRACTION_MODEL=claude-sonnet-5` or `claude-haiku-4-5` to trade accuracy for
-cost - but measure both with `extract:try` on your own screenshots first, rather
-than assuming the cheaper one is good enough or that the dearer one is needed.
+Text-only structuring is far cheaper than sending images - a few tenths of a
+cent per basket on the default `claude-opus-5`, against roughly two cents for
+the vision fallback. `EXTRACTION_MODEL` switches models; measure with
+`extract:eval` before deciding.
 
 ---
 

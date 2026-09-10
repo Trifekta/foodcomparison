@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef } from "react";
-import { Loader2, Minus, Plus, Sparkles, Store, Trash2, UtensilsCrossed } from "lucide-react";
+import { Minus, Plus, Store, Trash2, UtensilsCrossed } from "lucide-react";
 import {
   CURRENCY,
   MAX_CART_ITEMS,
@@ -14,13 +14,12 @@ import { FieldError } from "@/components/ui/FieldError";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote } from "@/components/customer/Motifs";
 import { cn } from "@/lib/utils/cn";
-import type { CartItemDraft, ExtractionStatus } from "./types";
+import type { CartItemDraft } from "./types";
 
 interface StepBasketProps {
   restaurantName: string;
   items: CartItemDraft[];
   restaurantError?: string;
-  extractionStatus: ExtractionStatus;
   onRestaurantNameChange: (value: string) => void;
   onItemsChange: (items: CartItemDraft[]) => void;
   onContinue: () => void;
@@ -29,10 +28,9 @@ interface StepBasketProps {
 /**
  * Confirm the basket.
  *
- * When a screenshot read succeeds this arrives pre-filled; otherwise it starts
- * empty and the customer types it. Either way every field is editable and the
- * customer's version is what gets stored - a model's read is a suggestion on
- * this screen, never a fact.
+ * Entirely customer-entered. Screenshot reading happens in the admin dashboard,
+ * on an admin's explicit action - nothing on this screen is machine-filled, and
+ * no screenshot is sent anywhere as a side effect of the customer using it.
  *
  * The restaurant is required: nobody can rebuild the order without it. The
  * items stay optional, and blank rows are dropped rather than flagged, because
@@ -42,7 +40,6 @@ export function StepBasket({
   restaurantName,
   items,
   restaurantError,
-  extractionStatus,
   onRestaurantNameChange,
   onItemsChange,
   onContinue,
@@ -53,7 +50,6 @@ export function StepBasket({
   const pendingFocus = useRef<string | null>(null);
 
   const full = items.length >= MAX_CART_ITEMS;
-  const reading = extractionStatus === "reading";
 
   const addItem = () => {
     if (full) return;
@@ -109,25 +105,6 @@ export function StepBasket({
         </div>
       </div>
 
-      {/* Says what happened to the screenshot, so nothing changes unannounced. */}
-      <div aria-live="polite" className="mt-4 empty:mt-0">
-        {reading ? (
-          <p className="flex items-center gap-2.5 rounded-2xl bg-brand-100 px-3.5 py-3 text-sm font-semibold text-ink-800">
-            <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin" />
-            Reading your screenshot…
-          </p>
-        ) : null}
-        {extractionStatus === "applied" ? (
-          <p className="flex items-start gap-2.5 rounded-2xl bg-chip-green-bg px-3.5 py-3 text-sm leading-snug text-chip-green-fg">
-            <Sparkles aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              <span className="font-bold">We read this from your screenshot.</span> Check it over
-              and fix anything we got wrong.
-            </span>
-          </p>
-        ) : null}
-      </div>
-
       <div className="mt-4 space-y-5">
         {/* Restaurant - required */}
         <div className="rounded-3xl bg-linear-to-b from-brand-100 to-beige p-3.5">
@@ -156,7 +133,7 @@ export function StepBasket({
               "min-h-14 w-full rounded-2xl bg-white px-4 text-base font-semibold text-ink-900 ring-1 placeholder:font-normal placeholder:text-slate-400",
               restaurantError ? "ring-rose-400" : "ring-ink-200",
             )}
-            placeholder={reading ? "Reading…" : "e.g. Al Safadi"}
+            placeholder="e.g. Al Safadi"
           />
           {restaurantError ? (
             <FieldError id={`${restaurantId}-error`} message={restaurantError} />

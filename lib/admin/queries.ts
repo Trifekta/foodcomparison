@@ -6,6 +6,7 @@ import type { AnalyticsRow } from "@/lib/calculations/analytics";
 import type {
   AreaRow,
   SubmissionEventRow,
+  SubmissionExtractionRow,
   SubmissionItemRow,
   SubmissionStatus,
   SubmissionWithArea,
@@ -148,6 +149,26 @@ export async function getSubmissionItems(id: string): Promise<SubmissionItemRow[
 
   if (error) throw new Error(`Could not load items: ${error.message}`);
   return (data ?? []) as SubmissionItemRow[];
+}
+
+/**
+ * The most recent extraction run, so reloading the page does not lose a result
+ * the admin has not confirmed yet.
+ */
+export async function getLatestExtraction(id: string): Promise<SubmissionExtractionRow | null> {
+  const supabase = await createServerSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("submission_extractions")
+    .select("*")
+    .eq("submission_id", id)
+    .eq("status", "ok")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return null;
+  return (data as SubmissionExtractionRow | null) ?? null;
 }
 
 export async function getSubmissionEvents(id: string): Promise<SubmissionEventRow[]> {

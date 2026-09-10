@@ -1,73 +1,83 @@
 import { z } from "zod";
-import { MAX_CART_ITEMS, MAX_ITEM_NAME_LENGTH, MAX_ITEM_QUANTITY } from "@/lib/constants";
 
 /**
- * What the vision model is asked to return, and what we let through afterwards.
+ * The structured basket, and the schema the model is held to.
  *
- * The model's schema is deliberately flat and all-required: an empty string
- * means "not visible in the screenshot" rather than an absent key, which keeps
- * the JSON schema simple and gives the model one obvious way to say "I can't
- * see this" instead of inventing a value.
- *
- * Prices are strings, never numbers. Money never touches binary floating point
- * in this codebase, and a model that returns 32.5 for "32.50" would otherwise
- * quietly become 32.5 fils-worth of rounding trouble.
+ * Field names follow the agreed contract exactly. Money is the one deliberate
+ * departure: every amount is a decimal STRING, never a JSON number. This
+ * codebase does currency arithmetic in integer fils precisely so that money
+ * never touches binary floating point, and a model emitting 32.5 for "32.50",
+ * or 1e2 for "100.00", would smuggle a float back in at the one boundary we
+ * cannot re-check. An empty string means "not present in the source".
  */
 
-export const modelExtractionSchema = z.object({
-  /** The restaurant as printed, or "" when the screenshot does not show it. */
-  restaurantName: z.string(),
-  items: z.array(
-    z.object({
-      /** The item as printed, including any size or option shown on the row. */
-      name: z.string(),
-      quantity: z.number().int(),
-      /**
-       * The price printed on that row, exactly as shown, e.g. "64.00".
-       * Deliberately the row price and not a per-unit price: delivery apps
-       * differ on which they display, and asking the model to divide invents
-       * precision the screenshot does not have. "" when no price is shown.
-       */
-      linePrice: z.string(),
-    }),
-  ),
-  /** The order total printed on the screenshot, or "". */
-  orderTotal: z.string(),
-  /** False when the image is not a food-delivery cart or is unreadable. */
-  readable: z.boolean(),
+const money = z.string();
+
+export const structuredItemSchema = z.object({
+  name: z.string(),
+  quantity: z.number().int(),
+  /** Options printed under or beside the item: "Extra garlic", "No pickles". */
+  modifiers: z.array(z.string()),
+  /** Price for a single unit, if the source states one separately. */
+  unit_price: money,
+  /** Price printed against the row as a whole. */
+  line_total: money,
 });
 
-export type ModelExtraction = z.infer<typeof modelExtractionSchema>;
-
-/** One item after cleaning, as the wizard and the API exchange it. */
-export interface ExtractedItem {
-  name: string;
-  quantity: number;
-  /** Integer fils, or null when the screenshot showed no price. */
-  linePriceMinor: number | null;
-}
-
-export interface ExtractionResult {
-  restaurantName: string | null;
-  items: ExtractedItem[];
-  orderTotalMinor: number | null;
-  readable: boolean;
-}
-
-/** The shape sent to the browser. Prices travel as fixed-2 decimal strings. */
-export const extractionResponseSchema = z.object({
-  restaurantName: z.string().max(200).nullable(),
-  items: z
-    .array(
-      z.object({
-        name: z.string().min(1).max(MAX_ITEM_NAME_LENGTH),
-        quantity: z.number().int().min(1).max(MAX_ITEM_QUANTITY),
-        linePrice: z.string().nullable(),
-      }),
-    )
-    .max(MAX_CART_ITEMS),
-  orderTotal: z.string().nullable(),
-  readable: z.boolean(),
+export const structuredBasketSchema = z.object({
+  restaurant_name: z.string(),
+  /** Talabat, Careem Food, Deliveroo, Noon Food - or "" if not identifiable. */
+  source_app: z.string(),
+  currency: z.string(),
+  items: z.array(structuredItemSchema),
+  subtotal: money,
+  delivery_fee: money,
+  service_fee: money,
+  discount: money,
+  final_total: money,
+  /**
+   * Dot-paths the model is not confident about, e.g. "items[2].line_total" or
+   * "restaurant_name". The admin UI highlights every field named here, so an
+   * over-full list is cheap and an empty one where it should not be is not.
+   */
+  uncertain_fields: z.array(z.string()),
 });
 
-export type ExtractionResponse = z.infer<typeof extractionResponseSchema>;
+export type StructuredBasket = z.infer<typeof structuredBasketSchema>;
+export type StructuredItem = z.infer<typeof structuredItemSchema>;
+
+/** How the basket was produced. Stored, shown to the admin, and evaluated on. */
+export type ExtractionMethod = "ocr_llm" | "vision";
+
+export interface ExtractionRun {
+  method: ExtractionMethod;
+  basket: StructuredBasket;
+  /** Verbatim OCR output. Null on the vision path, which never runs OCR. */
+  ocrText: string | null;
+  ocrConfidence: number | null;
+  ocrEngine: string | null;
+  ocrMs: number | null;
+  model: string;
+  promptVersion: string;
+  llmMs: number;
+}
+
+export type ExtractionOutcome =
+  | { ok: true; run: ExtractionRun }
+  | { ok: false; reason: "not_configured" | "unreadable" | "failed"; detail?: string };
+
+/** An empty basket, used when there is nothing to show but the shape is needed. */
+export function emptyBasket(): StructuredBasket {
+  return {
+    restaurant_name: "",
+    source_app: "",
+    currency: "AED",
+    items: [],
+    subtotal: "",
+    delivery_fee: "",
+    service_fee: "",
+    discount: "",
+    final_total: "",
+    uncertain_fields: [],
+  };
+}

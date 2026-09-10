@@ -23,9 +23,9 @@ export interface ProposedItem {
  * simply one nobody has filled in. `key` is a stable React key that survives
  * reordering and deletion - the name is not unique enough for that.
  *
- * `proposed` is set only on rows a vision model suggested. Comparing the row
- * against it at submit time tells us whether the customer accepted the read or
- * corrected it, which is the only honest way to label the row's source.
+ * `proposed` is unused on the customer path, which is entirely typed, and is
+ * kept because the source labelling below is shared with the admin extraction
+ * flow, where a row genuinely can start as a machine suggestion.
  */
 export interface CartItemDraft {
   key: string;
@@ -35,9 +35,6 @@ export interface CartItemDraft {
   linePrice: string | null;
   proposed: ProposedItem | null;
 }
-
-/** How the screenshot read is going, as far as the wizard is concerned. */
-export type ExtractionStatus = "idle" | "reading" | "applied" | "empty" | "failed";
 
 export const TOTAL_STEPS = 5;
 

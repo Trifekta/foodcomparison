@@ -17,3 +17,10 @@ coverage
 .wrangler
 .dev.vars
 .dev.vars.*
+
+# Copied from node_modules by scripts/copy-ocr-assets.mjs
+public/tesseract
+
+# tesseract.js decompresses language data into the working directory when it
+# runs under Node (the evaluation script).
+*.traineddata

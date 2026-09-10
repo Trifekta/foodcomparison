@@ -100,6 +100,34 @@ export interface SubmissionItemRow {
   created_at: string;
 }
 
+export type ExtractionMethod = "ocr_llm" | "vision";
+
+/** One admin-triggered basket extraction, successful or not. */
+export interface SubmissionExtractionRow {
+  id: string;
+  submission_id: string;
+  method: ExtractionMethod;
+  status: "ok" | "failed";
+  /** Verbatim OCR output. Null on the vision route, which runs no OCR. */
+  ocr_text: string | null;
+  ocr_confidence: string | null;
+  ocr_engine: string | null;
+  ocr_ms: number | null;
+  model: string | null;
+  prompt_version: string | null;
+  llm_ms: number | null;
+  /** The model's output. Never edited - corrections live in `confirmed`. */
+  structured: Record<string, unknown> | null;
+  uncertain_fields: string[];
+  error: string | null;
+  /** Set only when an admin explicitly confirmed the basket. */
+  confirmed: Record<string, unknown> | null;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  created_at: string;
+  created_by: string | null;
+}
+
 export interface SubmissionEventRow {
   id: string;
   submission_id: string;

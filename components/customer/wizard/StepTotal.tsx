@@ -1,7 +1,6 @@
 "use client";
 
-import { Info, Sparkles } from "lucide-react";
-import { CURRENCY } from "@/lib/constants";
+import { Info } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { AmountInput } from "@/components/forms/AmountInput";
 
@@ -10,9 +9,6 @@ interface StepTotalProps {
   onCurrentTotalChange: (value: string) => void;
   totalError?: string;
   hasCheckoutScreenshot: boolean;
-  /** The total printed on the screenshot, if one was read. */
-  readTotal: string | null;
-  onUseReadTotal: () => void;
   onContinue: () => void;
 }
 
@@ -21,13 +17,8 @@ export function StepTotal({
   onCurrentTotalChange,
   totalError,
   hasCheckoutScreenshot,
-  readTotal,
-  onUseReadTotal,
   onContinue,
 }: StepTotalProps) {
-  // Offered, never applied for them. This number is the baseline for the saving
-  // we quote back, so the customer has to put it there themselves.
-  const showHint = readTotal !== null && readTotal !== currentTotal;
   return (
     <>
       <h1 className="text-[1.9rem] font-extrabold leading-tight text-ink-900">
@@ -46,28 +37,6 @@ export function StepTotal({
           error={totalError}
         />
       </div>
-
-      {showHint ? (
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-chip-green-bg px-3.5 py-3">
-          <p className="flex min-w-0 flex-1 items-start gap-2 text-sm leading-snug text-chip-green-fg">
-            <Sparkles aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              Your screenshot shows{" "}
-              <span className="font-extrabold tabular-nums">
-                {CURRENCY} {readTotal}
-              </span>
-              .
-            </span>
-          </p>
-          <button
-            type="button"
-            onClick={onUseReadTotal}
-            className="min-h-9 shrink-0 rounded-full bg-white px-3.5 text-sm font-bold text-ink-900 ring-1 ring-emerald-200 hover:bg-emerald-50"
-          >
-            Use this
-          </button>
-        </div>
-      ) : null}
 
       <p className="mt-4 flex items-start gap-2 rounded-2xl bg-flame-50 p-3.5 text-sm leading-relaxed text-ink-600">
         <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-flame-500" />

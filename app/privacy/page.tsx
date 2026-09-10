@@ -78,19 +78,27 @@ export default function PrivacyPage() {
         {readsScreenshots ? (
           <Section title="How we read your screenshot">
             <p>
-              To save you typing, we send your cart screenshot to Anthropic&apos;s Claude API, which
-              reads the restaurant, the items and the prices from it and sends them back to us. This
-              happens outside the UAE. Anthropic processes the image on our behalf to answer that
-              one request and does not use it to train their models.
+              Sending us a comparison does not send your screenshot anywhere. It is stored privately
+              and, in the normal course of things, only a member of staff opens it.
             </p>
             <p>
-              What comes back is a suggestion, not a decision. It is shown to you on the next screen
-              for you to correct, and what we store is the version you confirmed — never the
-              machine&apos;s guess on its own.
+              When staff work on your comparison they may use software to help read the basket. That
+              reading happens on the staff member&apos;s own computer, and only the resulting{" "}
+              <em>text</em> — restaurant, items, quantities, prices — is sent to Anthropic&apos;s
+              Claude API to be tidied into a list. Your screenshot itself stays with us. Anthropic
+              processes that text on our behalf to answer that one request and does not use it to
+              train their models.
             </p>
             <p>
-              If you would rather this did not happen, you can clear the suggested items and type
-              your basket yourself, or leave the item list empty entirely — it is optional.
+              Occasionally the reading software cannot cope — an unclear photo, or Arabic it cannot
+              make out. A staff member may then choose to send the screenshot itself to be read
+              instead. This is a deliberate decision taken by a person, not something that happens
+              automatically, and it happens outside the UAE.
+            </p>
+            <p>
+              Nothing read this way is treated as final. A member of staff checks and corrects it
+              before it is used, and it never replaces the restaurant or the total you told us
+              yourself.
             </p>
           </Section>
         ) : null}
@@ -100,7 +108,7 @@ export default function PrivacyPage() {
             Screenshots are stored privately and are not publicly accessible. Only {BRAND_NAME} staff
             carrying out your comparison can open them, through short-lived links that expire
             {readsScreenshots
-              ? ", plus the reading service described above, which receives the image but does not store it"
+              ? ", and the reading service described above, in the uncommon case where a staff member sends it there"
               : ""}
             .
           </p>
