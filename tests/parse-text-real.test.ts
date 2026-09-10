@@ -308,6 +308,19 @@ describe("Mandarin Oak cart screen", () => {
     expect(names).not.toContain("cookie");
   });
 
+  it("catches the banner however OCR mangles it", () => {
+    // The same screenshot, read twice, gave "earn a stamp" once and "earn a
+    // star" the next time. Matching whole phrases misses the second reading.
+    for (const wording of ["earn a stamp", "earn a star", "earn a starnp"]) {
+      const { basket: b } = parseOcrText(
+        `Cart\n<  Mandarin Oak\no   Place your order and ${wording}   ®\nWok Box\n528.00 535.00`,
+      );
+      const names = JSON.stringify(b.items).toLowerCase();
+      expect(names).not.toContain("place your order");
+      expect(names).toContain("wok box");
+    }
+  });
+
   it("does not treat a savings banner as an item", () => {
     const everything = JSON.stringify(basket).toLowerCase();
     expect(everything).not.toContain("saving");

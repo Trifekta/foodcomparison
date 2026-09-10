@@ -130,19 +130,23 @@ function awaitsContinuation(name: string): boolean {
  * "Congrats! You saved AED 4.90" reads exactly like an item to a rules parser:
  * words, then money. Unlike NOISE these are matched at any line length, because
  * a banner is a sentence.
+ *
+ * These are deliberately STEMS, not whole phrases. "earn a stamp" came back
+ * from a second reading of the same screenshot as "earn a star", and an exact
+ * phrase misses that; "earn a" does not. Every entry here is chosen to be the
+ * part of the sentence least likely to be mangled, and short enough that OCR
+ * has fewer characters to get wrong.
  */
 const PROMO = [
   "congrats",
-  "you saved",
+  "place your order",
+  "earn a",
+  "saved",
+  "saving",
   "cashback",
   "get extra",
   "no coupons apply",
   "place order",
-  "you're saving",
-  "you are saving",
-  "maximize your savings",
-  "maximise your savings",
-  "earn a stamp",
   "to get free delivery",
   "delivering in",
   "yearly plan",
