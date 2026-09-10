@@ -1,6 +1,6 @@
 # FindFood UAE visual assets
 
-These files were cropped from the ChatGPT-generated FindFood reference screens from this conversation.
+Standalone AI-generated renders, transparent PNG, no UI chrome in the pixels.
 
 - spread.png — main food group for landing/upload hero
 - celebration.png — alternate food group for confirmation hero
@@ -28,3 +28,12 @@ layered around them in the components:
 So an asset should arrive on a transparent background with no badge, tick,
 label or caption in its pixels. Anything baked in ends up duplicated, because
 the component draws its own.
+
+## Weight
+
+The seven renders total about 10 MB, and the heroes sit above the fold. They are
+served at their native resolution, which is well above what any slot displays -
+`spread.png` is 2172px wide for a slot that renders around 220px. Nothing about
+the artwork needs to change to fix that: a build step emitting correctly-sized
+copies would cut the payload by roughly an order of magnitude while keeping
+these files as the source of truth.

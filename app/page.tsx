@@ -47,7 +47,7 @@ export default function LandingPage() {
       <main className="flex flex-1 flex-col">
         {/* Hero banner */}
         <div className="relative mt-3 rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4">
-          <div className="relative z-10 max-w-[50%]">
+          <div className="relative z-10 max-w-[44%]">
             <ScriptNote className="text-[1.35rem] text-ink-900">
               Good Food
               <br />
@@ -62,7 +62,7 @@ export default function LandingPage() {
           <FoodPhoto
             name="spread"
             eager
-            className="pointer-events-none absolute -top-3 right-1 w-[58%] select-none"
+            className="pointer-events-none absolute right-0 top-1/2 w-[62%] -translate-y-1/2 select-none"
           />
           <ScriptBubble className="absolute -right-1 -top-2 z-10 text-[0.64rem] leading-tight">
             Save

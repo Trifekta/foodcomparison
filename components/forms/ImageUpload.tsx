@@ -190,7 +190,7 @@ export function ImageUpload({
               </>
             ) : (
               <>
-                <span aria-hidden="true" className="relative mb-1.5 block h-[4.5rem] w-24">
+                <span aria-hidden="true" className="relative mb-1.5 block h-[5.25rem] w-28">
                   <FoodPhoto name={art} className="absolute inset-0 h-full w-full object-contain" />
                   <span className="absolute -bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-brand-400 shadow-sm">
                     <Camera className="h-4.5 w-4.5 text-ink-900" strokeWidth={2.2} />

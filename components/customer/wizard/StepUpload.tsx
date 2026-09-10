@@ -33,7 +33,7 @@ export function StepUpload({
     <>
       {/* Hero banner. The spread bleeds past the top edge, as in the reference. */}
       <div className="relative rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4">
-        <div className="relative z-10 max-w-[50%]">
+        <div className="relative z-10 max-w-[44%]">
           <ScriptNote underline className="text-[1.35rem] text-ink-900">
             Same Food
             <br />
@@ -48,7 +48,7 @@ export function StepUpload({
         <FoodPhoto
           name="spread"
           eager
-          className="pointer-events-none absolute -top-3 right-1 w-[58%] select-none"
+          className="pointer-events-none absolute right-0 top-1/2 w-[62%] -translate-y-1/2 select-none"
         />
         <ScriptBubble className="absolute -right-1 -top-2 z-10 text-[0.64rem] leading-tight">
           Good

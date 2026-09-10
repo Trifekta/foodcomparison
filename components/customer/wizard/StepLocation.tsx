@@ -67,7 +67,9 @@ export function StepLocation({
         {/* Bowl vignette on a soft blob that bleeds off the right edge */}
         <div aria-hidden="true" className="pointer-events-none absolute -top-3 -right-2 h-40 w-[46%] select-none">
           <span className="absolute inset-x-0 top-2 bottom-6 rounded-[2.5rem] bg-linear-to-br from-brand-100/80 to-beige" />
-          <FoodPhoto name="bowl" eager className="absolute bottom-4 right-4 w-[74%]" />
+          <FoodPhoto name="bowl" eager className="absolute bottom-3 right-3 w-[70%]" />
+          {/* Pin drawn in HTML, not baked into the bowl render */}
+          <MapPin className="absolute right-[42%] top-4 h-9 w-9 fill-[#e2483a] text-[#e2483a] drop-shadow" />
           <ScriptBubble className="absolute right-1 top-0 text-[0.66rem]">
             Good
             <br />
