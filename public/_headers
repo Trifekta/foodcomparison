@@ -1,0 +1,9 @@
+# Next.js fingerprints these filenames, so they can be cached forever.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Customer screenshots are private and never served from here, but be explicit
+# that nothing under this origin should be cached by shared proxies by default.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

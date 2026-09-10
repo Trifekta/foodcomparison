@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // Must match the Worker name in the Cloudflare dashboard. Workers Builds
+  // deploys to the project name, so a mismatch here is rejected at deploy time.
+  "name": "foodcomparison",
+
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-08",
+
+  // nodejs_compat: Next.js and supabase-js need Node built-ins.
+  // global_fetch_strictly_public: outbound fetch goes to the public internet
+  // rather than looping back into this Worker.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+
+  // Deliberately no WORKER_SELF_REFERENCE service binding. OpenNext only needs
+  // it to drive the ISR revalidation queue, and this app has no ISR: customer
+  // and admin routes are force-dynamic, and the handful of static pages are
+  // served straight from assets. A self-referencing binding also cannot be
+  // created on a Worker's first deploy, since the Worker does not exist yet.
+
+  // Secrets are NOT set here. SUPABASE_SERVICE_ROLE_KEY (and RESEND_API_KEY,
+  // if used) are Worker secrets - see README, "Deploy to Cloudflare Workers".
+}

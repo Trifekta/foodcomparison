@@ -32,7 +32,7 @@ The MVP exists to answer four questions:
 - [5. Create the first admin](#5-create-the-first-admin)
 - [6. Environment variables](#6-environment-variables)
 - [7. Run locally](#7-run-locally)
-- [8. Deploy to Vercel](#8-deploy-to-vercel)
+- [8. Deploy](#8-deploy)
 - [Testing](#testing)
 - [Acceptance walkthrough](#acceptance-walkthrough)
 - [How it is put together](#how-it-is-put-together)
@@ -57,7 +57,7 @@ The MVP exists to answer four questions:
 | Icons | Lucide React |
 | Type | Plus Jakarta Sans (self-hosted via `next/font`) |
 | Tests | Vitest |
-| Hosting | Vercel |
+| Hosting | Cloudflare Workers (via OpenNext) or Vercel |
 
 Dependencies are kept lean on purpose. Email (Resend) is optional and the app
 works fully without it.
@@ -223,6 +223,9 @@ npm run dev          # http://localhost:3000
 | `npm run typecheck` | TypeScript, no emit |
 | `npm run lint` | ESLint |
 | `npm test` | Vitest suite |
+| `npm run cf:build` | Build the Cloudflare Worker bundle into `.open-next/` |
+| `npm run cf:preview` | Build and run the real Worker locally on workerd |
+| `npm run cf:deploy` | Build and deploy to Cloudflare |
 
 Routes:
 
@@ -240,18 +243,101 @@ Routes:
 
 ---
 
-## 8. Deploy to Vercel
+## 8. Deploy
 
-1. Push this repository to GitHub.
-2. In Vercel, **Add New → Project**, import the repository. Vercel detects
-   Next.js; leave the build settings alone.
-3. Under **Settings → Environment Variables**, add all five variables from
+The repository is configured for **Cloudflare Workers** (`wrangler.jsonc` +
+`open-next.config.ts`). Vercel also works with no changes — see below.
+
+### Cloudflare Workers
+
+The Worker name in `wrangler.jsonc` **must match the Worker in your Cloudflare
+account**. It is currently `foodcomparison`. If you rename the Worker, change
+that `name` too, or the deploy is rejected.
+
+**1. Workers Builds settings** (Workers & Pages → your Worker → Settings →
+Build):
+
+| Setting | Value |
+| --- | --- |
+| Build command | `npm run cf:build` |
+| Deploy command | `npx wrangler deploy` |
+
+`cf:build` runs `opennextjs-cloudflare build`, which runs `next build` itself
+and then bundles the Worker into `.open-next/`. Leaving the build command as
+plain `npm run build` also works but builds Next.js twice.
+
+**2. Build variables** — Settings → Build → Variables. These are inlined into
+the bundle at build time, so they **must** be set here, not only as secrets:
+
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+NEXT_PUBLIC_APP_URL
+```
+
+**3. Secrets** — Settings → Variables and Secrets, added as **Secret**, not
+plain text. These are read at runtime, and the OpenNext adapter copies Worker
+bindings into `process.env` on each request:
+
+```
+SUPABASE_SERVICE_ROLE_KEY
+RESEND_API_KEY      (optional)
+EMAIL_FROM          (optional)
+```
+
+You can also set them from the CLI:
+
+```bash
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+```
+
+**4. Deploy**, then set your custom domain under the Worker's **Domains &
+Routes**.
+
+**5. In Supabase**, go to **Authentication → URL Configuration** and set the
+**Site URL** to your deployed domain.
+
+To build and run the Worker locally before pushing:
+
+```bash
+npm run cf:preview          # builds and serves the real Worker on workerd
+npx wrangler deploy --dry-run   # validates config and bindings, deploys nothing
+```
+
+Local Worker runs read secrets from a `.dev.vars` file (git-ignored) in the same
+`KEY=value` format as `.env.local`.
+
+#### Notes specific to Workers
+
+- **No `WORKER_SELF_REFERENCE` binding.** OpenNext's scaffolder adds one to
+  drive the ISR revalidation queue. This app has no ISR — every customer and
+  admin route is `force-dynamic` and the static pages come from Workers Assets —
+  so the binding is omitted. It is also impossible to create on a Worker's first
+  deploy, since a Worker cannot bind to itself before it exists. If you add ISR
+  later, add the binding *and* deploy once without it first.
+- **Middleware is experimental on Workers.** OpenNext prints a warning for
+  `proxy.ts`. Its matcher is `/admin/:path*` only, so the customer journey —
+  landing, wizard, `/api/submissions`, success — never runs through it. It
+  refreshes admin session cookies and redirects anonymous visitors; every admin
+  page independently calls `requireAdmin()`, and RLS is the real enforcement, so
+  deleting `proxy.ts` is a safe fallback if it ever misbehaves.
+- **Rate limiting is weaker here.** `lib/utils/rate-limit.ts` keeps counters in
+  memory, and Workers spreads requests across many short-lived isolates, so the
+  limit is best-effort at best. Move it to KV or a Durable Object if abuse
+  becomes real.
+
+### Vercel
+
+1. **Add New → Project**, import the repository. Vercel detects Next.js; leave
+   the build settings alone (`npm run build` is plain `next build`).
+2. Under **Settings → Environment Variables**, add all five variables from
    `.env.local` to **Production** (and Preview, if you use it). Set
-   `NEXT_PUBLIC_APP_URL` to your real domain, e.g. `https://findfoodae.com`.
-4. **Deploy.**
-5. Add your custom domain under **Settings → Domains**.
-6. In Supabase, go to **Authentication → URL Configuration** and set the **Site
-   URL** to your deployed domain.
+   `NEXT_PUBLIC_APP_URL` to your real domain.
+3. **Deploy**, add your domain under **Settings → Domains**, and set the
+   Supabase **Site URL** as above.
+
+The Cloudflare files are inert on Vercel, and `next.config.ts` only loads the
+adapter in development.
 
 After deploying, sign in at `https://your-domain/admin/login` and walk the
 acceptance list below.
@@ -361,6 +447,8 @@ lib/
 supabase/migrations/           the SQL you run, in order
 types/                         database row types
 proxy.ts                       refreshes admin sessions, blocks /admin early
+wrangler.jsonc                 Cloudflare Worker name, flags and asset binding
+open-next.config.ts            OpenNext adapter config (no ISR cache needed)
 ```
 
 **Where the business rules live.** `lib/calculations/saving.ts` is the only place

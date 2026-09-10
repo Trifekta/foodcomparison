@@ -1,5 +1,3 @@
-import { randomInt } from "node:crypto";
-
 /**
  * Customer-facing reference, e.g. FFA-260910-0042.
  *
@@ -17,10 +15,28 @@ export function formatReferenceDate(date: Date): string {
   return `${yy}${mm}${dd}`;
 }
 
+/**
+ * Uniform random integer in [0, max).
+ *
+ * Uses Web Crypto, which is available on Node and on Cloudflare Workers alike,
+ * so this module needs no Node built-ins. Rejection sampling keeps the
+ * distribution even - taking a modulo alone would bias the low end.
+ */
+function randomBelow(max: number): number {
+  const limit = Math.floor(0x1_0000_0000 / max) * max;
+  const buffer = new Uint32Array(1);
+  let value: number;
+  do {
+    crypto.getRandomValues(buffer);
+    value = buffer[0];
+  } while (value >= limit);
+  return value % max;
+}
+
 /** Injectable randomness keeps this testable without stubbing crypto globally. */
 export function generateReferenceNumber(
   date: Date = new Date(),
-  random: (max: number) => number = (max) => randomInt(max),
+  random: (max: number) => number = randomBelow,
 ): string {
   const suffix = String(random(10000)).padStart(4, "0");
   return `${REFERENCE_PREFIX}-${formatReferenceDate(date)}-${suffix}`;

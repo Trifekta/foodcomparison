@@ -6,7 +6,14 @@ const eslintConfig = [
   ...coreWebVitals,
   ...typescriptConfig,
   {
-    ignores: [".next/**", "node_modules/**", "next-env.d.ts"],
+    ignores: [
+      ".next/**",
+      ".open-next/**",
+      ".wrangler/**",
+      "node_modules/**",
+      "next-env.d.ts",
+      "cloudflare-env.d.ts",
+    ],
   },
   {
     // The manual comparison provider implements a future interface; its unused

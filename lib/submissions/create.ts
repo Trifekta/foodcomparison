@@ -1,6 +1,5 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
 import { COMPARISON_APP, OTHER_APP_VALUE, STORAGE_BUCKET } from "@/lib/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { validateImageFile, type ImageValidationSuccess } from "@/lib/validation/image";
@@ -124,7 +123,8 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   // Uploading before the insert means the row is never written with a
   // placeholder path, and a failed insert leaves only orphaned objects, which
   // we clean up below.
-  const submissionId = randomUUID();
+  // Web Crypto global: works on Node and on Cloudflare Workers alike.
+  const submissionId = crypto.randomUUID();
   const uploadedPaths: string[] = [];
 
   const cartPath = `submissions/${submissionId}/cart.${cartImage.extension}`;

@@ -11,3 +11,9 @@ npm-debug.log*
 next-env.d.ts
 tsconfig.tsbuildinfo
 coverage
+
+# Cloudflare Workers / OpenNext
+.open-next
+.wrangler
+.dev.vars
+.dev.vars.*
