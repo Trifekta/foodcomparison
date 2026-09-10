@@ -181,12 +181,13 @@ describe("Noon Food cart screen", () => {
     expect(basket.items[0]?.line_total).not.toBe("");
   });
 
-  it("flags a price it cannot prove, rather than guessing at it", () => {
-    // "539.00" is the AED glyph welded to 39.00. On the checkout screen that
-    // gets repaired outright, because the arithmetic proves it. Here there is
-    // no readable total to reconcile against - so the value is left alone and
-    // marked for the customer to check, which is the honest answer.
-    expect(basket.items[0]?.line_total).toBe("539.00");
+  it("drops a currency glyph OCR welded to the price, and flags it", () => {
+    // "539.00" is the AED mark read as a 5 in front of 39.00. There is no total
+    // on this screen to prove it arithmetically, so this is the narrow
+    // heuristic: the leading digit is one the glyph is really misread as, and
+    // 539 for one dish is past what a delivery order costs. Repaired, and
+    // flagged, because showing someone AED 539 for a set menu is worse.
+    expect(basket.items[0]?.line_total).toBe("39.00");
     expect(basket.uncertain_fields).toContain("items[0].line_total");
   });
 
@@ -220,5 +221,119 @@ describe("Noon Food cart screen", () => {
     // customer typing it on the next step, which they do anyway.
     expect(basket.final_total).not.toBe("4075.00");
     expect(basket.final_total).not.toBe("4075");
+  });
+});
+
+// Talabat again, a different order. Three new shapes: the item name wraps onto
+// two lines, the price line carries BOTH the discounted price and the struck-
+// through original, and the upsell shelf appears with its heading scrolled off
+// the top - so there is no "You might also like" to stop at.
+const MANDARIN_CART = `10:15 0 ¢ °                    NZ all all
+Cart
+<     Mandarin Oak
+o   Place your order and earn a stamp                                   ®
+Make Your Own Wok Box (Non
+Veg)                                                   \\y  a3
+Hakka Noodles, Kung Pao Chicken              ae Toa      g
+2. Edit
+o 1 +
+528.00 535.00
+You might also like...
+Save 0.80                                                      '
+:           =            =a  &
+NN FAL 3           By
++ NN +                      +
+Muffin                    Steamed Jasmine Oat & Golden          Straw
+83.20                 Rice                    Raisin Cookie        Chee
+8-400                  8.9.60                 8.1040                B18.
+Special request
++
+1      '       i
+Great! You're saving £7.00                                *®
+—
+Add B 115.00 to maximize your savings
+Add items                      Checkout
+I                    O                     <`;
+
+// The payment screen for the same order, scrolled so the upsell cards sit at
+// the top with no heading above them. This is the screenshot that broke it.
+const MANDARIN_PAYMENT = `10:15 0 @                    Nf = all al
+Cart
+<     Mandarin Oak
+MuTTn                    Steamed Jasmine Lat & Golden          Straw
+83.20                 Rice                    Raisin Cookie        Chee
+84.00                    8.9.60                  8.10.40                 B18.
+Special request
+Cutlery
+?q    Reduce waste. Select this option only if you
+really need cutlery.
+0   Any special requests?
+Anything else we need to know?
+Payment summary
+Subtotal                                                         £35.00
+Discount #                                                    -8700
+Delivery fee ©                                                  5490
+Service fee ©                                                    B175
+Total amount                                               B 34.65
++
+1      '        i
+Great! You're saving £700                                *
+—
+Add B 115.00 to maximize your savings
+Add items                      Checkout
+I                      O                       <`;
+
+describe("Mandarin Oak cart screen", () => {
+  const { basket } = parseOcrText(MANDARIN_CART);
+
+  it("finds the restaurant", () => {
+    expect(basket.restaurant_name).toBe("Mandarin Oak");
+  });
+
+  it("finds the one ordered item, whose name wrapped onto two lines", () => {
+    expect(basket.items).toHaveLength(1);
+    expect(basket.items[0]?.name).toContain("Make Your Own Wok Box");
+  });
+
+  it("takes the discounted price, not the struck-through original", () => {
+    // The line reads "528.00 535.00": 28.00 now, was 35.00. Taking the last
+    // number on the line charges the customer the price they are not paying.
+    expect(basket.items[0]?.line_total).toBe("28.00");
+  });
+
+  it("keeps the upsell shelf out of the basket", () => {
+    const names = JSON.stringify(basket.items).toLowerCase();
+    expect(names).not.toContain("muffin");
+    expect(names).not.toContain("jasmine");
+    expect(names).not.toContain("cookie");
+  });
+
+  it("does not treat a savings banner as an item", () => {
+    const everything = JSON.stringify(basket).toLowerCase();
+    expect(everything).not.toContain("saving");
+    expect(everything).not.toContain("maximize");
+    expect(everything).not.toContain("earn a stamp");
+  });
+});
+
+describe("Mandarin Oak payment screen, upsell heading scrolled away", () => {
+  const { basket } = parseOcrText(MANDARIN_PAYMENT);
+
+  it("recognises a shelf of cards by its column spacing, not by a heading", () => {
+    // No "You might also like" on this screenshot - it is above the fold. The
+    // rows are still three columns of names wide, which nothing you eat is.
+    const names = JSON.stringify(basket.items).toLowerCase();
+    expect(names).not.toContain("jasmine");
+    expect(names).not.toContain("raisin");
+    expect(names).not.toContain("straw");
+  });
+
+  it("reads the totals it can, and does not invent the ones it cannot", () => {
+    expect(basket.subtotal).toBe("35.00");
+    expect(basket.final_total).toBe("34.65");
+    // "-8700", "5490" and "B175" lost their decimal points entirely. Nothing
+    // reconciles, so they stay empty rather than becoming 8700 and 5490.
+    expect(basket.delivery_fee).not.toBe("5490.00");
+    expect(basket.service_fee).not.toBe("175.00");
   });
 });

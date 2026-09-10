@@ -105,7 +105,23 @@ const NAV_GLYPHS = /^[\s<>«»‹›|:;.,*+~^`'"&€£©®@#()\[\]{}-]+/;
 const TRAILING_JUNK = /[\s:;,|!*+~^`'"\-]+$/;
 
 function tidy(text: string): string {
+  // Only punctuation is trimmed. Stripping short trailing tokens was tried and
+  // reverted: it cleans "\y a3" off a name, but it also eats the "1" from
+  // "Special Set Menu Serves 1", and losing real words costs more than leaving
+  // noise the customer can see and delete.
   return text.replace(TRAILING_JUNK, "").trim();
+}
+
+/**
+ * A name split across two lines by the column being narrow.
+ *
+ * "Make Your Own Wok Box (Non" / "Veg)" is one dish, and the unclosed bracket
+ * says so - the continuation is not a description, it is the rest of the name.
+ */
+function awaitsContinuation(name: string): boolean {
+  const opens = (name.match(/\(/g) ?? []).length;
+  const closes = (name.match(/\)/g) ?? []).length;
+  return opens > closes;
 }
 
 /**
@@ -122,6 +138,12 @@ const PROMO = [
   "get extra",
   "no coupons apply",
   "place order",
+  "you're saving",
+  "you are saving",
+  "maximize your savings",
+  "maximise your savings",
+  "earn a stamp",
+  "to get free delivery",
   "delivering in",
   "yearly plan",
   "% off",
@@ -141,6 +163,32 @@ const VAT_WORDS = ["vat", "tax", "ضريبة"];
  */
 const IMPLAUSIBLE_ITEM_PRICE = 300;
 
+/**
+ * Digits the AED glyph is actually misread as, and the price above which that
+ * becomes the likelier explanation than a genuinely expensive dish.
+ *
+ * Reading English, Tesseract has no letter for د.إ and reaches for the nearest
+ * shape. Across real screenshots that has been 5 or 8 welded to the front of the
+ * number: 28.00 arriving as 528.00, 39.00 as 539.00, 36.00 as 836.00.
+ *
+ * Unlike the arithmetic repair further down, this is a HEURISTIC - there is no
+ * proof, only a strong prior. It is kept narrow on purpose (both the digit and
+ * the threshold must match) and every price it touches is flagged for the
+ * customer, because the alternative is showing someone AED 528 for a wok box.
+ */
+const GLYPH_DIGITS = ["5", "8"];
+const GLYPH_STRIP_ABOVE = 500;
+
+/** Drops a leading currency glyph misread as a digit, or returns null. */
+function withoutGlyphDigit(price: string): string | null {
+  if (!GLYPH_DIGITS.includes(price[0] ?? "")) return null;
+  if (Number(price) <= GLYPH_STRIP_ABOVE) return null;
+
+  const stripped = stripLeadingDigit(price);
+  if (stripped === null) return null;
+  return Number(stripped) >= 1 ? stripped : null;
+}
+
 /** Letters only - digits and glyphs do not make a line a name. */
 function letterCount(text: string): number {
   return (text.match(/\p{L}/gu) ?? []).length;
@@ -149,6 +197,26 @@ function letterCount(text: string): number {
 /** How many money-shaped numbers are on this line. */
 function countPrices(line: string): number {
   return (line.match(/\d{1,5}\.\d{1,2}/g) ?? []).length;
+}
+
+/**
+ * A row of cards laid out side by side, rather than one thing you ordered.
+ *
+ * This is why OCR runs with preserve_interword_spaces: the gaps between columns
+ * survive, and a shelf of upsell cards reads as three or four names separated by
+ * wide runs of space. An ordinary item line has at most one such gap - the one
+ * between its name and its price - so two or more means columns.
+ *
+ * It matters because the heading above the shelf ("You might also like") is
+ * often scrolled off the top of the screenshot, leaving nothing else to go on.
+ */
+function looksLikeCardRow(rawLine: string): boolean {
+  return (rawLine.match(/\S {4,}(?=\S)/g) ?? []).length >= 2;
+}
+
+/** Every money-shaped value on a line, in the order they appear. */
+function allPrices(line: string): string[] {
+  return line.match(/\d{1,5}\.\d{1,2}/g) ?? [];
 }
 
 type FinancialKey = keyof typeof KEYWORDS;
@@ -312,6 +380,19 @@ function repairMergedCurrency(basket: StructuredBasket): string[] {
   return changed;
 }
 
+/**
+ * When a price line shows two amounts, the one you pay is the lower.
+ *
+ * Delivery apps print "28.00 35.00" - the discounted price beside the original
+ * with a line through it. The strike-through does not survive OCR, so position
+ * is no guide, but the discount always is: an offer never raises the price.
+ */
+function cheapestOf(line: string, fallback: string): string {
+  const prices = allPrices(line);
+  if (prices.length < 2) return fallback;
+  return prices.reduce((low, price) => (Number(price) < Number(low) ? price : low));
+}
+
 /** "836.00" -> "36.00". Null when there is no leading digit to spare. */
 function stripLeadingDigit(value: string): string | null {
   const match = value.match(/^\d(\d+(?:\.\d{1,2})?)$/);
@@ -332,9 +413,11 @@ export function parseOcrText(raw: string): ParseResult {
   // own description: a delivery app prints the name, the contents, the price as
   // one block, then a gap before the next item. Discarding them means every
   // description after a priced item looks like a new item.
+  // Raw and collapsed forms are both kept: the collapsed one is what gets read,
+  // the raw one still carries the column spacing that identifies a card shelf.
   const lines = westernise(raw)
     .split(/\r?\n/)
-    .map((line) => line.replace(/\s+/g, " ").trim());
+    .map((rawLine) => ({ raw: rawLine, text: rawLine.replace(/\s+/g, " ").trim() }));
 
   const items: StructuredItem[] = [];
 
@@ -361,7 +444,9 @@ export function parseOcrText(raw: string): ParseResult {
     pending = null;
   };
 
-  for (const [index, original] of lines.entries()) {
+  for (const [index, entry] of lines.entries()) {
+    const original = entry.text;
+
     // The phone's own clock and battery, only ever the first line.
     if (index === 0 && STATUS_BAR.test(original)) continue;
 
@@ -416,14 +501,17 @@ export function parseOcrText(raw: string): ParseResult {
 
     if (itemsClosed) continue;
 
-    // A row of upsell cards puts several prices on one line. It is never an item.
-    if (countPrices(line) >= 3) continue;
+    // A shelf of cards, whether or not its heading survived the screenshot.
+    // Skipped, not flushed: OCR junk beside a description can widen its gaps
+    // enough to look like columns, and closing the row there would strand the
+    // item's price, which is still several lines below.
+    if (countPrices(line) >= 3 || looksLikeCardRow(entry.raw)) continue;
 
     // Quantity steppers and stray glyphs: too few letters to be a name.
     if (letterCount(line) < 3) {
       // Unless it is nothing but a price, which belongs to the item above.
       if (priced && pending && pending.line_total === "" && letterCount(priced.rest) < 3) {
-        pending.line_total = priced.price;
+        pending.line_total = cheapestOf(line, priced.price);
       }
       continue;
     }
@@ -452,7 +540,7 @@ export function parseOcrText(raw: string): ParseResult {
 
     // ---- a price on its own line: it belongs to the item above -------------
     if (priced && letterCount(priced.rest) < 3) {
-      if (pending && pending.line_total === "") pending.line_total = priced.price;
+      if (pending && pending.line_total === "") pending.line_total = cheapestOf(line, priced.price);
       continue;
     }
 
@@ -468,6 +556,12 @@ export function parseOcrText(raw: string): ParseResult {
     if (pending === null) {
       const { quantity, name } = extractQuantity(line);
       pending = { name, quantity, modifiers: [], unit_price: "", line_total: "" };
+      continue;
+    }
+
+    // A name cut in half by a narrow column is finished, not annotated.
+    if (pending.modifiers.length === 0 && awaitsContinuation(pending.name)) {
+      pending.name = `${pending.name} ${line}`.replace(/\s+/g, " ").trim();
       continue;
     }
 
@@ -492,8 +586,11 @@ export function parseOcrText(raw: string): ParseResult {
   }
   if (basket.final_total === "") uncertain.add("final_total");
   items.forEach((item, index) => {
+    const repaired = withoutGlyphDigit(item.line_total);
+    if (repaired !== null) item.line_total = repaired;
+
     if (item.line_total === "") uncertain.add(`items[${index}].line_total`);
-    if (Number(item.line_total) > IMPLAUSIBLE_ITEM_PRICE) {
+    if (repaired !== null || Number(item.line_total) > IMPLAUSIBLE_ITEM_PRICE) {
       uncertain.add(`items[${index}].line_total`);
     }
   });
