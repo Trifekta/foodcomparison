@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Camera, Check, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Camera, Check, Loader2, Maximize2, RefreshCw, Trash2 } from "lucide-react";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/constants";
 import { validateImageClientSide } from "@/lib/validation/submission";
 import { downscaleImage } from "@/lib/utils/image-client";
 import { FieldError } from "@/components/ui/FieldError";
+import { ImageLightbox } from "@/components/ui/ImageLightbox";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { Sparks } from "@/components/customer/Motifs";
 import { cn } from "@/lib/utils/cn";
@@ -50,6 +51,7 @@ export function ImageUpload({
   const [localError, setLocalError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
 
   // Derived from the file rather than stored; the effect only releases the URL.
   const previewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
@@ -130,15 +132,30 @@ export function ImageUpload({
         <div className="mt-3 overflow-hidden rounded-2xl ring-1 ring-ink-100">
           {/*
             Cropped to the top of the screenshot, where the restaurant and items
-            sit. "Change" reopens the picker; the admin sees the full image.
+            sit. Tapping opens the whole thing, which is the only way to catch a
+            screenshot that cut off the bottom of the order.
           */}
-          {/* Local object URL: the Next image optimiser does not apply. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={previewUrl ?? ""}
-            alt={`Preview of your ${label.toLowerCase()}`}
-            className="h-36 w-full bg-ink-50 object-cover object-top"
-          />
+          <button
+            type="button"
+            onClick={() => setZoomed(true)}
+            className="group relative block w-full cursor-zoom-in"
+            aria-label={`View your ${label.toLowerCase()} full size`}
+          >
+            {/* Local object URL: the Next image optimiser does not apply. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl ?? ""}
+              alt={`Preview of your ${label.toLowerCase()}`}
+              className="h-36 w-full bg-ink-50 object-cover object-top"
+            />
+            <span
+              aria-hidden="true"
+              className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink-900/75 px-2.5 py-1 text-[0.7rem] font-bold text-white"
+            >
+              <Maximize2 className="h-3 w-3" strokeWidth={3} />
+              Tap to check
+            </span>
+          </button>
           <div className="flex items-center justify-end gap-1.5 bg-white px-2 py-1.5">
             {allowRemove ? (
               <button
@@ -159,6 +176,13 @@ export function ImageUpload({
               Change
             </button>
           </div>
+
+          <ImageLightbox
+            src={previewUrl}
+            alt={`Your ${label.toLowerCase()}, full size`}
+            open={zoomed}
+            onClose={() => setZoomed(false)}
+          />
         </div>
       ) : (
         <div

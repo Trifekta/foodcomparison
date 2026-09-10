@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Check, ChevronRight, MapPin, Minus, Receipt, Store } from "lucide-react";
 import { COMPARISON_APP, CURRENCY, OTHER_APP_VALUE } from "@/lib/constants";
 import { maskEmail, maskPhone, normalisePhone } from "@/lib/utils/phone";
 import { Button } from "@/components/ui/Button";
+import { ImageLightbox } from "@/components/ui/ImageLightbox";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptNote, Sparks } from "@/components/customer/Motifs";
 import { cn } from "@/lib/utils/cn";
@@ -121,6 +122,9 @@ export function StepReview({
     return () => URL.revokeObjectURL(checkoutThumb);
   }, [checkoutThumb]);
 
+  // Which screenshot, if any, is open full size.
+  const [zoomed, setZoomed] = useState<"cart" | "checkout" | null>(null);
+
   const appLabel =
     values.sourceApp === OTHER_APP_VALUE && values.sourceAppOther.trim()
       ? values.sourceAppOther.trim()
@@ -160,20 +164,34 @@ export function StepReview({
           <div className="flex items-start gap-3">
           <div className="flex shrink-0 gap-2">
             {cartThumb ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={cartThumb}
-                alt="Your cart screenshot"
-                className="h-16 w-16 rounded-xl bg-ink-50 object-cover object-top ring-1 ring-ink-100"
-              />
+              <button
+                type="button"
+                onClick={() => setZoomed("cart")}
+                className="cursor-zoom-in"
+                aria-label="View your cart screenshot full size"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={cartThumb}
+                  alt="Your cart screenshot"
+                  className="h-16 w-16 rounded-xl bg-ink-50 object-cover object-top ring-1 ring-ink-100"
+                />
+              </button>
             ) : null}
             {checkoutThumb ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={checkoutThumb}
-                alt="Your checkout screenshot"
-                className="h-16 w-16 rounded-xl bg-ink-50 object-cover object-top ring-1 ring-ink-100"
-              />
+              <button
+                type="button"
+                onClick={() => setZoomed("checkout")}
+                className="cursor-zoom-in"
+                aria-label="View your checkout screenshot full size"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={checkoutThumb}
+                  alt="Your checkout screenshot"
+                  className="h-16 w-16 rounded-xl bg-ink-50 object-cover object-top ring-1 ring-ink-100"
+                />
+              </button>
             ) : null}
           </div>
           <div className="min-w-0 flex-1">
@@ -181,7 +199,7 @@ export function StepReview({
               {hasCheckoutShot ? "2 screenshots ready" : "1 screenshot ready"}
             </p>
             <p className="mt-0.5 text-[0.85rem] leading-snug text-slate-500">
-              An admin opens these to rebuild your basket.
+              Tap to check nothing got cut off.
             </p>
           </div>
           </div>
@@ -273,6 +291,13 @@ export function StepReview({
           onEdit={onEditContact}
         />
       </section>
+
+      <ImageLightbox
+        src={zoomed === "cart" ? cartThumb : zoomed === "checkout" ? checkoutThumb : null}
+        alt={zoomed === "checkout" ? "Your checkout screenshot, full size" : "Your cart screenshot, full size"}
+        open={zoomed !== null}
+        onClose={() => setZoomed(null)}
+      />
 
       {submitError ? (
         <p
