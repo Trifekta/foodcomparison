@@ -6,7 +6,9 @@ FindFoodae lets a Dubai food-delivery customer send the basket they are about to
 order, and get back an answer: is the same order cheaper on another app?
 
 **Phase 1 is deliberately manual.** A customer submits a cart screenshot, the
-restaurant it is from, their area, their app and their checkout total. An admin opens Keeta, rebuilds the same
+restaurant it is from, their area, their app and their checkout total. A vision
+model reads the screenshot to pre-fill the basket, but it only ever proposes:
+the customer corrects it and what they confirm is what gets stored. An admin opens Keeta, rebuilds the same
 basket by hand, types the total, and the system does the rest — calculates the
 saving, writes the customer message, and hands the admin a prefilled WhatsApp
 link. Nothing is scraped, no platform APIs are called, and no AI reads the
@@ -36,6 +38,7 @@ The MVP exists to answer four questions:
 - [Testing](#testing)
 - [Acceptance walkthrough](#acceptance-walkthrough)
 - [How it is put together](#how-it-is-put-together)
+- [Reading the screenshot](#reading-the-screenshot)
 - [Security model](#security-model)
 - [Screenshot retention](#screenshot-retention)
 - [Design notes](#design-notes)
@@ -108,7 +111,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 
 ## 2. Run the migrations
 
-Open **SQL Editor → New query** in the Supabase dashboard and run these four
+Open **SQL Editor → New query** in the Supabase dashboard and run these five
 files **in order**, one at a time:
 
 | Order | File | What it does |
@@ -117,6 +120,7 @@ files **in order**, one at a time:
 | 2 | `supabase/migrations/0002_row_level_security.sql` | `is_admin()` plus every RLS policy |
 | 3 | `supabase/migrations/0003_storage.sql` | Creates the private bucket and its policies |
 | 4 | `supabase/migrations/0004_cart_items.sql` | Adds `submissions.restaurant_name` and the optional `submission_items` table |
+| 5 | `supabase/migrations/0005_item_prices.sql` | Adds row prices and where each row came from |
 
 Each file is safe to run more than once.
 
@@ -203,6 +207,10 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 # Optional — leave blank and the dashboard falls back to "Copy email message"
 RESEND_API_KEY=
 EMAIL_FROM=FindFoodae <results@yourdomain.com>
+
+# Optional — leave blank and the confirm step starts empty instead of pre-filled
+ANTHROPIC_API_KEY=
+EXTRACTION_MODEL=
 ```
 
 `.env.local` is git-ignored. Never commit real credentials.
@@ -282,9 +290,13 @@ bindings into `process.env` on each request:
 
 ```
 SUPABASE_SERVICE_ROLE_KEY
+ANTHROPIC_API_KEY   (optional - reads the cart screenshot)
 RESEND_API_KEY      (optional)
 EMAIL_FROM          (optional)
 ```
+
+`EXTRACTION_MODEL` is a plain build/runtime variable, not a secret - set it only
+if you want something other than the default.
 
 You can also set them from the CLI:
 
@@ -407,8 +419,10 @@ non-admin sessions, and an admin cannot grant admin rights from inside the app.
 1. Open the homepage, tap **Check my order**.
 2. Upload a cart screenshot into slot 1; leave slot 2 (marked **Optional**)
    empty → **Continue**.
-3. Type **Al Safadi** as the restaurant. Add an item or two if you like — the
-   list is optional and a blank row is simply dropped → **Continue**.
+3. If a reading key is configured, the restaurant, items and prices are already
+   filled in from your screenshot — correct anything wrong, delete what you do
+   not want. Otherwise type **Al Safadi** as the restaurant; the item list is
+   optional and a blank row is simply dropped → **Continue**.
 4. Choose **Al Karama**, choose **Talabat** → **Continue**.
 5. Enter **82** → **Continue**. (The optional checkout screenshot lives on
    screen 1, alongside the required cart screenshot.)
@@ -482,6 +496,47 @@ touches a float.
 **Server components by default.** The customer wizard, the comparison panel and
 the filter bar are client components because they genuinely need interactivity.
 Everything else renders on the server.
+
+---
+
+## Reading the screenshot
+
+With `ANTHROPIC_API_KEY` set, the cart screenshot is read by a vision model as
+soon as the customer picks it, and the confirm step arrives pre-filled with the
+restaurant, the items, their quantities and the price printed on each row. The
+order total is offered on the total step as a "use this" button.
+
+Four rules hold this together, and none of them should be relaxed without
+thinking hard:
+
+1. **It proposes, the customer disposes.** Every value lands in an editable
+   field. What reaches the database is the customer's confirmed version, so a
+   misread costs a correction, never a wrong price.
+2. **The total is never filled in silently.** That number is the baseline for
+   the saving we quote back, so the customer puts it there themselves - the
+   screenshot's total is a suggestion behind an explicit tap.
+3. **Failure is invisible and harmless.** No key, a timeout, a rate limit, an
+   unreadable image: all of them land on an empty confirm step, which is exactly
+   what the wizard did before this feature existed. `/api/extract` never returns
+   an error status for a failed read.
+4. **Nothing a model returns is trusted.** Prices, quantities and names go
+   through the same bounds a typed basket does, and the image is magic-byte
+   checked before it is sent anywhere.
+
+`submission_items.source` records whether each row was typed (`customer`),
+proposed and accepted unchanged (`extracted`), or proposed and then corrected
+(`edited`). The `edited` rows are worth watching: each one is a labelled example
+of the model getting something wrong, collected as a side effect of ordinary
+use, and they are the raw material for measuring whether a cheaper model would
+do just as well.
+
+The image leaves our infrastructure at this point, which `/privacy` discloses -
+and discloses only when a key is actually configured, so the page always matches
+what the deployment does. Read that section before changing what is sent.
+
+Costs run to roughly a cent or two per screenshot on the default model. Set
+`EXTRACTION_MODEL=claude-sonnet-5` or `claude-haiku-4-5` to trade accuracy for
+cost once you have measured both against your own screenshots.
 
 ---
 

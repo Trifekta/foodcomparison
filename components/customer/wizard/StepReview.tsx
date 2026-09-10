@@ -209,8 +209,15 @@ export function StepReview({
                   <span className="min-w-0 flex-1 truncate text-[0.92rem] font-semibold text-ink-900">
                     {item.name}
                   </span>
-                  <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[0.78rem] font-bold tabular-nums text-slate-600 ring-1 ring-ink-200">
-                    &times;{item.quantity}
+                  <span className="inline-flex shrink-0 items-center gap-2">
+                    <span className="rounded-full bg-white px-2.5 py-0.5 text-[0.78rem] font-bold tabular-nums text-slate-600 ring-1 ring-ink-200">
+                      &times;{item.quantity}
+                    </span>
+                    {item.linePrice ? (
+                      <span className="text-[0.88rem] font-extrabold tabular-nums text-ink-900">
+                        {CURRENCY} {item.linePrice}
+                      </span>
+                    ) : null}
                   </span>
                 </li>
               ))}

@@ -35,9 +35,14 @@ export type CreateSubmissionResult =
 const GENERIC_FAILURE = "We couldn't submit your order. Please try again.";
 const MAX_REFERENCE_ATTEMPTS = 5;
 
-type ParsedItems =
-  | { ok: true; value: Array<{ name: string; quantity: number }> }
-  | { ok: false; error: string };
+interface StoredItem {
+  name: string;
+  quantity: number;
+  linePriceMinor: number | null;
+  source: "customer" | "extracted" | "edited";
+}
+
+type ParsedItems = { ok: true; value: StoredItem[] } | { ok: false; error: string };
 
 /** Reads the optional `items` JSON entry. Absent is fine; malformed is not. */
 function parseItems(raw: FormDataEntryValue | null): ParsedItems {
@@ -55,9 +60,24 @@ function parseItems(raw: FormDataEntryValue | null): ParsedItems {
 
   // Names are re-cleaned here: the schema bounds them, sanitiseText strips
   // control characters. A name that sanitises away entirely is dropped.
-  const value = parsed.data.flatMap((item) => {
+  const value = parsed.data.flatMap<StoredItem>((item) => {
     const name = sanitiseText(item.name, MAX_ITEM_NAME_LENGTH);
-    return name ? [{ name, quantity: item.quantity }] : [];
+    if (!name) return [];
+
+    // The price is re-parsed here rather than trusted as a string: it reaches
+    // the database as an integer, and a malformed one drops the price, not the
+    // item.
+    let linePriceMinor: number | null = null;
+    if (item.linePrice !== null) {
+      try {
+        const minor = parseAmountToMinor(item.linePrice);
+        if (minor !== null && minor > 0) linePriceMinor = minor;
+      } catch {
+        linePriceMinor = null;
+      }
+    }
+
+    return [{ name, quantity: item.quantity, linePriceMinor, source: item.source }];
   });
 
   return { ok: true, value };
@@ -251,6 +271,8 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       submission_id: submissionId,
       name: item.name,
       quantity: item.quantity,
+      line_price_minor: item.linePriceMinor,
+      source: item.source,
       sort_order: index,
     }));
 
@@ -266,6 +288,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       source_app: fields.sourceApp,
       has_checkout_image: checkoutPath !== null,
       item_count: itemsStored,
+      extracted_item_count: items.value.filter((item) => item.source !== "customer").length,
     },
   });
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BrandHeader } from "@/components/customer/BrandHeader";
 import { Disclaimer } from "@/components/customer/Disclaimer";
 import { BRAND_NAME, SCREENSHOT_RETENTION_DAYS } from "@/lib/constants";
+import { isExtractionConfigured } from "@/lib/env";
 
 export const metadata: Metadata = {
   title: "Privacy",
@@ -18,6 +19,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function PrivacyPage() {
+  // The disclosure below has to describe what this deployment actually does, so
+  // it follows the configuration rather than being written in by hand.
+  const readsScreenshots = isExtractionConfigured();
+
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-5">
       <BrandHeader />
@@ -64,10 +69,34 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        {readsScreenshots ? (
+          <Section title="How we read your screenshot">
+            <p>
+              To save you typing, we send your cart screenshot to Anthropic&apos;s Claude API, which
+              reads the restaurant, the items and the prices from it and sends them back to us. This
+              happens outside the UAE. Anthropic processes the image on our behalf to answer that
+              one request and does not use it to train their models.
+            </p>
+            <p>
+              What comes back is a suggestion, not a decision. It is shown to you on the next screen
+              for you to correct, and what we store is the version you confirmed — never the
+              machine&apos;s guess on its own.
+            </p>
+            <p>
+              If you would rather this did not happen, you can clear the suggested items and type
+              your basket yourself, or leave the item list empty entirely — it is optional.
+            </p>
+          </Section>
+        ) : null}
+
         <Section title="Who can see it">
           <p>
             Screenshots are stored privately and are not publicly accessible. Only {BRAND_NAME} staff
-            carrying out your comparison can open them, through short-lived links that expire.
+            carrying out your comparison can open them, through short-lived links that expire
+            {readsScreenshots
+              ? ", plus the reading service described above, which receives the image but does not store it"
+              : ""}
+            .
           </p>
         </Section>
 

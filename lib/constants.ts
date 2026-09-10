@@ -61,6 +61,19 @@ export const MAX_CART_ITEMS = 20;
 export const MAX_ITEM_NAME_LENGTH = 120;
 export const MAX_ITEM_QUANTITY = 99;
 
+/**
+ * Screenshot reading.
+ *
+ * A vision model reads the uploaded cart screenshot and proposes a restaurant,
+ * items and prices for the customer to confirm. Nothing it returns is trusted:
+ * every value lands in an editable field, and the customer's confirmed version
+ * is what we store.
+ */
+/** Hard ceiling on how long a customer waits for the read before we give up. */
+export const EXTRACTION_TIMEOUT_MS = 45_000;
+/** The extraction endpoint calls a paid API, so it gets its own tighter limit. */
+export const RATE_LIMIT_MAX_EXTRACTIONS = 12;
+
 /** Money limits for the checkout total the customer types in. */
 export const MIN_TOTAL_AED = 0.01;
 export const MAX_TOTAL_AED = 5000;

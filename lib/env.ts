@@ -34,6 +34,22 @@ export function getServiceRoleKey(): string {
   return required("SUPABASE_SERVICE_ROLE_KEY", process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
+/**
+ * Screenshot reading. Absent key means the feature is simply off - the wizard
+ * still works, the customer just types the basket themselves.
+ */
+export function getAnthropicApiKey(): string | null {
+  return process.env.ANTHROPIC_API_KEY || null;
+}
+
+export function getExtractionModel(): string {
+  return process.env.EXTRACTION_MODEL || "claude-opus-5";
+}
+
+export function isExtractionConfigured(): boolean {
+  return getAnthropicApiKey() !== null;
+}
+
 export interface ResendConfig {
   apiKey: string;
   from: string;

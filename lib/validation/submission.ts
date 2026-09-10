@@ -178,6 +178,21 @@ export const contactStepSchema = z
 export const cartItemSchema = z.object({
   name: z.string().trim().min(1).max(MAX_ITEM_NAME_LENGTH),
   quantity: z.number().int().min(1).max(MAX_ITEM_QUANTITY),
+  /**
+   * The price printed on that row in the screenshot, as a fixed-2 decimal
+   * string. Null whenever no price was read - most typed rows have none.
+   */
+  linePrice: z
+    .string()
+    .regex(/^\d{1,7}(\.\d{1,2})?$/)
+    .nullable()
+    .default(null),
+  /**
+   * Where the row came from. The browser asserts this and the server stores it
+   * as a label only - it grants nothing, so a tampered value costs us a wrong
+   * statistic and nothing else.
+   */
+  source: z.enum(["customer", "extracted", "edited"]).default("customer"),
 });
 
 export const cartItemsSchema = z.array(cartItemSchema).max(MAX_CART_ITEMS);

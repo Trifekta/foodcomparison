@@ -85,11 +85,17 @@ export interface SubmissionWithArea extends SubmissionRow {
 }
 
 /** One line of the optional item list the customer confirmed. */
+export type SubmissionItemSource = "customer" | "extracted" | "edited";
+
 export interface SubmissionItemRow {
   id: string;
   submission_id: string;
   name: string;
   quantity: number;
+  /** Price printed on that row in the screenshot, in fils. Often null. */
+  line_price_minor: number | null;
+  /** Whether the row was typed, read from the screenshot, or read then corrected. */
+  source: SubmissionItemSource;
   sort_order: number;
   created_at: string;
 }

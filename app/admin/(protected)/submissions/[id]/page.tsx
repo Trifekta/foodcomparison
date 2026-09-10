@@ -14,10 +14,11 @@ import { ComparisonPanel } from "@/components/admin/ComparisonPanel";
 import { ResultPanel } from "@/components/admin/ResultPanel";
 import { StartReviewButton } from "@/components/admin/StartReviewButton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { formatDecimalStringAsCurrency } from "@/lib/calculations/money";
+import { formatDecimalStringAsCurrency, formatMinorAsCurrency } from "@/lib/calculations/money";
 import { formatDubaiDateTime } from "@/lib/utils/text";
 import { maskEmail } from "@/lib/utils/phone";
 import { statusLabel } from "@/lib/utils/status";
+import type { SubmissionItemSource } from "@/types/database";
 
 export const metadata: Metadata = {
   title: "Submission",
@@ -25,6 +26,27 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
+
+/** Says whether a row was typed, read from the screenshot, or read then fixed. */
+function SourceBadge({ source }: { source: SubmissionItemSource }) {
+  if (source === "customer") return null;
+
+  const corrected = source === "edited";
+  return (
+    <span
+      className={`ml-2 inline-block rounded px-1.5 py-0.5 align-middle text-[0.65rem] font-bold uppercase tracking-wide ${
+        corrected ? "bg-amber-100 text-amber-800" : "bg-ink-100 text-ink-600"
+      }`}
+      title={
+        corrected
+          ? "Read from the screenshot, then corrected by the customer"
+          : "Read from the screenshot and confirmed unchanged"
+      }
+    >
+      {corrected ? "read · fixed" : "read"}
+    </span>
+  );
+}
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -57,6 +79,13 @@ export default async function SubmissionDetailPage({
       : submission.source_app;
 
   const hasSaving = Number(submission.saving_amount ?? 0) > 0;
+
+  const pricedItems = items.filter((item) => item.line_price_minor !== null);
+  const pricedCount = pricedItems.length;
+  const itemsSubtotal =
+    pricedCount > 0
+      ? pricedItems.reduce((sum, item) => sum + (item.line_price_minor ?? 0), 0)
+      : null;
 
   return (
     <div className="space-y-5">
@@ -128,37 +157,50 @@ export default async function SubmissionDetailPage({
             ) : null}
           </section>
 
-          {/* What the customer typed in. The screenshot below is still the
-              source of truth - this list is optional and may be incomplete. */}
+          {/* The basket as the customer confirmed it. Some rows may have been
+              proposed by a screenshot read; the badge says which, and the
+              screenshot below remains the source of truth either way. */}
           <section className="rounded-2xl border border-ink-200 bg-white p-5">
-            <h2 className="text-base font-semibold text-ink-900">
-              Items the customer listed
-            </h2>
+            <h2 className="text-base font-semibold text-ink-900">Basket the customer confirmed</h2>
             {items.length > 0 ? (
               <>
                 <ul className="mt-3 divide-y divide-ink-100">
                   {items.map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex items-start justify-between gap-4 py-2.5 text-sm"
-                    >
-                      <span className="min-w-0 break-words font-semibold text-ink-900">
+                    <li key={item.id} className="flex items-start gap-3 py-2.5 text-sm">
+                      <span className="min-w-0 flex-1 break-words font-semibold text-ink-900">
                         {item.name}
+                        <SourceBadge source={item.source} />
                       </span>
                       <span className="shrink-0 tabular-nums text-ink-500">
                         &times;{item.quantity}
                       </span>
+                      <span className="w-24 shrink-0 text-right font-semibold tabular-nums text-ink-900">
+                        {item.line_price_minor === null
+                          ? "—"
+                          : formatMinorAsCurrency(item.line_price_minor)}
+                      </span>
                     </li>
                   ))}
                 </ul>
+                {itemsSubtotal !== null ? (
+                  <p className="mt-3 flex items-baseline justify-between border-t border-ink-200 pt-3 text-sm">
+                    <span className="text-ink-500">
+                      Listed prices add up to
+                      {pricedCount < items.length ? ` (${pricedCount} of ${items.length} priced)` : ""}
+                    </span>
+                    <span className="font-bold tabular-nums text-ink-900">
+                      {formatMinorAsCurrency(itemsSubtotal)}
+                    </span>
+                  </p>
+                ) : null}
                 <p className="mt-3 text-xs text-ink-500">
-                  Typed by the customer, not read from the screenshot. Check it against the cart
-                  below.
+                  Confirmed by the customer, not verified by us. Check it against the cart
+                  screenshot below before rebuilding on {submission.comparison_app}.
                 </p>
               </>
             ) : (
               <p className="mt-1.5 text-sm text-ink-500">
-                Customer did not list items. Rebuild the basket from the cart screenshot.
+                No items confirmed. Rebuild the basket from the cart screenshot.
               </p>
             )}
           </section>

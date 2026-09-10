@@ -8,17 +8,36 @@ export interface WizardFiles {
   checkout: File | null;
 }
 
+/** What a row originally was when the model proposed it, for comparison later. */
+export interface ProposedItem {
+  name: string;
+  quantity: number;
+  linePrice: string | null;
+}
+
 /**
- * A row in the optional item list, as it is being typed.
+ * A row in the item list, as it is being edited.
  *
  * `quantity` is a number because the stepper is the only way to change it, so
  * it can never hold a half-typed value; `name` is free text and a blank row is
- * simply one the customer has not filled in. `key` is a stable React key that
- * survives reordering and deletion - the name is not unique enough for that.
+ * simply one nobody has filled in. `key` is a stable React key that survives
+ * reordering and deletion - the name is not unique enough for that.
+ *
+ * `proposed` is set only on rows a vision model suggested. Comparing the row
+ * against it at submit time tells us whether the customer accepted the read or
+ * corrected it, which is the only honest way to label the row's source.
  */
-export interface CartItemDraft extends CartItem {
+export interface CartItemDraft {
   key: string;
+  name: string;
+  quantity: number;
+  /** Fixed-2 decimal string, or null when no price was read for this row. */
+  linePrice: string | null;
+  proposed: ProposedItem | null;
 }
+
+/** How the screenshot read is going, as far as the wizard is concerned. */
+export type ExtractionStatus = "idle" | "reading" | "applied" | "empty" | "failed";
 
 export const TOTAL_STEPS = 5;
 
@@ -34,3 +53,26 @@ export const WIZARD_DEFAULTS: WizardValues = {
   email: "",
   marketingConsent: false,
 };
+
+/** Rows the customer left blank are dropped; the list is optional. */
+export function usableItems(items: CartItemDraft[]): CartItem[] {
+  return items.flatMap((item) => {
+    const name = item.name.trim();
+    if (!name) return [];
+
+    const unchanged =
+      item.proposed !== null &&
+      item.proposed.name === item.name &&
+      item.proposed.quantity === item.quantity &&
+      item.proposed.linePrice === item.linePrice;
+
+    return [
+      {
+        name,
+        quantity: item.quantity,
+        linePrice: item.linePrice,
+        source: item.proposed === null ? "customer" : unchanged ? "extracted" : "edited",
+      } as CartItem,
+    ];
+  });
+}
