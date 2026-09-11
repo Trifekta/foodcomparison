@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AlertStatus } from "@/components/admin/AlertStatus";
+import { SchemaWarning } from "@/components/admin/SchemaWarning";
 import { SummaryCards } from "@/components/admin/SummaryCards";
 import { SubmissionFilters } from "@/components/admin/SubmissionFilters";
 import { SubmissionsTable } from "@/components/admin/SubmissionsTable";
@@ -14,6 +15,7 @@ import {
 } from "@/lib/admin/queries";
 import { computeValidationMetrics } from "@/lib/calculations/analytics";
 import { alertChannels } from "@/lib/notifications/admin-alert";
+import { findMissingMigrations } from "@/lib/admin/schema-check";
 import { STATUS_ORDER } from "@/lib/utils/status";
 import type { SubmissionStatus } from "@/types/database";
 
@@ -50,11 +52,15 @@ export default async function AdminDashboardPage({
     search: single(params.search),
   };
 
-  const [counts, rows, areas, analyticsRows] = await Promise.all([
+  // Analytics is allowed to fail here. It is the query that names the newest
+  // columns, so on a database that is behind it throws - and if that took the
+  // whole dashboard with it, the warning explaining why would never render.
+  const [counts, rows, areas, analyticsRows, gaps] = await Promise.all([
     getDashboardCounts(),
     listSubmissions(filters),
     listAreas(false),
-    getAnalyticsRows(),
+    getAnalyticsRows().catch(() => []),
+    findMissingMigrations(),
   ]);
 
   const metrics = computeValidationMetrics(analyticsRows);
@@ -66,6 +72,7 @@ export default async function AdminDashboardPage({
         <p className="text-sm text-ink-500">Newest first · {rows.length} shown</p>
       </div>
 
+      <SchemaWarning gaps={gaps} />
       <AlertStatus channels={alertChannels()} />
       <SummaryCards counts={counts} />
       <ValidationStrip metrics={metrics} />

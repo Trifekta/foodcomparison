@@ -37,6 +37,14 @@ export interface ActionResult {
   message?: string;
 }
 
+/**
+ * Covers both reasons the load can come back empty - the row is gone, or the
+ * query named something the database does not have - because the admin's next
+ * step is the same either way, and the dashboard names the missing migration.
+ */
+const LOAD_FAILED =
+  "Could not load this submission. If this keeps happening, open the dashboard - it will say if a migration is missing.";
+
 async function recordEvent(input: {
   submissionId: string;
   eventType:
@@ -89,7 +97,12 @@ async function loadSubmission(id: string) {
       >
     >();
 
-  if (error) throw new Error(error.message);
+  // Null rather than thrown, deliberately. Every button on the submission page
+  // comes through here, and a throw from a server action takes the whole page
+  // down to "Something went wrong" with nothing an admin can act on. A column
+  // the code names and the database does not have is the likeliest cause, and
+  // the dashboard says which migration to run.
+  if (error) return null;
   return data;
 }
 
@@ -99,7 +112,7 @@ export async function startReview(submissionId: string): Promise<ActionResult> {
   const supabase = await createServerSupabaseClient();
 
   const submission = await loadSubmission(submissionId);
-  if (!submission) return { ok: false, message: "Submission not found." };
+  if (!submission) return { ok: false, message: LOAD_FAILED };
   if (submission.status !== "new") {
     return { ok: true, message: "Already under review." };
   }
@@ -146,7 +159,7 @@ export async function saveComparison(formData: FormData): Promise<ActionResult> 
   }
 
   const submission = await loadSubmission(parsed.data.submissionId);
-  if (!submission) return { ok: false, message: "Submission not found." };
+  if (!submission) return { ok: false, message: LOAD_FAILED };
 
   const comparisonMinor = parseAmountToMinor(parsed.data.comparisonTotal);
   if (comparisonMinor === null) return { ok: false, message: "Enter the Keeta total." };
@@ -244,7 +257,7 @@ export async function markUnavailable(formData: FormData): Promise<ActionResult>
   }
 
   const submission = await loadSubmission(parsed.data.submissionId);
-  if (!submission) return { ok: false, message: "Submission not found." };
+  if (!submission) return { ok: false, message: LOAD_FAILED };
 
   const message = buildUnavailableMessage({
     restaurantName: submission.restaurant_name,
@@ -291,7 +304,7 @@ export async function markResultSent(submissionId: string): Promise<ActionResult
   const { user } = await requireAdmin();
 
   const submission = await loadSubmission(submissionId);
-  if (!submission) return { ok: false, message: "Submission not found." };
+  if (!submission) return { ok: false, message: LOAD_FAILED };
   if (!submission.result_message) {
     return { ok: false, message: "Generate the result before marking it sent." };
   }
@@ -323,7 +336,7 @@ export async function sendResultByEmail(submissionId: string): Promise<ActionRes
   const { user } = await requireAdmin();
 
   const submission = await loadSubmission(submissionId);
-  if (!submission) return { ok: false, message: "Submission not found." };
+  if (!submission) return { ok: false, message: LOAD_FAILED };
   if (submission.contact_type !== "email" || !submission.email) {
     return { ok: false, message: "This customer asked for WhatsApp." };
   }
@@ -375,7 +388,7 @@ export async function updateStatus(
   const { user } = await requireAdmin();
 
   const submission = await loadSubmission(submissionId);
-  if (!submission) return { ok: false, message: "Submission not found." };
+  if (!submission) return { ok: false, message: LOAD_FAILED };
 
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.from("submissions").update({ status }).eq("id", submissionId);
