@@ -24,7 +24,7 @@ export function AlertStatus({ channels }: { channels: string[] }) {
         configured ? "border-ink-200 bg-white" : "border-amber-300 bg-amber-50"
       }`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <p className="flex items-center gap-2 text-sm text-ink-700">
           {configured ? (
             <Bell aria-hidden="true" className="h-4 w-4 text-ink-500" />
@@ -42,6 +42,13 @@ export function AlertStatus({ channels }: { channels: string[] }) {
             </span>
           )}
         </p>
+
+        <a
+          href="/admin/diagnostics"
+          className="min-h-9 shrink-0 self-center text-sm font-semibold text-ink-600 underline underline-offset-2 hover:text-ink-900"
+        >
+          Diagnostics
+        </a>
 
         <button
           type="button"

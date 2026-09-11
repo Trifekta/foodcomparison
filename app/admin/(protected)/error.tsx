@@ -27,8 +27,8 @@ export default function AdminError({
     <div className="mx-auto max-w-lg space-y-4 py-10">
       <h1 className="text-xl font-bold text-ink-900">Something went wrong here</h1>
       <p className="text-sm text-ink-600">
-        The most likely cause is a migration that has not been run yet. Open the dashboard: if one
-        is missing it names the file.
+        Diagnostics runs the same queries these pages rely on and prints what the database says
+        back, which is the fastest way to find out what this actually was.
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -40,10 +40,10 @@ export default function AdminError({
           Try again
         </button>
         <Link
-          href="/admin"
+          href="/admin/diagnostics"
           className="inline-flex min-h-10 items-center rounded-lg bg-ink-900 px-4 text-sm font-semibold text-white hover:bg-ink-800"
         >
-          Open the dashboard
+          Open diagnostics
         </Link>
       </div>
 

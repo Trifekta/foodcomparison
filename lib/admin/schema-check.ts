@@ -40,6 +40,8 @@ const PROBES: MigrationProbe[] = [
 export interface SchemaGap {
   file: string;
   breaks: string;
+  /** The database's own words, for the diagnostics page. */
+  detail: string;
 }
 
 export async function findMissingMigrations(): Promise<SchemaGap[]> {
@@ -51,9 +53,85 @@ export async function findMissingMigrations(): Promise<SchemaGap[]> {
       // Only a missing column counts. A permissions or network failure is a
       // different problem and must not be reported as a missing migration.
       const missing = error !== null && /column|does not exist|schema cache/i.test(error.message);
-      return missing ? { file: probe.file, breaks: probe.breaks } : null;
+      return missing ? { file: probe.file, breaks: probe.breaks, detail: error.message } : null;
     }),
   );
 
   return results.filter((gap): gap is SchemaGap => gap !== null);
+}
+
+export interface Check {
+  name: string;
+  ok: boolean;
+  detail: string;
+}
+
+/**
+ * Runs the queries the admin's own buttons run, and reports what came back.
+ *
+ * The point is the raw message. Next redacts a server error in production, so
+ * a failing action shows "Something went wrong" and nothing else - while the
+ * database has almost certainly said precisely what is wrong. This asks it the
+ * same questions and prints the answers.
+ */
+export async function runDiagnostics(): Promise<Check[]> {
+  const supabase = await createServerSupabaseClient();
+  const checks: Check[] = [];
+
+  // A thenable rather than a Promise: a PostgREST builder only becomes one when
+  // awaited, which is exactly what happens on the next line.
+  const record = async (
+    name: string,
+    run: () => PromiseLike<{ error: { message: string } | null }>,
+  ) => {
+    try {
+      const { error } = await run();
+      checks.push({ name, ok: error === null, detail: error?.message ?? "OK" });
+    } catch (error) {
+      checks.push({
+        name,
+        ok: false,
+        detail: error instanceof Error ? error.message : "Threw a non-Error",
+      });
+    }
+  };
+
+  // Exactly the projection every button on the submission page loads through.
+  await record("Load a submission (every admin button)", () =>
+    supabase
+      .from("submissions")
+      .select(
+        "id, status, source_app, source_app_other, current_total, comparison_total, comparison_app, contact_type, whatsapp_number, email, reference_number, restaurant_name, result_message, result_token",
+      )
+      .limit(1),
+  );
+
+  await record("Save a comparison (writes comparison_url)", () =>
+    supabase.from("submissions").select("comparison_url").limit(1),
+  );
+
+  await record("Record couldn't compare (writes unavailable_reason)", () =>
+    supabase.from("submissions").select("unavailable_reason").limit(1),
+  );
+
+  await record("Analytics page", () =>
+    supabase
+      .from("submissions")
+      .select("status, source_app, current_total, restaurant_name, unavailable_reason")
+      .limit(1),
+  );
+
+  await record("Write an event row", () =>
+    supabase.from("submission_events").select("event_type").limit(1),
+  );
+
+  await record("Read the item list", () =>
+    supabase.from("submission_items").select("id").limit(1),
+  );
+
+  await record("Read extractions", () =>
+    supabase.from("submission_extractions").select("id").limit(1),
+  );
+
+  return checks;
 }
