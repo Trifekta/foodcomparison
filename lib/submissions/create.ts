@@ -36,6 +36,27 @@ export type CreateSubmissionResult =
 const GENERIC_FAILURE = "We couldn't submit your order. Please try again.";
 const MAX_REFERENCE_ATTEMPTS = 5;
 
+/** The shape supabase-js hands back on a failed query. */
+type DbError = { message: string; code?: string; details?: string; hint?: string } | null;
+
+/**
+ * What to put in a log line about a failed query.
+ *
+ * Postgres already says exactly what was wrong - a missing column, a violated
+ * constraint - and that sentence is the difference between a fix and an
+ * afternoon. None of it is customer data: these fields describe the schema and
+ * the statement, never the values, which is why they are safe to log when the
+ * row itself is not.
+ */
+function describeDbError(error: DbError) {
+  return {
+    message: error?.message ?? "no error message",
+    code: error?.code,
+    details: error?.details,
+    hint: error?.hint,
+  };
+}
+
 interface StoredItem {
   name: string;
   quantity: number;
@@ -180,7 +201,10 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     .eq("id", fields.areaId)
     .maybeSingle<{ id: string; active: boolean; name: string | null }>();
 
-  if (areaError) return { ok: false, status: 500, error: GENERIC_FAILURE };
+  if (areaError) {
+    console.error("[submissions] could not read the area", describeDbError(areaError));
+    return { ok: false, status: 500, error: GENERIC_FAILURE };
+  }
   if (!area?.active) {
     return { ok: false, status: 400, error: "Please select your Dubai area.", field: "areaId" };
   }
@@ -199,6 +223,10 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     .upload(cartPath, cartImage.bytes, { contentType: cartImage.mimeType, upsert: true });
 
   if (cartUpload.error) {
+    console.error("[submissions] could not store the cart screenshot", {
+      bucket: STORAGE_BUCKET,
+      message: cartUpload.error.message,
+    });
     return { ok: false, status: 500, error: "We couldn't upload your screenshot. Please try again." };
   }
   uploadedPaths.push(cartPath);
@@ -225,6 +253,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   let referenceNumber = "";
   const resultToken = generateResultToken();
   let inserted = false;
+  let insertError: DbError = null;
 
   for (let attempt = 0; attempt < MAX_REFERENCE_ATTEMPTS; attempt += 1) {
     referenceNumber = generateReferenceNumber();
@@ -259,11 +288,22 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       break;
     }
 
+    insertError = error;
+
     // 23505 = unique violation; retry with a different reference suffix.
     if (error.code !== "23505") break;
   }
 
   if (!inserted) {
+    // The most common cause by far is a migration that was never run, and the
+    // Postgres error says which column is missing - so log it rather than make
+    // somebody reproduce the failure to find out. The row's values are not
+    // logged, only what the database objected to.
+    console.error("[submissions] could not insert the submission", {
+      ...describeDbError(insertError),
+      hint: "A missing column here usually means a migration has not been run.",
+    });
+
     await supabase.storage.from(STORAGE_BUCKET).remove(uploadedPaths);
     return { ok: false, status: 500, error: GENERIC_FAILURE };
   }

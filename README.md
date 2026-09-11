@@ -112,7 +112,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 
 ## 2. Run the migrations
 
-Open **SQL Editor → New query** in the Supabase dashboard and run these six
+Open **SQL Editor → New query** in the Supabase dashboard and run these eight
 files **in order**, one at a time:
 
 | Order | File | What it does |
@@ -123,8 +123,16 @@ files **in order**, one at a time:
 | 4 | `supabase/migrations/0004_cart_items.sql` | Adds `submissions.restaurant_name` and the optional `submission_items` table |
 | 5 | `supabase/migrations/0005_item_prices.sql` | Adds row prices and where each row came from |
 | 6 | `supabase/migrations/0006_extractions.sql` | The extraction audit trail (`submission_extractions`) |
+| 7 | `supabase/migrations/0007_result_link.sql` | `submissions.result_token` and `comparison_url` — the customer's result page |
+| 8 | `supabase/migrations/0008_unavailable_outcome.sql` | The `unavailable` status and `unavailable_reason` |
 
 Each file is safe to run more than once.
+
+> **Run every one of them.** `0007` and `0008` add columns rather than tables,
+> and the code writes `result_token` on every single submission. Skip them and
+> the app deploys, the wizard runs, and then every submission fails at the last
+> step with "We couldn't submit your order" — which is why the check below looks
+> at columns and not only at table names.
 
 If you prefer the CLI:
 
@@ -141,6 +149,17 @@ select table_name from information_schema.tables
 where table_schema = 'public' order by 1;
 -- expect: admin_profiles, areas, submission_events, submission_extractions,
 --         submission_items, submissions
+```
+
+Then check the columns the later migrations add, which a table list cannot show:
+
+```sql
+select column_name from information_schema.columns
+where table_schema = 'public' and table_name = 'submissions'
+  and column_name in ('result_token', 'comparison_url', 'unavailable_reason')
+order by 1;
+-- expect all three: comparison_url, result_token, unavailable_reason
+-- anything missing means 0007 or 0008 has not been run
 ```
 
 ---
