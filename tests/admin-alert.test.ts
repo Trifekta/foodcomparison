@@ -136,3 +136,31 @@ describe("alertAdminOfNewSubmission", () => {
     expect(message).not.toContain("Items listed");
   });
 });
+
+describe("alertChannels and the test alert", () => {
+  it("names what is configured, so the dashboard can say so", async () => {
+    const { alertChannels } = await import("@/lib/notifications/admin-alert");
+    expect(alertChannels()).toEqual(["Telegram", "email"]);
+
+    telegramConfigured = false;
+    expect(alertChannels()).toEqual(["email"]);
+
+    alertEmail = null;
+    expect(alertChannels()).toEqual([]);
+  });
+
+  it("sends the test down the same path a real alert takes", async () => {
+    // A test that exercised a different path would prove nothing.
+    const { sendTestAdminAlert } = await import("@/lib/notifications/admin-alert");
+    expect(await sendTestAdminAlert()).toBe(true);
+    expect(sentTelegram[0]).toContain("Test alert");
+    expect(sentEmail[0]?.to).toBe("admin@example.com");
+  });
+
+  it("reports failure rather than claiming success", async () => {
+    const { sendTestAdminAlert } = await import("@/lib/notifications/admin-alert");
+    telegramConfigured = false;
+    alertEmail = null;
+    expect(await sendTestAdminAlert()).toBe(false);
+  });
+});

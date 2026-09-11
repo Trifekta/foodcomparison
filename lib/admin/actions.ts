@@ -16,6 +16,7 @@ import {
   buildUnavailableMessage,
   sourceAppLabel,
 } from "@/lib/notifications/messages";
+import { alertChannels, sendTestAdminAlert } from "@/lib/notifications/admin-alert";
 import { getEmailProvider } from "@/lib/notifications/resend";
 import { sanitiseMultiline, sanitiseText } from "@/lib/utils/text";
 import { absoluteUrl } from "@/lib/env";
@@ -391,6 +392,35 @@ export async function updateStatus(
   revalidatePath(`/admin/submissions/${submissionId}`);
   revalidatePath("/admin");
   return { ok: true };
+}
+
+/**
+ * Prove the alert works, without waiting for a customer.
+ *
+ * Worth a button rather than a paragraph of instructions: the whole product
+ * depends on somebody's phone buzzing, so "is it still set up?" is a question
+ * worth being able to answer in one tap, on the day it is configured and every
+ * time afterwards.
+ */
+export async function sendTestAlert(): Promise<ActionResult> {
+  await requireAdmin();
+
+  const channels = alertChannels();
+  if (channels.length === 0) {
+    return {
+      ok: false,
+      message:
+        "No alert channel is configured. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, or ADMIN_ALERT_EMAIL.",
+    };
+  }
+
+  const delivered = await sendTestAdminAlert();
+  return delivered
+    ? { ok: true, message: `Sent to ${channels.join(" and ")}. Check your phone.` }
+    : {
+        ok: false,
+        message: `${channels.join(" and ")} configured, but the send failed. Check the token and chat id.`,
+      };
 }
 
 // ---- Areas ----------------------------------------------------------------

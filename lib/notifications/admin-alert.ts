@@ -78,3 +78,47 @@ export async function alertAdminOfNewSubmission(alert: NewSubmissionAlert): Prom
   if (jobs.length === 0) return;
   await Promise.allSettled(jobs);
 }
+
+/** Which routes an alert would actually take right now. */
+export function alertChannels(): string[] {
+  const channels: string[] = [];
+  if (isTelegramConfigured()) channels.push("Telegram");
+  if (getAdminAlertEmail() && getEmailProvider().configured) channels.push("email");
+  return channels;
+}
+
+/**
+ * A real alert down the real channels, saying plainly that it is a test.
+ *
+ * Deliberately the same code path as a genuine one - a test that proved a
+ * different path worked would be worth nothing.
+ */
+export async function sendTestAdminAlert(): Promise<boolean> {
+  const link = absoluteUrl("/admin");
+  const body = [
+    "Test alert from FindFoodae.",
+    "",
+    "If you can read this, a new price check will reach you the same way.",
+    ...(link ? ["", link] : []),
+  ].join("\n");
+
+  const results: boolean[] = [];
+
+  if (isTelegramConfigured()) results.push(await sendTelegramMessage(body));
+
+  const email = getAdminAlertEmail();
+  if (email) {
+    const provider = getEmailProvider();
+    if (provider.configured) {
+      const outcome = await provider.send({
+        to: email,
+        subject: "Test alert from FindFoodae",
+        body,
+        reference: "test",
+      });
+      results.push(outcome.sent);
+    }
+  }
+
+  return results.length > 0 && results.some(Boolean);
+}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { AlertStatus } from "@/components/admin/AlertStatus";
 import { SummaryCards } from "@/components/admin/SummaryCards";
 import { SubmissionFilters } from "@/components/admin/SubmissionFilters";
 import { SubmissionsTable } from "@/components/admin/SubmissionsTable";
@@ -12,6 +13,7 @@ import {
   type SubmissionFilters as Filters,
 } from "@/lib/admin/queries";
 import { computeValidationMetrics } from "@/lib/calculations/analytics";
+import { alertChannels } from "@/lib/notifications/admin-alert";
 import { STATUS_ORDER } from "@/lib/utils/status";
 import type { SubmissionStatus } from "@/types/database";
 
@@ -64,6 +66,7 @@ export default async function AdminDashboardPage({
         <p className="text-sm text-ink-500">Newest first · {rows.length} shown</p>
       </div>
 
+      <AlertStatus channels={alertChannels()} />
       <SummaryCards counts={counts} />
       <ValidationStrip metrics={metrics} />
 
