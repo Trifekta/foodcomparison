@@ -83,6 +83,15 @@ export default async function AdminAnalyticsPage() {
           hint="A competitor total was entered"
         />
         <Metric
+          label="Couldn't compare"
+          value={String(metrics.unavailableCount)}
+          hint={
+            metrics.totalSubmissions > 0
+              ? `${metrics.unavailablePercentage.toFixed(1)}% of submissions`
+              : "No submissions yet"
+          }
+        />
+        <Metric
           label="Saving found"
           value={String(metrics.savingFoundCount)}
           hint={
@@ -151,6 +160,26 @@ export default async function AdminAnalyticsPage() {
           total={metrics.totalSubmissions}
         />
       </div>
+
+      {/*
+        The ceiling on everything above it. However good the savings are, they
+        only reach the orders that can be compared at all - and the named list
+        says exactly which restaurants are standing in the way.
+      */}
+      {metrics.unavailableCount > 0 ? (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <BreakdownList
+            title="Why we couldn't compare"
+            items={metrics.unavailableByReason}
+            total={metrics.unavailableCount}
+          />
+          <BreakdownList
+            title="Restaurants we couldn't find"
+            items={metrics.unavailableRestaurants}
+            total={metrics.unavailableCount}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

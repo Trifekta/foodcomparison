@@ -8,6 +8,8 @@ function row(overrides: Partial<AnalyticsRow>): AnalyticsRow {
     current_total: "82.00",
     comparison_total: "63.00",
     saving_amount: "19.00",
+    restaurant_name: "Al Safadi",
+    unavailable_reason: null,
     areas: { name: "Al Karama" },
     ...overrides,
   };
@@ -85,5 +87,56 @@ describe("computeValidationMetrics", () => {
     expect(metrics.byArea[0]).toEqual({ label: "Al Karama", count: 2 });
     expect(metrics.byArea.map((entry) => entry.label)).toContain("Unknown area");
     expect(metrics.bySourceApp[0]).toEqual({ label: "Talabat", count: 3 });
+  });
+});
+
+describe("baskets nobody could price", () => {
+  it("counts them, and keeps them out of the saving maths", () => {
+    // These have no comparison total by definition, so they must not drag the
+    // "found a saving" rate down as if we had checked and failed to beat it.
+    const metrics = computeValidationMetrics([
+      row({}),
+      row({ status: "unavailable", comparison_total: null, saving_amount: null }),
+    ]);
+
+    expect(metrics.totalSubmissions).toBe(2);
+    expect(metrics.completedComparisons).toBe(1);
+    expect(metrics.savingFoundCount).toBe(1);
+    expect(metrics.savingFoundPercentage).toBe(100);
+    expect(metrics.unavailableCount).toBe(1);
+    expect(metrics.unavailablePercentage).toBe(50);
+  });
+
+  it("separates a missing restaurant from a menu that would not match", () => {
+    const metrics = computeValidationMetrics([
+      row({ status: "unavailable", comparison_total: null, unavailable_reason: "restaurant_not_listed" }),
+      row({ status: "unavailable", comparison_total: null, unavailable_reason: "items_not_available" }),
+      row({ status: "unavailable", comparison_total: null, unavailable_reason: "restaurant_not_listed" }),
+    ]);
+
+    expect(metrics.unavailableByReason).toEqual([
+      { label: "Restaurant not listed", count: 2 },
+      { label: "Items not available", count: 1 },
+    ]);
+  });
+
+  it("names the restaurants, which is the actionable half", () => {
+    const metrics = computeValidationMetrics([
+      row({ status: "unavailable", comparison_total: null, restaurant_name: "Mandarin Oak" }),
+      row({ status: "unavailable", comparison_total: null, restaurant_name: "Mandarin Oak" }),
+      row({ status: "unavailable", comparison_total: null, restaurant_name: "ALBAIK" }),
+    ]);
+
+    expect(metrics.unavailableRestaurants).toEqual([
+      { label: "Mandarin Oak", count: 2 },
+      { label: "ALBAIK", count: 1 },
+    ]);
+  });
+
+  it("says so rather than guessing when the reason was never recorded", () => {
+    const metrics = computeValidationMetrics([
+      row({ status: "unavailable", comparison_total: null, unavailable_reason: null }),
+    ]);
+    expect(metrics.unavailableByReason).toEqual([{ label: "Not recorded", count: 1 }]);
   });
 });

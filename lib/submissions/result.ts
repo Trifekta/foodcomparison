@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidResultToken } from "@/lib/utils/reference";
 import { calculateSavingFromStrings } from "@/lib/calculations/saving";
 import { formatMinorToDecimalString, parseAmountToMinor } from "@/lib/calculations/money";
-import type { SubmissionItemRow, SubmissionStatus } from "@/types/database";
+import type { SubmissionItemRow, SubmissionStatus, UnavailableReason } from "@/types/database";
 
 /**
  * The customer's view of their own submission.
@@ -24,8 +24,16 @@ import type { SubmissionItemRow, SubmissionStatus } from "@/types/database";
 /** What the customer is shown, and nothing else. */
 export interface PublicResult {
   referenceNumber: string;
-  /** Where the request has got to, collapsed to the three states worth showing. */
-  state: "checking" | "saving" | "no_saving" | "cancelled";
+  /** Where the request has got to, collapsed to the states worth showing. */
+  state: "checking" | "saving" | "no_saving" | "unavailable" | "cancelled";
+  /**
+   * Why nothing could be compared, when that is the answer.
+   *
+   * Carried so the page can name the reason it knows - "not on Keeta" reads
+   * very differently from a vague failure - without the customer having to be
+   * told which of our internal categories it fell into.
+   */
+  unavailableReason: UnavailableReason | null;
   restaurantName: string | null;
   /** The total the customer told us they would pay. */
   currentTotal: string;
@@ -56,6 +64,7 @@ const ANSWERED: readonly SubmissionStatus[] = [
 
 function stateOf(status: SubmissionStatus, hasSaving: boolean): PublicResult["state"] {
   if (status === "cancelled") return "cancelled";
+  if (status === "unavailable") return "unavailable";
   if (status === "no_saving") return "no_saving";
   if (ANSWERED.includes(status)) return hasSaving ? "saving" : "no_saving";
   return "checking";
@@ -70,7 +79,7 @@ export async function getPublicResult(token: string): Promise<PublicResult | nul
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, reference_number, status, restaurant_name, current_total, comparison_app, comparison_total, saving_amount, saving_percentage, comparison_url, created_at",
+      "id, reference_number, status, restaurant_name, current_total, comparison_app, comparison_total, saving_amount, saving_percentage, comparison_url, unavailable_reason, created_at",
     )
     .eq("result_token", token)
     .maybeSingle();
@@ -106,6 +115,7 @@ export async function getPublicResult(token: string): Promise<PublicResult | nul
   return {
     referenceNumber: data.reference_number,
     state,
+    unavailableReason: state === "unavailable" ? data.unavailable_reason : null,
     restaurantName: data.restaurant_name,
     currentTotal: data.current_total,
     comparisonApp: data.comparison_app,

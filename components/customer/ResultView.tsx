@@ -100,6 +100,7 @@ export function ResultView({ initial, token }: { initial: PublicResult; token: s
       ) : null}
       {result.state === "saving" ? <Saving result={result} /> : null}
       {result.state === "no_saving" ? <NoSaving result={result} /> : null}
+      {result.state === "unavailable" ? <Unavailable result={result} /> : null}
       {result.state === "cancelled" ? <Cancelled reference={result.referenceNumber} /> : null}
 
       <footer className="relative mt-auto border-t border-ink-100 pt-4">
@@ -348,6 +349,81 @@ function NoSaving({ result }: { result: PublicResult }) {
       </p>
 
       {result.comparisonTotal ? <PriceRows result={result} /> : null}
+
+      <div className="mt-5 mb-6">
+        <Link
+          href="/compare"
+          className="relative inline-flex min-h-14 w-full items-center justify-center rounded-full bg-brand-400 px-6 text-base font-bold text-ink-900 shadow-sm hover:bg-brand-300"
+        >
+          Check another order
+          <ArrowRight aria-hidden="true" className="absolute right-6 h-5 w-5" />
+        </Link>
+      </div>
+    </>
+  );
+}
+
+/**
+ * The basket nobody could price.
+ *
+ * Not a failure screen and not an apology: the comparison app simply does not
+ * carry this restaurant, which is a fact about the world rather than about the
+ * customer's order. So it says that plainly, names the restaurant when we know
+ * it, invents no numbers, and offers the only useful next step.
+ */
+function Unavailable({ result }: { result: PublicResult }) {
+  const restaurant = result.restaurantName?.trim();
+
+  return (
+    <>
+      <div className="relative mt-3 h-40">
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-2 bottom-2 top-4 rounded-[2.5rem] bg-linear-to-b from-brand-100 to-beige"
+        />
+        <FoodPhoto
+          name="bowl"
+          eager
+          className="pointer-events-none absolute bottom-0 right-4 w-[46%] select-none"
+        />
+        <ScriptNote className="absolute left-5 top-1/2 -translate-y-1/2 text-[0.95rem] text-ink-900">
+          Not on
+          <br />
+          {result.comparisonApp}
+          <br />
+          yet
+        </ScriptNote>
+      </div>
+
+      <p className="mt-4 text-[0.82rem] font-bold uppercase tracking-[0.16em] text-slate-500">
+        Your result
+      </p>
+      <h1 className="mt-1 text-[1.9rem] font-extrabold leading-tight text-ink-900">
+        We couldn&apos;t compare this one
+      </h1>
+      <p className="mt-2.5 text-[1rem] leading-relaxed text-slate-600">
+        {result.unavailableReason === "items_not_available" && restaurant ? (
+          <>
+            <span className="font-bold text-ink-900">{restaurant}</span> is on{" "}
+            {result.comparisonApp}, but we couldn&apos;t rebuild this exact basket there — some of
+            your items aren&apos;t on its menu.
+          </>
+        ) : restaurant ? (
+          <>
+            <span className="font-bold text-ink-900">{restaurant}</span> isn&apos;t on{" "}
+            {result.comparisonApp} yet, so there&apos;s no price for us to compare against.
+          </>
+        ) : (
+          <>
+            We couldn&apos;t rebuild your order on {result.comparisonApp}, so there&apos;s no price
+            for us to compare against.
+          </>
+        )}
+      </p>
+      <p className="mt-3 text-[1rem] leading-relaxed text-slate-600">
+        Nothing to change then — go ahead and order where you were. Plenty of restaurants are on
+        both, so it&apos;s worth sending us the next one.
+      </p>
 
       <div className="mt-5 mb-6">
         <Link

@@ -15,6 +15,8 @@ export interface AnalyticsRow {
   current_total: string;
   comparison_total: string | null;
   saving_amount: string | null;
+  restaurant_name: string | null;
+  unavailable_reason: string | null;
   areas: { name: string } | null;
 }
 
@@ -36,7 +38,28 @@ export interface ValidationMetrics {
   savingDistribution: Array<{ key: SavingBucketKey; label: string; count: number }>;
   byArea: CountByLabel[];
   bySourceApp: CountByLabel[];
+  /**
+   * Baskets that could not be priced at all, because the restaurant is not on
+   * the comparison app or its menu could not be matched.
+   *
+   * This is a ceiling, not a footnote: however good the savings are, they only
+   * reach the share of orders that can be compared in the first place. The
+   * named list is the more actionable half - it says which restaurants the
+   * comparison app is missing.
+   */
+  unavailableCount: number;
+  /** Share of every submission that ended with no comparison possible, 0-100. */
+  unavailablePercentage: number;
+  unavailableByReason: CountByLabel[];
+  unavailableRestaurants: CountByLabel[];
 }
+
+/** Reasons, in the words the dashboard shows rather than the enum's. */
+const UNAVAILABLE_REASON_LABELS: Record<string, string> = {
+  restaurant_not_listed: "Restaurant not listed",
+  items_not_available: "Items not available",
+  other: "Something else",
+};
 
 /** A comparison counts as complete once an admin has entered a competitor total. */
 function isCompleted(row: AnalyticsRow): boolean {
@@ -45,6 +68,7 @@ function isCompleted(row: AnalyticsRow): boolean {
 
 export function computeValidationMetrics(rows: AnalyticsRow[]): ValidationMetrics {
   const completed = rows.filter(isCompleted);
+  const unavailable = rows.filter((row) => row.status === "unavailable");
 
   let savingFoundCount = 0;
   let savingTotalMinor = 0;
@@ -89,6 +113,16 @@ export function computeValidationMetrics(rows: AnalyticsRow[]): ValidationMetric
     })),
     byArea: countBy(rows, (row) => row.areas?.name ?? "Unknown area"),
     bySourceApp: countBy(rows, (row) => row.source_app),
+    unavailableCount: unavailable.length,
+    unavailablePercentage: rows.length > 0 ? (unavailable.length / rows.length) * 100 : 0,
+    unavailableByReason: countBy(
+      unavailable,
+      (row) => UNAVAILABLE_REASON_LABELS[row.unavailable_reason ?? ""] ?? "Not recorded",
+    ),
+    unavailableRestaurants: countBy(
+      unavailable,
+      (row) => row.restaurant_name?.trim() || "Restaurant not named",
+    ),
   };
 }
 

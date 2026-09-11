@@ -146,6 +146,35 @@ describe("getPublicResult", () => {
     expect((await getPublicResult(TOKEN))?.items).toEqual([]);
   });
 
+  it("has a state for a basket nobody could price", async () => {
+    // Before this existed the submission had nowhere to go: no total meant no
+    // save, so it sat in "reviewing" and the customer's page waited forever.
+    submission = row({
+      status: "unavailable",
+      comparison_total: null,
+      saving_amount: null,
+      unavailable_reason: "restaurant_not_listed",
+    });
+
+    const result = await getPublicResult(TOKEN);
+    expect(result).toMatchObject({
+      state: "unavailable",
+      unavailableReason: "restaurant_not_listed",
+      comparisonTotal: null,
+      savingAmount: null,
+      comparisonUrl: null,
+    });
+  });
+
+  it("keeps the restaurant name, which is what makes that answer specific", async () => {
+    submission = row({ status: "unavailable", comparison_total: null, saving_amount: null });
+    expect((await getPublicResult(TOKEN))?.restaurantName).toBe("Mandarin Oak");
+  });
+
+  it("carries no reason on any other outcome", async () => {
+    expect((await getPublicResult(TOKEN))?.unavailableReason).toBeNull();
+  });
+
   it("explains a cancelled request rather than leaving it spinning", async () => {
     submission = row({ status: "cancelled" });
     expect((await getPublicResult(TOKEN))?.state).toBe("cancelled");

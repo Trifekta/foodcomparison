@@ -4,11 +4,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAdminSession, requireAdmin } from "@/lib/supabase/auth";
-import { areaInputSchema, comparisonInputSchema } from "@/lib/validation/admin";
+import {
+  areaInputSchema,
+  comparisonInputSchema,
+  unavailableInputSchema,
+} from "@/lib/validation/admin";
 import { calculateSavingFromStrings, toPersistableSaving } from "@/lib/calculations/saving";
 import {
   buildResultMessage,
   buildResultSubject,
+  buildUnavailableMessage,
   sourceAppLabel,
 } from "@/lib/notifications/messages";
 import { getEmailProvider } from "@/lib/notifications/resend";
@@ -60,7 +65,7 @@ async function loadSubmission(id: string) {
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, status, source_app, source_app_other, current_total, comparison_total, comparison_app, contact_type, whatsapp_number, email, reference_number, result_message, result_token",
+      "id, status, source_app, source_app_other, current_total, comparison_total, comparison_app, contact_type, whatsapp_number, email, reference_number, restaurant_name, result_message, result_token",
     )
     .eq("id", id)
     .maybeSingle<
@@ -70,6 +75,7 @@ async function loadSubmission(id: string) {
         | "status"
         | "source_app"
         | "source_app_other"
+        | "restaurant_name"
         | "result_token"
         | "current_total"
         | "comparison_total"
@@ -214,6 +220,72 @@ export async function saveComparison(formData: FormData): Promise<ActionResult> 
  * Step 14. Opening WhatsApp is not proof of delivery, so this is always an
  * explicit admin action.
  */
+/**
+ * Record that this basket cannot be priced on the comparison app.
+ *
+ * The ending saveComparison cannot express, because it has no total to save.
+ * Everything a comparison would have written stays null - no comparison_total,
+ * no saving, nothing that could later be mistaken for a price somebody checked
+ * - and the customer's message is written the same way the others are, so it
+ * reaches them through the same panel and the same send button.
+ */
+export async function markUnavailable(formData: FormData): Promise<ActionResult> {
+  const { user } = await requireAdmin();
+
+  const parsed = unavailableInputSchema.safeParse({
+    submissionId: String(formData.get("submissionId") ?? ""),
+    reason: String(formData.get("reason") ?? ""),
+    adminNotes: String(formData.get("adminNotes") ?? ""),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Pick a reason." };
+  }
+
+  const submission = await loadSubmission(parsed.data.submissionId);
+  if (!submission) return { ok: false, message: "Submission not found." };
+
+  const message = buildUnavailableMessage({
+    restaurantName: submission.restaurant_name,
+    comparisonAppLabel: submission.comparison_app,
+    resultUrl: absoluteUrl(resultPath(submission.result_token)),
+  });
+
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase
+    .from("submissions")
+    .update({
+      status: "unavailable",
+      unavailable_reason: parsed.data.reason,
+      admin_notes: sanitiseMultiline(parsed.data.adminNotes ?? "", 2000),
+      result_message: message,
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", parsed.data.submissionId);
+
+  if (error) return { ok: false, message: "Could not save the outcome." };
+
+  await recordEvent({
+    submissionId: parsed.data.submissionId,
+    eventType: "status_changed",
+    previousStatus: submission.status,
+    newStatus: "unavailable",
+    metadata: { unavailable_reason: parsed.data.reason },
+    actorId: user.id,
+  });
+
+  await recordEvent({
+    submissionId: parsed.data.submissionId,
+    eventType: "result_generated",
+    newStatus: "unavailable",
+    actorId: user.id,
+  });
+
+  revalidatePath(`/admin/submissions/${parsed.data.submissionId}`);
+  revalidatePath("/admin");
+  return { ok: true, message: "Recorded — the customer's message is ready below." };
+}
+
 export async function markResultSent(submissionId: string): Promise<ActionResult> {
   const { user } = await requireAdmin();
 

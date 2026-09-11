@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Calculator, CheckCircle2 } from "lucide-react";
-import { saveComparison } from "@/lib/admin/actions";
+import { Ban, Calculator, CheckCircle2 } from "lucide-react";
+import { markUnavailable, saveComparison } from "@/lib/admin/actions";
 import { ADMIN_SOURCE_APPS, UNKNOWN_SOURCE_APP } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
 import { AmountInput } from "@/components/forms/AmountInput";
@@ -41,6 +41,13 @@ export function ComparisonPanel({
   areaName,
   initial,
 }: ComparisonPanelProps) {
+  // Which ending this submission is getting. "priced" is the ordinary one; the
+  // other exists because a basket that is not on the comparison app has no
+  // total to enter, and before this it had nowhere to go at all.
+  const [outcome, setOutcome] = useState<"priced" | "unavailable">("priced");
+  const [reason, setReason] = useState<
+    "restaurant_not_listed" | "items_not_available" | "other"
+  >("restaurant_not_listed");
   const [sourceApp, setSourceApp] = useState(initial.sourceApp);
   const [comparisonUrl, setComparisonUrl] = useState(initial.comparisonUrl);
   const [comparisonTotal, setComparisonTotal] = useState(initial.comparisonTotal);
@@ -100,6 +107,18 @@ export function ComparisonPanel({
     });
   };
 
+  const onSaveUnavailable = () => {
+    const formData = new FormData();
+    formData.set("submissionId", submissionId);
+    formData.set("reason", reason);
+    formData.set("adminNotes", notes);
+
+    startTransition(async () => {
+      const result = await markUnavailable(formData);
+      setFeedback({ ok: result.ok, message: result.message ?? (result.ok ? "Saved." : "Failed.") });
+    });
+  };
+
   const fieldClass =
     "min-h-11 w-full rounded-xl border border-ink-200 bg-white px-3.5 text-sm text-ink-900";
 
@@ -115,7 +134,39 @@ export function ComparisonPanel({
         Rebuild this basket on {comparisonApp}, then enter the final total you see at checkout.
       </p>
 
-      <div className="mt-5 space-y-4">
+      {/*
+        Which ending this is, chosen before anything is typed. A basket that is
+        not on the comparison app has no total, and the form below spends most
+        of its fields asking for one - so it is hidden rather than left to be
+        filled in with something invented.
+      */}
+      <div className="mt-4 flex gap-2" role="group" aria-label="Outcome">
+        {(
+          [
+            ["priced", `Found it on ${comparisonApp}`],
+            ["unavailable", "Couldn't compare"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => {
+              setOutcome(value);
+              setFeedback(null);
+            }}
+            aria-pressed={outcome === value}
+            className={`min-h-10 flex-1 rounded-xl border px-3 text-sm font-semibold ${
+              outcome === value
+                ? "border-ink-900 bg-ink-900 text-white"
+                : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className={outcome === "priced" ? "mt-5 space-y-4" : "hidden"}>
         {/*
           The customer is never asked this - the screenshots are right there on
           the left of this page and the app is obvious from them. Set here
@@ -217,7 +268,67 @@ export function ComparisonPanel({
         </div>
       </div>
 
-      {preview ? (
+      {outcome === "unavailable" ? (
+        <div className="mt-5 space-y-4">
+          <fieldset>
+            <legend className="mb-1.5 text-sm font-semibold text-ink-900">
+              What stopped it?
+            </legend>
+            <p className="mb-2 text-sm text-ink-500">
+              The customer is told the same thing either way. This is so we can
+              tell a gap in {comparisonApp}&apos;s restaurant list from a gap in one menu.
+            </p>
+            <div className="space-y-2">
+              {(
+                [
+                  ["restaurant_not_listed", `Restaurant isn't on ${comparisonApp}`],
+                  ["items_not_available", `It's on ${comparisonApp}, but these items aren't`],
+                  ["other", "Something else"],
+                ] as const
+              ).map(([value, label]) => (
+                <label
+                  key={value}
+                  className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-ink-200 bg-white p-3 text-sm text-ink-900 hover:bg-ink-50"
+                >
+                  <input
+                    type="radio"
+                    name="unavailable-reason"
+                    value={value}
+                    checked={reason === value}
+                    onChange={() => setReason(value)}
+                    className="h-4 w-4 accent-ink-900"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <div>
+            <label
+              htmlFor="unavailable-notes"
+              className="mb-1.5 block text-sm font-semibold text-ink-900"
+            >
+              Notes <span className="font-normal text-ink-400">(internal)</span>
+            </label>
+            <textarea
+              id="unavailable-notes"
+              rows={3}
+              className="w-full rounded-xl border border-ink-200 bg-white p-3.5 text-sm text-ink-900"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Anything worth remembering — searched spellings, nearby branches."
+            />
+          </div>
+
+          <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            No price is saved and no saving is calculated. The customer gets a message
+            saying we couldn&apos;t compare this one.
+          </p>
+        </div>
+      ) : null}
+
+      {outcome === "priced" && preview ? (
         <div className="mt-5">
           <PriceVerdict
             sourceAppLabel={sourceApp === UNKNOWN_SOURCE_APP ? "Your order" : sourceApp}
@@ -249,10 +360,17 @@ export function ComparisonPanel({
       ) : null}
 
       <div className="mt-5">
-        <Button onClick={onSave} loading={pending} loadingLabel="Saving…" size="md">
-          <Calculator aria-hidden="true" className="h-4 w-4" />
-          Save comparison &amp; generate result
-        </Button>
+        {outcome === "priced" ? (
+          <Button onClick={onSave} loading={pending} loadingLabel="Saving…" size="md">
+            <Calculator aria-hidden="true" className="h-4 w-4" />
+            Save comparison &amp; generate result
+          </Button>
+        ) : (
+          <Button onClick={onSaveUnavailable} loading={pending} loadingLabel="Saving…" size="md">
+            <Ban aria-hidden="true" className="h-4 w-4" />
+            Record &amp; generate message
+          </Button>
+        )}
       </div>
     </section>
   );

@@ -225,7 +225,9 @@ export async function getAnalyticsRows(limit = 5000): Promise<AnalyticsRow[]> {
 
   const { data, error } = await supabase
     .from("submissions")
-    .select("status, source_app, current_total, comparison_total, saving_amount, areas(name)")
+    .select(
+      "status, source_app, current_total, comparison_total, saving_amount, restaurant_name, unavailable_reason, areas(name)",
+    )
     .order("created_at", { ascending: false })
     .limit(limit);
 

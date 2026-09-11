@@ -43,6 +43,21 @@ export const comparisonInputSchema = z.object({
 
 export type ComparisonInput = z.infer<typeof comparisonInputSchema>;
 
+/**
+ * The outcome with no number in it.
+ *
+ * Deliberately a separate schema from the comparison above: that one demands a
+ * total, and demanding one here is exactly the bug this fixes - there is no
+ * total to give, which is the whole point.
+ */
+export const unavailableInputSchema = z.object({
+  submissionId: z.uuid(),
+  reason: z.enum(["restaurant_not_listed", "items_not_available", "other"]),
+  adminNotes: z.string().trim().max(2000).optional(),
+});
+
+export type UnavailableInput = z.infer<typeof unavailableInputSchema>;
+
 export const areaInputSchema = z.object({
   name: z.string().trim().min(2, "Area name is too short").max(80),
   active: z.boolean().default(true),

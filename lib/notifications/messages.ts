@@ -44,6 +44,36 @@ export interface GeneratedResult {
   savingPercentage: number;
 }
 
+/**
+ * The message for a basket nobody could price.
+ *
+ * Says what happened and stops. No apology dressed up as an offer, no
+ * substitute restaurant: we promised this basket compared, and the honest
+ * answer is that it cannot be. Naming the restaurant matters - it is the
+ * difference between "we failed" and "this one is not on there yet".
+ */
+export function buildUnavailableMessage(input: {
+  restaurantName: string | null;
+  comparisonAppLabel?: string;
+  resultUrl?: string | null;
+}): string {
+  const comparisonApp = input.comparisonAppLabel ?? COMPARISON_APP;
+  const restaurant = input.restaurantName?.trim();
+
+  return [
+    restaurant
+      ? `We checked, and we couldn't find ${restaurant} on ${comparisonApp}.`
+      : `We checked, and we couldn't rebuild your order on ${comparisonApp}.`,
+    "",
+    `That means there's no ${comparisonApp} price to compare against this time, so go ahead and order where you were.`,
+    ...(input.resultUrl ? ["", input.resultUrl] : []),
+    "",
+    "Send us another order any time — plenty of restaurants are on both.",
+    "",
+    `— ${BRAND_NAME}`,
+  ].join("\n");
+}
+
 export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
   const comparisonApp = input.comparisonAppLabel ?? COMPARISON_APP;
   const currentMinor = parseAmountToMinor(input.currentTotal);

@@ -9,11 +9,22 @@ export type SubmissionStatus =
   | "reviewing"
   | "comparison_found"
   | "no_saving"
+  /** No comparison was possible: not on the comparison app, or not rebuildable. */
+  | "unavailable"
   | "result_ready"
   | "result_sent"
   | "cancelled";
 
 export type ContactType = "whatsapp" | "email";
+
+/**
+ * Why a basket could not be priced on the comparison app.
+ *
+ * The customer is told the same thing whichever it is. The distinction is for
+ * us: a restaurant Keeta does not carry is a coverage gap worth knowing about
+ * by name, while a menu that cannot be matched is a different problem.
+ */
+export type UnavailableReason = "restaurant_not_listed" | "items_not_available" | "other";
 
 export type SubmissionEventType =
   | "submission_created"
@@ -73,6 +84,8 @@ export interface SubmissionRow {
   restaurant_found: string | null;
   comparison_location_note: string | null;
   result_message: string | null;
+  /** Why no comparison was possible. Only ever set alongside 'unavailable'. */
+  unavailable_reason: UnavailableReason | null;
   /** Unguessable address for the customer's own result page. Never logged. */
   result_token: string;
   /** Where the rebuilt basket lives on the comparison app, pasted by an admin. */

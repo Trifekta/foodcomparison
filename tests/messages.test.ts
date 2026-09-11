@@ -3,6 +3,7 @@ import {
   buildMailtoLink,
   buildResultMessage,
   buildResultSubject,
+  buildUnavailableMessage,
   buildWhatsAppLink,
   sourceAppLabel,
 } from "@/lib/notifications/messages";
@@ -154,5 +155,38 @@ describe("the result link in a message", () => {
     const { message } = buildResultMessage(base);
     expect(message).not.toContain("http");
     expect(message).toContain("You could save");
+  });
+});
+
+describe("buildUnavailableMessage", () => {
+  it("names the restaurant, so it reads as a fact and not a failure", () => {
+    const message = buildUnavailableMessage({ restaurantName: "Mandarin Oak" });
+    expect(message).toContain("couldn't find Mandarin Oak on Keeta");
+  });
+
+  it("still works when we never learned the restaurant's name", () => {
+    const message = buildUnavailableMessage({ restaurantName: null });
+    expect(message).toContain("couldn't rebuild your order on Keeta");
+    expect(message).not.toContain("null");
+  });
+
+  it("quotes no price, because there is none", () => {
+    const message = buildUnavailableMessage({ restaurantName: "Mandarin Oak" });
+    expect(message).not.toMatch(/AED\s*\d/);
+    expect(message).not.toContain("save");
+  });
+
+  it("tells them to order where they were rather than leaving them hanging", () => {
+    expect(buildUnavailableMessage({ restaurantName: "ALBAIK" })).toContain(
+      "order where you were",
+    );
+  });
+
+  it("carries the result link when there is one", () => {
+    const message = buildUnavailableMessage({
+      restaurantName: "ALBAIK",
+      resultUrl: "https://findfoodae.example/r/0123456789abcdef0123456789abcdef",
+    });
+    expect(message).toContain("/r/0123456789abcdef0123456789abcdef");
   });
 });
