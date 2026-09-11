@@ -95,6 +95,20 @@ const ITEM_SECTION_ENDS = [
 /** A phone status bar: the clock, signal bars and battery across the top. */
 const STATUS_BAR = /^\s*\d{1,2}[:.]\d{2}\b/;
 
+/**
+ * The same status bar when the clock did not survive the read.
+ *
+ * "10:15" came back as "M015" once the screenshot was enlarged, and the line
+ * became the restaurant name. The clock is the unreliable part; the rest of the
+ * bar is not. Signal bars and a battery read as a handful of two- and
+ * three-letter fragments - "8 Zo all al", "XR ED)" - and nothing anybody names
+ * a restaurant is made only of words that short. Checked on the first line
+ * alone, where the bar is the only thing that can be.
+ */
+function looksLikeStatusBar(line: string): boolean {
+  return STATUS_BAR.test(line) || (/\d/.test(line) && longestWord(line) < 4);
+}
+
 /** Leading back-arrow glyphs OCR leaves on a header line. */
 const NAV_GLYPHS = /^[\s<>«»‹›|:;.,*+~^`'"&€£©®@#()\[\]{}-]+/;
 
@@ -233,6 +247,45 @@ function countPrices(line: string): number {
  */
 function looksLikeCardRow(rawLine: string): boolean {
   return (rawLine.match(/\S {4,}(?=\S)/g) ?? []).length >= 2;
+}
+
+/** The longest run of letters on a line, which is what tells a word from noise. */
+function longestWord(text: string): number {
+  return (text.match(/\p{L}+/gu) ?? []).reduce((longest, word) => Math.max(longest, word.length), 0);
+}
+
+/**
+ * Drops the debris OCR leaves out to the right of an item.
+ *
+ * A delivery app puts a photo of the dish beside its name, and the engine reads
+ * the picture: "Manoushe Box (12 pieces)" comes back with "Br Pn ”" trailing it
+ * across the gap where the photo was.
+ *
+ * The gap is the evidence, which is why this is safe where trimming short
+ * trailing words was not. Only a tail that sits beyond a column gap is even
+ * considered, and only then when it carries no digits, no word long enough to
+ * be a word, and either several fragments or a character no menu would print.
+ * A size suffix - "Cappuccino      L" - fails all of that and survives.
+ */
+function withoutJunkTail(rawLine: string): string {
+  const gap = /\S {4,}(?=\S)/g;
+  let lastEnd = -1;
+  let match: RegExpExecArray | null;
+  while ((match = gap.exec(rawLine)) !== null) lastEnd = match.index + match[0].length;
+  if (lastEnd < 0) return rawLine;
+
+  const head = rawLine.slice(0, lastEnd);
+  const tail = rawLine.slice(lastEnd).trim();
+
+  if (/\d/.test(tail)) return rawLine;
+  if (longestWord(tail) >= 4) return rawLine;
+  if (letterCount(head) < 3) return rawLine;
+
+  const fragments = tail.split(/\s+/).filter(Boolean).length;
+  const hasOddCharacter = /[^\p{L}\d\s]/u.test(tail);
+  if (fragments < 2 && !hasOddCharacter) return rawLine;
+
+  return head;
 }
 
 /** Every money-shaped value on a line, in the order they appear. */
@@ -513,10 +566,25 @@ export function parseOcrText(raw: string): ParseResult {
   /** A gap before this line means a new row started; no gap means it continues. */
   let afterGap = true;
 
+  /**
+   * A row that carries no price, no description and no word long enough to be
+   * one is the engine reading the dish photograph, not the dish.
+   *
+   * Enlarging the screenshot is what makes this necessary: more pixels in the
+   * photo means more spurious glyphs out of it, arriving as short standalone
+   * lines - "Px Ta", "b( Ai". Every real item name across the screenshots
+   * collected so far has a word of four letters in it, and any row that really
+   * is an item has a price or an option list to say so.
+   */
+  const isPhotographNoise = (item: StructuredItem) =>
+    item.line_total === "" && item.modifiers.length === 0 && longestWord(item.name) < 4;
+
   const flush = () => {
-    if (pending && letterCount(pending.name) >= 2) {
+    if (pending && letterCount(pending.name) >= 2 && !isPhotographNoise(pending)) {
       pending.name = tidy(pending.name);
-      pending.modifiers = pending.modifiers.map(tidy).filter((entry) => letterCount(entry) >= 2);
+      // A description is words. Anything without one is the engine reading a
+      // photograph, and the customer should not have to delete it.
+      pending.modifiers = pending.modifiers.map(tidy).filter((entry) => longestWord(entry) >= 3);
       items.push(pending);
     }
     pending = null;
@@ -526,7 +594,7 @@ export function parseOcrText(raw: string): ParseResult {
     const original = entry.text;
 
     // The phone's own clock and battery, only ever the first line.
-    if (index === 0 && STATUS_BAR.test(original)) continue;
+    if (index === 0 && looksLikeStatusBar(original)) continue;
 
     // A gap ends whatever row we were assembling.
     if (original === "") {
@@ -535,7 +603,7 @@ export function parseOcrText(raw: string): ParseResult {
       continue;
     }
 
-    const line = original.replace(NAV_GLYPHS, "").trim();
+    const line = withoutJunkTail(entry.raw).replace(/\s+/g, " ").replace(NAV_GLYPHS, "").trim();
     const startsNewRow = afterGap;
     afterGap = false;
 
@@ -621,7 +689,7 @@ export function parseOcrText(raw: string): ParseResult {
     // opened, this is still that item's row - not a second item.
     if (priced && pending !== null && pending.line_total === "" && !startsNewRow) {
       pending.line_total = priced.price;
-      if (letterCount(priced.rest) >= 2 && pending.modifiers.length < 4) {
+      if (longestWord(priced.rest) >= 3 && pending.modifiers.length < 4) {
         pending.modifiers.push(priced.rest);
       }
       continue;
@@ -658,8 +726,10 @@ export function parseOcrText(raw: string): ParseResult {
       continue;
     }
 
-    // A name cut in half by a narrow column is finished, not annotated.
-    if (pending.modifiers.length === 0 && awaitsContinuation(pending.name)) {
+    // A name cut in half by a narrow column is finished, not annotated - but a
+    // continuation is a fragment ("Veg)"), not a sentence. Without the length
+    // cap an unclosed bracket swallows the option list that follows it.
+    if (pending.modifiers.length === 0 && line.length <= 20 && awaitsContinuation(pending.name)) {
       pending.name = `${pending.name} ${line}`.replace(/\s+/g, " ").trim();
       continue;
     }
@@ -698,6 +768,14 @@ export function parseOcrText(raw: string): ParseResult {
 
   return {
     basket,
-    empty: items.length === 0 && basket.restaurant_name === "" && basket.final_total === "",
+    // Empty means nothing recognisable came out, and a stated total is not the
+    // only recognisable thing. A payment summary whose total lost its decimal
+    // point still read a subtotal and two fees; binning all of it because one
+    // line failed threw away the only screen that knows what the order cost.
+    empty:
+      items.length === 0 &&
+      basket.restaurant_name === "" &&
+      MONEY_FIELDS.every((field) => basket[field] === "") &&
+      basket.final_total === "",
   };
 }

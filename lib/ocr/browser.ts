@@ -8,6 +8,7 @@ import {
   OCR_PARAMETERS,
   ocrEngineVersion,
 } from "./config";
+import { enlargeForOcr } from "./preprocess";
 import type { OcrOutcome } from "./types";
 
 /**
@@ -106,7 +107,10 @@ export async function readImageInBrowser(
 
   try {
     const worker = await getWorker(audience, onProgress);
-    const { data } = await worker.recognize(image);
+    // Enlarged first: a phone screenshot is below the resolution the engine
+    // wants, and doubling it is the difference between reading a restaurant
+    // name and reading "SMe". See preprocess.ts.
+    const { data } = await worker.recognize(await enlargeForOcr(image));
 
     return {
       ok: true,

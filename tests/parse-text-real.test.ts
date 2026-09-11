@@ -366,3 +366,86 @@ describe("Mandarin Oak payment screen, upsell heading scrolled away", () => {
     expect(basket.uncertain_fields).not.toContain("final_total");
   });
 });
+
+// On The Wood, captured from a real browser AFTER the image is enlarged and
+// desaturated - which is the only reason any of this is legible, and the only
+// place worth capturing it from, since the canvas resamples differently to any
+// server-side library. The same screenshot at its native 1080px gave "SMe" for
+// the restaurant, no price at all, and a payment summary the parser threw away
+// whole. See lib/ocr/preprocess.ts.
+const ON_THE_WOOD_CART = `Cart
+<   On The Wood
+
+Manoushe Box (12 pieces)       87 Vrs
+2. Edit                     re pr
+oo                     Ca Yo
+
+Px Ta
+
+b( Ai
+og 1 +
+
+& 87.00                                          RAT Tr
+`;
+
+const ON_THE_WOOD_PAYMENT = `Payment summary
+
+Subtotal                                                                 8 87.00
+Free delivery E@                                       Bed
+Service fee ©                                                              B 3.90
+Total amount                                                 B 90.90
+`;
+
+describe("On The Wood cart screen", () => {
+  const { basket } = parseOcrText(ON_THE_WOOD_CART);
+
+  it("reads the restaurant out of the header beside the back button", () => {
+    expect(basket.restaurant_name).toBe("On The Wood");
+  });
+
+  it("finds the dish, and the price somewhere", () => {
+    expect(basket.items[0]?.name).toContain("Manoushe Box (12 pieces)");
+    expect(basket.items.some((item) => item.line_total === "87.00")).toBe(true);
+  });
+
+  it("is honest about what enlarging does not fix", () => {
+    // Recorded rather than wished for. The dish photo beside this row reads as
+    // several short lines with blank lines between them, which splits the row:
+    // the name keeps a fragment of the photo ("87 Vrs") and the price lands on
+    // a second row that is nothing but photo. More pixels means more of this,
+    // which is the price paid for reading the restaurant name at all.
+    //
+    // It is survivable because of what these fields are: the restaurant is
+    // required and now correct, the money comes off the payment screen and is
+    // now complete, and the item list is optional and editable on the very
+    // screen it appears on. It is not fixable with more rules - this is the
+    // case for reading screenshots with a model instead.
+    expect(basket.items).toHaveLength(2);
+    expect(basket.items[0]?.name).toBe("Manoushe Box (12 pieces) 87 Vrs");
+  });
+});
+
+describe("On The Wood payment screen", () => {
+  const { basket, empty } = parseOcrText(ON_THE_WOOD_PAYMENT);
+
+  it("is not thrown away for want of a total", () => {
+    // The bug this pins: empty was computed from final_total alone, so a
+    // summary that read a subtotal and two fees counted as nothing at all and
+    // the customer saw none of it.
+    expect(empty).toBe(false);
+  });
+
+  it("reads the whole summary", () => {
+    expect(basket.subtotal).toBe("87.00");
+    expect(basket.service_fee).toBe("3.90");
+    expect(basket.final_total).toBe("90.90");
+  });
+
+  it("reads a delivery struck through by a subscription as free", () => {
+    expect(basket.delivery_fee).toBe("0.00");
+  });
+
+  it("is sure enough of all of it to flag nothing", () => {
+    expect(basket.uncertain_fields).toEqual([]);
+  });
+});
