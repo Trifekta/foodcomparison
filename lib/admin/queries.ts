@@ -3,6 +3,7 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { SIGNED_URL_TTL_SECONDS, STORAGE_BUCKET } from "@/lib/constants";
 import type { AnalyticsRow } from "@/lib/calculations/analytics";
+import { withAmountStrings } from "@/lib/calculations/money";
 import type {
   AreaRow,
   SubmissionEventRow,
@@ -77,8 +78,7 @@ export async function listSubmissions(
 
   const { data, error } = await query;
   if (error) throw new Error(`Could not load submissions: ${error.message}`);
-
-  return (data ?? []) as unknown as SubmissionListRow[];
+  return ((data ?? []) as unknown as SubmissionListRow[]).map(withAmountStrings);
 }
 
 export interface DashboardCounts {
@@ -134,7 +134,8 @@ export async function getSubmission(id: string): Promise<SubmissionWithArea | nu
     .maybeSingle();
 
   if (error) throw new Error(`Could not load submission: ${error.message}`);
-  return (data as unknown as SubmissionWithArea) ?? null;
+  if (!data) return null;
+  return withAmountStrings(data as unknown as SubmissionWithArea);
 }
 
 /** The optional item list the customer confirmed. Often empty. */
@@ -232,5 +233,5 @@ export async function getAnalyticsRows(limit = 5000): Promise<AnalyticsRow[]> {
     .limit(limit);
 
   if (error) throw new Error(`Could not load analytics: ${error.message}`);
-  return (data ?? []) as unknown as AnalyticsRow[];
+  return ((data ?? []) as unknown as AnalyticsRow[]).map(withAmountStrings);
 }

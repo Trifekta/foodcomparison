@@ -21,7 +21,11 @@ import { getEmailProvider } from "@/lib/notifications/resend";
 import { sanitiseMultiline, sanitiseText } from "@/lib/utils/text";
 import { absoluteUrl } from "@/lib/env";
 import { resultPath } from "@/lib/utils/reference";
-import { formatMinorToDecimalString, parseAmountToMinor } from "@/lib/calculations/money";
+import {
+  formatMinorToDecimalString,
+  parseAmountToMinor,
+  withAmountStrings,
+} from "@/lib/calculations/money";
 import type { SubmissionRow, SubmissionStatus } from "@/types/database";
 
 /**
@@ -127,7 +131,9 @@ async function loadSubmission(id: string) {
   // Thrown, so the message survives: every action runs inside reported(), which
   // turns it into a sentence in the panel rather than an error page.
   if (error) throw new Error(`Could not load the submission: ${error.message}`);
-  return data;
+  // numeric columns arrive as JSON numbers; the callers below all assume the
+  // fixed-2 strings their types promise.
+  return data ? withAmountStrings(data) : null;
 }
 
 /** Step 3 of the workflow: new -> reviewing. */

@@ -9,7 +9,11 @@ import {
 } from "@/lib/utils/reference";
 import { normalisePhone } from "@/lib/utils/phone";
 import { calculateSavingFromStrings } from "@/lib/calculations/saving";
-import { formatMinorToDecimalString, parseAmountToMinor } from "@/lib/calculations/money";
+import {
+  formatMinorToDecimalString,
+  parseAmountToMinor,
+  withAmountStrings,
+} from "@/lib/calculations/money";
 import type { SubmissionItemRow, SubmissionStatus, UnavailableReason } from "@/types/database";
 
 /**
@@ -91,13 +95,16 @@ export async function getPublicResult(token: string): Promise<PublicResult | nul
     .maybeSingle();
 
   if (error || !data) return null;
+  // The same coercion the admin side needs: numeric columns come back as JSON
+  // numbers, and everything downstream treats them as decimal strings.
+  const row = withAmountStrings(data);
 
   const saving =
-    data.comparison_total !== null
-      ? calculateSavingFromStrings(data.current_total, data.comparison_total)
+    row.comparison_total !== null
+      ? calculateSavingFromStrings(row.current_total, row.comparison_total)
       : null;
 
-  const state = stateOf(data.status, saving?.hasSaving ?? false);
+  const state = stateOf(row.status, saving?.hasSaving ?? false);
 
   // Items are only worth fetching once there is a result to rebuild.
   let items: PublicResult["items"] = [];
@@ -105,7 +112,7 @@ export async function getPublicResult(token: string): Promise<PublicResult | nul
     const { data: rows } = await supabase
       .from("submission_items")
       .select("name, quantity, line_price_minor")
-      .eq("submission_id", data.id)
+      .eq("submission_id", row.id)
       .order("sort_order", { ascending: true });
 
     items = ((rows ?? []) as Pick<SubmissionItemRow, "name" | "quantity" | "line_price_minor">[]).map(
@@ -119,19 +126,19 @@ export async function getPublicResult(token: string): Promise<PublicResult | nul
   }
 
   return {
-    referenceNumber: data.reference_number,
+    referenceNumber: row.reference_number,
     state,
-    unavailableReason: state === "unavailable" ? data.unavailable_reason : null,
-    restaurantName: data.restaurant_name,
-    currentTotal: data.current_total,
-    comparisonApp: data.comparison_app,
-    comparisonTotal: state === "checking" ? null : data.comparison_total,
+    unavailableReason: state === "unavailable" ? row.unavailable_reason : null,
+    restaurantName: row.restaurant_name,
+    currentTotal: row.current_total,
+    comparisonApp: row.comparison_app,
+    comparisonTotal: state === "checking" ? null : row.comparison_total,
     savingAmount:
       saving && saving.hasSaving ? formatMinorToDecimalString(saving.savingMinor) : null,
     savingPercentage: saving && saving.hasSaving ? Math.round(saving.savingPercentage) : null,
-    comparisonUrl: state === "saving" ? sanitiseLink(data.comparison_url) : null,
+    comparisonUrl: state === "saving" ? sanitiseLink(row.comparison_url) : null,
     items,
-    createdAt: data.created_at,
+    createdAt: row.created_at,
   };
 }
 

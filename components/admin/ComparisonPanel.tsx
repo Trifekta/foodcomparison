@@ -48,12 +48,20 @@ export function ComparisonPanel({
   const [reason, setReason] = useState<
     "restaurant_not_listed" | "items_not_available" | "other"
   >("restaurant_not_listed");
-  const [sourceApp, setSourceApp] = useState(initial.sourceApp);
-  const [comparisonUrl, setComparisonUrl] = useState(initial.comparisonUrl);
-  const [comparisonTotal, setComparisonTotal] = useState(initial.comparisonTotal);
-  const [restaurantFound, setRestaurantFound] = useState(initial.restaurantFound);
-  const [locationNote, setLocationNote] = useState(initial.comparisonLocationNote);
-  const [notes, setNotes] = useState(initial.adminNotes);
+  // Coerced on the way in. These come from database columns, and a numeric one
+  // arrives over PostgREST as a JSON number however the type describes it -
+  // which is how a saved comparison turned every later render of this panel
+  // into "C.trim is not a function". Harmless when the value is already a
+  // string, and this component must not be the thing that breaks the page.
+  const text = (value: string | number | null | undefined) =>
+    value === null || value === undefined ? "" : String(value);
+
+  const [sourceApp, setSourceApp] = useState(text(initial.sourceApp));
+  const [comparisonUrl, setComparisonUrl] = useState(text(initial.comparisonUrl));
+  const [comparisonTotal, setComparisonTotal] = useState(text(initial.comparisonTotal));
+  const [restaurantFound, setRestaurantFound] = useState(text(initial.restaurantFound));
+  const [locationNote, setLocationNote] = useState(text(initial.comparisonLocationNote));
+  const [notes, setNotes] = useState(text(initial.adminNotes));
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, startTransition] = useTransition();
 

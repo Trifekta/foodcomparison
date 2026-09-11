@@ -41,6 +41,46 @@ export function formatMinorAsCurrency(minor: number): string {
 }
 
 /**
+ * The columns Postgres hands back as numbers rather than strings.
+ *
+ * numeric(10,2) arrives over PostgREST as a JSON number - 29, not "29.00" - so
+ * every row read from `submissions` disagrees with the type that describes it.
+ * That is not cosmetic: a number reaching code that expected a string produced
+ * "C.trim is not a function" and took the whole submission page down the moment
+ * a comparison had been saved.
+ */
+const AMOUNT_COLUMNS = [
+  "current_total",
+  "comparison_total",
+  "saving_amount",
+  "saving_percentage",
+] as const;
+
+/** A database numeric as the fixed-2 string the rest of the app assumes. */
+export function toDecimalString(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value.toFixed(2) : null;
+  }
+  return value;
+}
+
+/**
+ * Makes a row match the type that claims to describe it.
+ *
+ * Applied where rows enter the app rather than at each use, so there is one
+ * place to be right and no caller has to remember. Untouched keys pass through,
+ * so it is safe on any projection.
+ */
+export function withAmountStrings<T extends object>(row: T): T {
+  const fixed = { ...row } as Record<string, unknown>;
+  for (const column of AMOUNT_COLUMNS) {
+    if (column in fixed) fixed[column] = toDecimalString(fixed[column] as string | number | null);
+  }
+  return fixed as T;
+}
+
+/**
  * Formats a database numeric string (or null) for display.
  *
  * Never throws. Parsing for arithmetic is strict on purpose - a malformed
