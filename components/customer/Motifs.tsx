@@ -69,33 +69,34 @@ export function ScriptBubble({
 }
 
 /**
- * Dubai skyline that closes every screen, drawn as a single flat silhouette in
- * a barely-there cream so it reads as paper texture rather than content.
+ * Dubai skyline that closes every screen.
+ *
+ * The supplied illustration, in place of the flat cream silhouette this used to
+ * draw by hand - the real landmarks are the point, since half of what the app
+ * promises is that it knows this city.
  */
 export function SkylineFooter({ className }: { className?: string }) {
   return (
     <div className={cn("pointer-events-none relative select-none", className)} aria-hidden="true">
-      <svg viewBox="0 0 390 90" className="w-full" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* dune */}
-        <path d="M0 62c60-16 120 6 190-2s130-22 200-6v36H0z" fill="var(--color-brand-100)" opacity="0.55" />
-        {/* skyline */}
-        <g fill="var(--color-brand-200)" opacity="0.75">
-          <rect x="24" y="58" width="14" height="32" rx="2" />
-          <rect x="44" y="48" width="10" height="42" rx="2" />
-          <rect x="60" y="64" width="16" height="26" rx="2" />
-          <rect x="88" y="54" width="12" height="36" rx="2" />
-          {/* Burj-like spire */}
-          <path d="M188 90V34l4-24 4 24v56z" />
-          <rect x="176" y="52" width="9" height="38" rx="2" />
-          <rect x="199" y="46" width="9" height="44" rx="2" />
-          <rect x="216" y="60" width="14" height="30" rx="2" />
-          <rect x="242" y="50" width="11" height="40" rx="2" />
-          <rect x="262" y="64" width="16" height="26" rx="2" />
-          <rect x="292" y="56" width="12" height="34" rx="2" />
-          <rect x="316" y="66" width="18" height="24" rx="2" />
-          <rect x="346" y="58" width="12" height="32" rx="2" />
-        </g>
-      </svg>
+      {/*
+        The supplied Dubai skyline, served straight from /public like the food
+        renders and for the same reason: next/image's optimiser needs a
+        Cloudflare Images binding this Worker does not declare.
+
+        It sits behind the footer text, so it is dialled back rather than shown
+        at full strength - the artwork is a backdrop here, and a legible
+        disclaimer matters more than a vivid Burj Khalifa.
+      */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/art/skyline.png"
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+        draggable={false}
+        className="w-full opacity-60"
+      />
     </div>
   );
 }

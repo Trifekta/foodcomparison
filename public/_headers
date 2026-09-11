@@ -6,6 +6,10 @@
 /food/*
   Cache-Control: public, max-age=2592000, immutable
 
+# Brand artwork, same story.
+/art/*
+  Cache-Control: public, max-age=2592000, immutable
+
 # Customer screenshots are private and never served from here, but be explicit
 # that nothing under this origin should be cached by shared proxies by default.
 /*
