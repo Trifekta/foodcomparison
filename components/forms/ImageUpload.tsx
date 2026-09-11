@@ -16,6 +16,15 @@ interface ImageUploadProps {
   step: number;
   label: string;
   hint?: string;
+  /**
+   * One quiet line under the box, saying what the screenshot needs to show.
+   *
+   * Deliberately below rather than above: it is the last thing read before the
+   * camera opens, which is the moment it can still change what gets taken.
+   * Kept to a single sentence in secondary text - a screen that lectures people
+   * about screenshots costs more uploads than a bad screenshot does.
+   */
+  helper?: string;
   file: File | null;
   /**
    * `file` is the downscaled version that gets uploaded. `original` is what the
@@ -43,6 +52,7 @@ export function ImageUpload({
   step,
   label,
   hint,
+  helper,
   file,
   onChange,
   error,
@@ -234,6 +244,10 @@ export function ImageUpload({
           </button>
         </div>
       )}
+
+      {helper ? (
+        <p className="mt-2 px-0.5 text-xs leading-snug text-slate-500">{helper}</p>
+      ) : null}
 
       <FieldError id={errorId} message={message} />
     </section>

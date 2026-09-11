@@ -86,6 +86,7 @@ export function StepUpload({
           step={1}
           label="Order details"
           hint="Restaurant and selected items"
+          helper="Make sure your restaurant name and ordered items are visible."
           requirement="required"
           art="cartDoc"
           file={cartFile}
@@ -96,7 +97,8 @@ export function StepUpload({
         <ImageUpload
           step={2}
           label="Final checkout total"
-          hint="Helps us include fees, discounts and delivery charges."
+          hint="Fees, discounts and final total"
+          helper="Include the total and fees if visible."
           requirement="optional"
           art="receipt"
           allowRemove
