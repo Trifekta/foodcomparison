@@ -47,6 +47,16 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
+const alerts: unknown[] = [];
+let alertThrows = false;
+
+vi.mock("@/lib/notifications/admin-alert", () => ({
+  alertAdminOfNewSubmission: async (alert: unknown) => {
+    if (alertThrows) throw new Error("telegram is down");
+    alerts.push(alert);
+  },
+}));
+
 const { createSubmission } = await import("@/lib/submissions/create");
 
 /** Smallest byte sequence that passes the server's magic-byte check. */
@@ -86,6 +96,8 @@ function itemRows(): Array<Record<string, unknown>> {
 
 beforeEach(() => {
   inserts.length = 0;
+  alerts.length = 0;
+  alertThrows = false;
   areaActive = true;
 });
 
@@ -112,6 +124,30 @@ describe("createSubmission", () => {
     const result = await createSubmission(formData({ sourceApp: "Talabat" }));
     expect(result.ok).toBe(true);
     expect(submissionRow().source_app).toBe("Unknown");
+  });
+
+  it("tells the admin, because nobody watches a dashboard", async () => {
+    const result = await createSubmission(formData({ restaurantName: "On The Wood" }));
+    expect(result.ok).toBe(true);
+    expect(alerts[0]).toMatchObject({
+      restaurantName: "On The Wood",
+      currentTotal: "82.00",
+      hasCheckoutImage: false,
+    });
+  });
+
+  it("keeps the submission when the alert fails", async () => {
+    // The row is already written by then. A missed alert is a slower answer;
+    // losing the submission would be the customer's whole visit.
+    alertThrows = true;
+    const result = await createSubmission(formData());
+    expect(result.ok).toBe(true);
+    expect(submissionRow().restaurant_name).toBe("Al Safadi");
+  });
+
+  it("says nothing to anyone when the submission was refused", async () => {
+    await createSubmission(formData({ restaurantName: "" }));
+    expect(alerts).toHaveLength(0);
   });
 
   it("refuses a submission with no restaurant", async () => {

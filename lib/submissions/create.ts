@@ -15,6 +15,7 @@ import {
   submissionFieldsSchema,
 } from "@/lib/validation/submission";
 import { generateReferenceNumber, generateResultToken } from "@/lib/utils/reference";
+import { alertAdminOfNewSubmission } from "@/lib/notifications/admin-alert";
 import { normalisePhone } from "@/lib/utils/phone";
 import { sanitiseText } from "@/lib/utils/text";
 import { formatMinorToDecimalString, parseAmountToMinor } from "@/lib/calculations/money";
@@ -175,9 +176,9 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   // The area must exist and still be active - a stale or tampered id is rejected.
   const { data: area, error: areaError } = await supabase
     .from("areas")
-    .select("id, active")
+    .select("id, active, name")
     .eq("id", fields.areaId)
-    .maybeSingle<{ id: string; active: boolean }>();
+    .maybeSingle<{ id: string; active: boolean; name: string | null }>();
 
   if (areaError) return { ok: false, status: 500, error: GENERIC_FAILURE };
   if (!area?.active) {
@@ -295,6 +296,23 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       extracted_item_count: items.value.filter((item) => item.source !== "customer").length,
     },
   });
+
+  // ---- 6. Tell somebody ---------------------------------------------------
+  // Last, and unable to fail the submission: the row is written and the
+  // customer's result page exists whatever happens here. Without it nobody
+  // knows to go and do the comparison, which is the whole job.
+  try {
+    await alertAdminOfNewSubmission({
+      reference: referenceNumber,
+      restaurantName: fields.restaurantName,
+      areaName: area.name,
+      currentTotal: formatMinorToDecimalString(currentTotalMinor),
+      hasCheckoutImage: checkoutPath !== null,
+      itemCount: itemsStored,
+    });
+  } catch {
+    // Already swallowed inside, and swallowed again here on principle.
+  }
 
   return { ok: true, referenceNumber, resultToken, id: submissionId };
 }

@@ -79,3 +79,31 @@ export function getResendConfig(): ResendConfig | null {
   if (!apiKey || !from) return null;
   return { apiKey, from };
 }
+
+export interface TelegramConfig {
+  botToken: string;
+  chatId: string;
+}
+
+/**
+ * Telegram, for telling the admin a price check has come in.
+ *
+ * Chosen over email for the alert because the whole product depends on somebody
+ * answering within minutes, and a phone buzzing is what makes that happen. It
+ * also needs no account, no sender domain and no approval - a bot from
+ * @BotFather and a chat id, both free.
+ *
+ * Null when unset, like everything else here: an unconfigured alert must leave
+ * the customer's submission working exactly as it did.
+ */
+export function getTelegramConfig(): TelegramConfig | null {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!botToken || !chatId) return null;
+  return { botToken, chatId };
+}
+
+/** Where a "new price check" email goes, when email is the chosen alert. */
+export function getAdminAlertEmail(): string | null {
+  return process.env.ADMIN_ALERT_EMAIL?.trim() || null;
+}
