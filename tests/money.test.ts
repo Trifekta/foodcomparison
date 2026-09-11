@@ -44,3 +44,20 @@ describe("formatting", () => {
     expect(formatPercentage(null)).toBeNull();
   });
 });
+
+describe("formatting never takes a page down", () => {
+  it("returns nothing rather than throwing on a value it cannot read", () => {
+    // Parsing for arithmetic is strict by design. Formatting is display, and a
+    // display helper that throws inside a client component breaks the whole
+    // page over one odd row.
+    for (const bad of ["-5.00", "1.234", "abc", "1e5", "12,50", "99999999"]) {
+      expect(() => formatDecimalStringAsCurrency(bad), `for ${bad}`).not.toThrow();
+      expect(formatDecimalStringAsCurrency(bad), `for ${bad}`).toBeNull();
+    }
+  });
+
+  it("still formats the values it can", () => {
+    expect(formatDecimalStringAsCurrency("90.90")).toBe("AED 90.90");
+    expect(formatDecimalStringAsCurrency(null)).toBeNull();
+  });
+});

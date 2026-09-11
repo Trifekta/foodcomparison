@@ -47,11 +47,37 @@ export default function AdminError({
         </Link>
       </div>
 
-      {error.digest ? (
-        <p className="text-xs text-ink-500">
-          Reference for the logs: <code className="font-semibold">{error.digest}</code>
+      {/*
+        The message, not just the digest.
+
+        Next redacts a SERVER error's message in production and gives it a
+        digest; a CLIENT error keeps its message and has no digest. Showing only
+        the digest therefore hid the one case where the real sentence was
+        available all along - which is exactly the case that turned up.
+      */}
+      <div className="space-y-2 rounded-xl border border-ink-200 bg-white p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+          {error.digest ? "Server error" : "Browser error"}
         </p>
-      ) : null}
+        <p className="break-words font-mono text-xs text-ink-800">
+          {error.message || "No message was attached."}
+        </p>
+        {error.digest ? (
+          <p className="text-xs text-ink-500">
+            Digest for the logs: <code className="font-semibold">{error.digest}</code>
+          </p>
+        ) : null}
+        {error.stack ? (
+          <details>
+            <summary className="cursor-pointer text-xs font-semibold text-ink-600">
+              Where it happened
+            </summary>
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-[0.7rem] leading-snug text-ink-600">
+              {error.stack}
+            </pre>
+          </details>
+        ) : null}
+      </div>
     </div>
   );
 }

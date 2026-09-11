@@ -40,11 +40,22 @@ export function formatMinorAsCurrency(minor: number): string {
   return `AED ${formatMinorToDecimalString(minor)}`;
 }
 
-/** Formats a database numeric string (or null) for display. */
+/**
+ * Formats a database numeric string (or null) for display.
+ *
+ * Never throws. Parsing for arithmetic is strict on purpose - a malformed
+ * amount must not quietly become a number - but formatting is display, and a
+ * display helper that throws takes a whole admin page down over one odd row.
+ * Nothing shown beats nothing working.
+ */
 export function formatDecimalStringAsCurrency(value: string | null | undefined): string | null {
   if (value === null || value === undefined || value === "") return null;
-  const minor = parseAmountToMinor(value);
-  return minor === null ? null : formatMinorAsCurrency(minor);
+  try {
+    const minor = parseAmountToMinor(value);
+    return minor === null ? null : formatMinorAsCurrency(minor);
+  } catch {
+    return null;
+  }
 }
 
 /** Percentages are stored as numeric(6,2) and displayed with one decimal. */

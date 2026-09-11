@@ -57,7 +57,17 @@ export function ComparisonPanel({
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const currentMinor = useMemo(() => parseAmountToMinor(currentTotal) ?? 0, [currentTotal]);
+  // Guarded like the preview below it. This runs during render on a value that
+  // comes straight from the database, and parseAmountToMinor throws on anything
+  // it does not recognise - which in a client component means the page, not the
+  // field, is what breaks.
+  const currentMinor = useMemo(() => {
+    try {
+      return parseAmountToMinor(currentTotal) ?? 0;
+    } catch {
+      return 0;
+    }
+  }, [currentTotal]);
 
   const preview = useMemo(() => {
     try {
