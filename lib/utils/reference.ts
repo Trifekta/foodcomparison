@@ -1,19 +1,25 @@
 /**
- * Customer-facing reference, e.g. FFA-260910-0042.
+ * The reference a person quotes back at us.
  *
- * FFA (FindFoodae) + YYMMDD + a random 4-digit suffix. The suffix is random rather than a
- * running sequence so references cannot be walked; the UUID primary key remains
- * the real identifier and nothing is authorised by reference alone.
+ * Six characters, no dashes, no date: short enough to read aloud down a phone,
+ * type with one thumb, or copy off a WhatsApp message without losing your place.
+ * It replaces FFA-260911-1850, which was fifteen characters of which eleven
+ * told the customer nothing they needed.
+ *
+ * The alphabet leaves out 0, 1, I, L, O and U - the characters people mistype
+ * for each other and the ones that make words nobody wants printed on their
+ * order. What is left is 30 symbols, so 729 million references; the insert
+ * retries on the rare collision.
+ *
+ * This is a HANDLE, not a key. It identifies an order in a conversation and
+ * authorises nothing on its own: the result page is addressed by the token
+ * below, and looking an order up by reference also asks for the contact detail
+ * it was sent to. Six characters would be far too few for anything else.
  */
-export const REFERENCE_PREFIX = "FFA";
-export const REFERENCE_PATTERN = /^FFA-\d{6}-\d{4}$/;
+const ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
+const REFERENCE_LENGTH = 6;
 
-export function formatReferenceDate(date: Date): string {
-  const yy = String(date.getUTCFullYear()).slice(-2);
-  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(date.getUTCDate()).padStart(2, "0");
-  return `${yy}${mm}${dd}`;
-}
+export const REFERENCE_PATTERN = new RegExp(`^[${ALPHABET}]{${REFERENCE_LENGTH}}$`);
 
 /**
  * Uniform random integer in [0, max).
@@ -35,11 +41,25 @@ function randomBelow(max: number): number {
 
 /** Injectable randomness keeps this testable without stubbing crypto globally. */
 export function generateReferenceNumber(
-  date: Date = new Date(),
   random: (max: number) => number = randomBelow,
 ): string {
-  const suffix = String(random(10000)).padStart(4, "0");
-  return `${REFERENCE_PREFIX}-${formatReferenceDate(date)}-${suffix}`;
+  let reference = "";
+  for (let index = 0; index < REFERENCE_LENGTH; index += 1) {
+    reference += ALPHABET[random(ALPHABET.length)];
+  }
+  return reference;
+}
+
+/**
+ * Tidies what someone typed into what we stored.
+ *
+ * Uppercase, and nothing but letters and digits: people type lowercase, add a
+ * space in the middle, and paste it with a full stop on the end. No character
+ * is remapped, because the alphabet has already removed every pair worth
+ * confusing - there is no 0 to mistake for an O, and no 1 for an I.
+ */
+export function normaliseReference(input: string): string {
+  return input.toUpperCase().replace(/[^0-9A-Z]/g, "");
 }
 
 export function isValidReferenceNumber(value: string): boolean {

@@ -183,7 +183,9 @@ function Checking({
         ) : (
           <>
             <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin" />
-            <span>Rebuilding your basket to compare the price…</span>
+            {/* What we are doing, not how. "Rebuilding your basket" sounded
+                like we were changing their order. */}
+            <span>Checking the price for you — hang tight…</span>
           </>
         )}
       </p>

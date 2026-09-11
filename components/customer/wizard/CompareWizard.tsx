@@ -12,6 +12,7 @@ import {
   submissionFieldsSchema,
   whereStepSchema,
 } from "@/lib/validation/submission";
+import { rememberLastOrder } from "@/lib/utils/last-order";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
 import { StepBasket } from "./StepBasket";
@@ -288,6 +289,12 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       if (!response.ok || !payload?.resultPath) {
         setSubmitError(payload?.error ?? ERROR_MESSAGES.network);
         return;
+      }
+
+      // Kept on this device so coming back to the site finds the order without
+      // anybody typing a reference.
+      if (payload.referenceNumber) {
+        rememberLastOrder(payload.referenceNumber, payload.resultPath);
       }
 
       // Straight to their own result page, which starts out saying we are

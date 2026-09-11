@@ -1,35 +1,58 @@
 import { describe, expect, it } from "vitest";
 import {
-  formatReferenceDate,
   generateReferenceNumber,
   isValidReferenceNumber,
+  normaliseReference,
 } from "@/lib/utils/reference";
 
+/**
+ * The reference is the handle a person quotes, not a key to anything. These
+ * tests are mostly about the shape of it being kind to a human: short enough to
+ * read aloud, and made only of characters nobody mistypes for each other.
+ */
+
 describe("reference numbers", () => {
-  it("uses the FFA-YYMMDD-NNNN shape", () => {
-    const reference = generateReferenceNumber(new Date("2026-09-10T08:00:00Z"), () => 42);
-    expect(reference).toBe("FFA-260910-0042");
+  it("is six characters, and that is the whole of it", () => {
+    const reference = generateReferenceNumber(() => 0);
+    expect(reference).toBe("222222");
+    expect(reference).toHaveLength(6);
     expect(isValidReferenceNumber(reference)).toBe(true);
   });
 
-  it("formats the date part in UTC", () => {
-    expect(formatReferenceDate(new Date("2026-01-05T23:30:00Z"))).toBe("260105");
-  });
-
-  it("rejects malformed references", () => {
-    for (const bad of ["FFA-2609-0042", "ffa-260910-0042", "FFA-260910-42", "", "0042"]) {
-      expect(isValidReferenceNumber(bad)).toBe(false);
+  it("never uses a character people confuse for another", () => {
+    // 0/O and 1/I/L are the classic pairs; U is left out so no reference spells
+    // something the customer would rather not read back to us.
+    const seen = new Set(Array.from({ length: 4000 }, () => generateReferenceNumber()).join(""));
+    for (const banned of ["0", "1", "I", "L", "O", "U"]) {
+      expect(seen.has(banned), `expected no ${banned}`).toBe(false);
     }
   });
 
-  it("produces unique references across many draws on the same day", () => {
-    const date = new Date("2026-09-10T08:00:00Z");
-    const seen = new Set<string>();
-    for (let i = 0; i < 2000; i += 1) seen.add(generateReferenceNumber(date));
+  it("rejects anything that is not a reference", () => {
+    for (const bad of [
+      "",
+      "ABC12",
+      "ABC1234",
+      "FFA-260910-0042",
+      "ABCI23",
+      "abc234",
+      "AB C23",
+    ]) {
+      expect(isValidReferenceNumber(bad), `expected ${bad} to be rejected`).toBe(false);
+    }
+  });
 
-    // 4 random digits over 2000 draws: collisions are expected and handled by the
-    // unique constraint + retry, but the generator must still spread widely.
-    expect(seen.size).toBeGreaterThan(1500);
+  it("accepts it back however a person types it", () => {
+    const reference = generateReferenceNumber();
+    for (const typed of [reference.toLowerCase(), ` ${reference} `, `${reference}.`]) {
+      expect(isValidReferenceNumber(normaliseReference(typed))).toBe(true);
+      expect(normaliseReference(typed)).toBe(reference);
+    }
+  });
+
+  it("spreads widely enough that collisions stay rare", () => {
+    const seen = new Set(Array.from({ length: 5000 }, () => generateReferenceNumber()));
+    expect(seen.size).toBe(5000);
     for (const reference of seen) expect(isValidReferenceNumber(reference)).toBe(true);
   });
 });

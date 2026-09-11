@@ -16,11 +16,12 @@ import {
 
 describe("result tokens", () => {
   it("is long enough that guessing is not a strategy", () => {
-    // 32 hex characters is 128 bits. The reference number, by contrast, is a
-    // date plus four digits: ten thousand possibilities a day.
+    // 32 hex characters is 128 bits. The reference, by contrast, is six
+    // characters of a thirty-symbol alphabet - plenty for quoting an order
+    // down a phone, nowhere near enough to guard a page.
     const token = generateResultToken();
     expect(token).toMatch(/^[0-9a-f]{32}$/);
-    expect(generateReferenceNumber()).toMatch(/^FFA-\d{6}-\d{4}$/);
+    expect(generateReferenceNumber()).toMatch(/^[2-9A-HJ-NP-TV-Z]{6}$/);
   });
 
   it("does not repeat itself", () => {
@@ -31,7 +32,7 @@ describe("result tokens", () => {
   it("rejects anything that is not exactly a token", () => {
     for (const bad of [
       "",
-      "FFA-260910-0042",
+      "K7M2QX",
       "0123456789abcdef0123456789abcde",
       "0123456789abcdef0123456789abcdef0",
       "0123456789ABCDEF0123456789abcdef",

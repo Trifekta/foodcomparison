@@ -1,7 +1,13 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isValidResultToken } from "@/lib/utils/reference";
+import {
+  isValidReferenceNumber,
+  isValidResultToken,
+  normaliseReference,
+  resultPath,
+} from "@/lib/utils/reference";
+import { normalisePhone } from "@/lib/utils/phone";
 import { calculateSavingFromStrings } from "@/lib/calculations/saving";
 import { formatMinorToDecimalString, parseAmountToMinor } from "@/lib/calculations/money";
 import type { SubmissionItemRow, SubmissionStatus, UnavailableReason } from "@/types/database";
@@ -154,4 +160,62 @@ export function isStorableComparisonUrl(value: string): boolean {
 /** Kept alongside the parse so both sides agree on what a total looks like. */
 export function totalAsMinor(value: string): number {
   return parseAmountToMinor(value) ?? 0;
+}
+
+/**
+ * Finding an order again from what the customer knows.
+ *
+ * The reference alone is not enough and is not meant to be. Six characters is
+ * the right length for something read down a phone and the wrong length for
+ * anything guarding a basket, a price and a saving - so the contact detail the
+ * result was going to be sent to has to match as well. Someone who has both
+ * already had the result sent to them.
+ *
+ * Returns the path to the result, or null. Null for a reference that does not
+ * exist, a contact that does not match, and a reference that is not even the
+ * right shape: telling those apart would turn this into the oracle the token
+ * exists to avoid.
+ */
+export async function findResultPath(
+  reference: string,
+  contact: string,
+): Promise<string | null> {
+  const cleaned = normaliseReference(reference);
+  if (!isValidReferenceNumber(cleaned)) return null;
+
+  const typed = contact.trim();
+  if (typed.length < 3) return null;
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("submissions")
+    .select("result_token, whatsapp_number, email")
+    .eq("reference_number", cleaned)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  return matchesContact(data, typed) ? resultPath(data.result_token) : null;
+}
+
+/**
+ * Whether what they typed is the contact this result was going to.
+ *
+ * One field rather than two, because a customer remembers "you were going to
+ * WhatsApp me" without remembering which box they ticked. A phone is compared
+ * after normalising both sides - they may type 050..., 50... or +971 50... and
+ * all three are the number we stored.
+ */
+function matchesContact(
+  row: { whatsapp_number: string | null; email: string | null },
+  typed: string,
+): boolean {
+  if (row.email && row.email.trim().toLowerCase() === typed.toLowerCase()) return true;
+  if (!row.whatsapp_number) return false;
+
+  try {
+    return normalisePhone("+971", typed).e164 === row.whatsapp_number;
+  } catch {
+    return false;
+  }
 }

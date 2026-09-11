@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/forms/ImageUpload";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
+import { LastOrderBanner } from "@/components/customer/LastOrderBanner";
 
 interface StepUploadProps {
   cartFile: File | null;
@@ -71,6 +72,10 @@ export function StepUpload({
           Deals Ahead <span aria-hidden="true">&hearts;</span>
         </ScriptBubble>
       </div>
+
+      {/* Above everything, because somebody who already has an order in flight
+          is not here to start another one. */}
+      <LastOrderBanner />
 
       <h1 className="relative mt-4 inline-flex items-start text-[1.9rem] font-extrabold leading-tight text-ink-900">
         Upload your order
