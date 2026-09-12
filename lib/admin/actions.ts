@@ -7,6 +7,7 @@ import { getAdminSession, requireAdmin } from "@/lib/supabase/auth";
 import {
   areaInputSchema,
   comparisonInputSchema,
+  submissionEditSchema,
   unavailableInputSchema,
 } from "@/lib/validation/admin";
 import { calculateSavingFromStrings, toPersistableSaving } from "@/lib/calculations/saving";
@@ -19,6 +20,12 @@ import {
 import { alertChannels, sendTestAdminAlert } from "@/lib/notifications/admin-alert";
 import { getEmailProvider } from "@/lib/notifications/resend";
 import { sanitiseMultiline, sanitiseText } from "@/lib/utils/text";
+import { normalisePhone } from "@/lib/utils/phone";
+import {
+  MAX_RESTAURANT_NAME_LENGTH,
+  STORAGE_BUCKET,
+  UNKNOWN_SOURCE_APP,
+} from "@/lib/constants";
 import { absoluteUrl } from "@/lib/env";
 import { resultPath } from "@/lib/utils/reference";
 import {
@@ -83,7 +90,10 @@ async function recordEvent(input: {
     | "comparison_added"
     | "status_changed"
     | "result_generated"
-    | "result_sent";
+    | "result_sent"
+    | "submission_edited"
+    | "submission_archived"
+    | "submission_unarchived";
   previousStatus?: SubmissionStatus | null;
   newStatus?: SubmissionStatus | null;
   metadata?: Record<string, unknown>;
@@ -601,4 +611,201 @@ export async function signOut(): Promise<void> {
   const supabase = await createServerSupabaseClient();
   await supabase.auth.signOut();
   redirect("/admin/login");
+}
+
+/**
+ * Correct what the customer sent.
+ *
+ * Only the customer's own facts: restaurant, area, the total they are paying,
+ * which app it came from, and where to reach them. Nothing the comparison
+ * derives is touched here - saveComparison owns the Keeta total, the saving and
+ * the message, and duplicating that arithmetic in a second place is how the two
+ * drift apart.
+ *
+ * The edit is recorded with the fields that actually changed, so the audit
+ * trail says "the total went from 85.69 to 86.59" rather than "somebody edited
+ * this".
+ */
+export async function editSubmission(formData: FormData): Promise<ActionResult> {
+  const { user } = await requireAdmin();
+  return reported(async () => {
+    const parsed = submissionEditSchema.safeParse({
+      submissionId: String(formData.get("submissionId") ?? ""),
+      restaurantName: String(formData.get("restaurantName") ?? ""),
+      areaId: String(formData.get("areaId") ?? ""),
+      currentTotal: String(formData.get("currentTotal") ?? ""),
+      sourceApp: String(formData.get("sourceApp") ?? ""),
+      contactType: String(formData.get("contactType") ?? ""),
+      dialCode: String(formData.get("dialCode") ?? ""),
+      whatsappNumber: String(formData.get("whatsappNumber") ?? ""),
+      email: String(formData.get("email") ?? ""),
+    });
+
+    if (!parsed.success) {
+      return { ok: false, message: parsed.error.issues[0]?.message ?? "Please check the fields." };
+    }
+    const input = parsed.data;
+
+    const before = await loadSubmission(input.submissionId);
+    if (!before) return { ok: false, message: LOAD_FAILED };
+
+    const currentTotalMinor = parseAmountToMinor(input.currentTotal);
+    if (currentTotalMinor === null) {
+      return { ok: false, message: "Enter a valid amount, e.g. 85.69" };
+    }
+
+    // One channel is written and the other cleared, so a submission can never
+    // carry a stale address the admin thinks they have replaced.
+    let whatsappNumber: string | null = null;
+    let email: string | null = null;
+    if (input.contactType === "whatsapp") {
+      try {
+        whatsappNumber = normalisePhone(input.dialCode, input.whatsappNumber).e164;
+      } catch {
+        return { ok: false, message: "Enter a valid mobile number." };
+      }
+    } else {
+      email = input.email.toLowerCase();
+    }
+
+    const currentTotal = formatMinorToDecimalString(currentTotalMinor);
+    const restaurantName = sanitiseText(input.restaurantName ?? "", MAX_RESTAURANT_NAME_LENGTH);
+
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase
+      .from("submissions")
+      .update({
+        restaurant_name: restaurantName || null,
+        area_id: input.areaId,
+        current_total: currentTotal,
+        source_app: input.sourceApp || UNKNOWN_SOURCE_APP,
+        contact_type: input.contactType,
+        whatsapp_number: whatsappNumber,
+        email,
+      })
+      .eq("id", input.submissionId);
+
+    if (error) return { ok: false, message: `Could not save the changes: ${error.message}` };
+
+    // Only what moved. A list of every field would bury the one that matters.
+    const changed: Record<string, { from: unknown; to: unknown }> = {};
+    if (before.current_total !== currentTotal) {
+      changed.current_total = { from: before.current_total, to: currentTotal };
+    }
+    if ((before.restaurant_name ?? null) !== (restaurantName || null)) {
+      changed.restaurant_name = { from: before.restaurant_name, to: restaurantName || null };
+    }
+    if (before.source_app !== input.sourceApp) {
+      changed.source_app = { from: before.source_app, to: input.sourceApp };
+    }
+    if (before.contact_type !== input.contactType) {
+      changed.contact_type = { from: before.contact_type, to: input.contactType };
+    }
+
+    await recordEvent({
+      submissionId: input.submissionId,
+      eventType: "submission_edited",
+      previousStatus: before.status,
+      newStatus: before.status,
+      // Contact details themselves are not recorded - that the channel changed
+      // is the useful fact, and the number belongs on the row, not in an
+      // audit row that outlives every reason to hold it.
+      metadata: { changed: Object.keys(changed), values: changed },
+      actorId: user.id,
+    });
+
+    revalidatePath(`/admin/submissions/${input.submissionId}`);
+    revalidatePath("/admin");
+    return { ok: true };
+  });
+}
+
+/** Out of the working list, without losing what it measured. */
+export async function setSubmissionArchived(
+  submissionId: string,
+  archived: boolean,
+): Promise<ActionResult> {
+  const { user } = await requireAdmin();
+  return reported(async () => {
+    const submission = await loadSubmission(submissionId);
+    if (!submission) return { ok: false, message: LOAD_FAILED };
+
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase
+      .from("submissions")
+      .update({ archived_at: archived ? new Date().toISOString() : null })
+      .eq("id", submissionId);
+
+    if (error) {
+      return { ok: false, message: `Could not archive this submission: ${error.message}` };
+    }
+
+    await recordEvent({
+      submissionId,
+      eventType: archived ? "submission_archived" : "submission_unarchived",
+      previousStatus: submission.status,
+      newStatus: submission.status,
+      actorId: user.id,
+    });
+
+    revalidatePath(`/admin/submissions/${submissionId}`);
+    revalidatePath("/admin");
+    revalidatePath("/admin/analytics");
+    return { ok: true };
+  });
+}
+
+/**
+ * Remove a submission and everything attached to it.
+ *
+ * Archiving is the answer to "get this out of my way"; this is the answer to
+ * "this should not exist" - a customer asking for their data back, or the test
+ * rows that were never real. It cannot be undone, which is why the button that
+ * calls it asks first.
+ *
+ * Screenshots go before the row does. The database cascades items, events and
+ * extractions, but it knows nothing about the storage bucket, so deleting the
+ * row first would leave the customer's cart photo - name, address and order -
+ * sitting in storage with nothing left pointing at it. Failing to delete the
+ * images therefore stops the whole thing rather than pressing on.
+ */
+export async function deleteSubmission(submissionId: string): Promise<ActionResult> {
+  await requireAdmin();
+  return reported(async () => {
+    const supabase = await createServerSupabaseClient();
+
+    const { data: row, error: loadError } = await supabase
+      .from("submissions")
+      .select("id, cart_image_path, checkout_image_path")
+      .eq("id", submissionId)
+      .maybeSingle<{
+        id: string;
+        cart_image_path: string | null;
+        checkout_image_path: string | null;
+      }>();
+
+    if (loadError) return { ok: false, message: `Could not load this submission: ${loadError.message}` };
+    if (!row) return { ok: false, message: LOAD_FAILED };
+
+    const paths = [row.cart_image_path, row.checkout_image_path].filter(
+      (path): path is string => typeof path === "string" && path.length > 0,
+    );
+
+    if (paths.length > 0) {
+      const { error: storageError } = await supabase.storage.from(STORAGE_BUCKET).remove(paths);
+      if (storageError) {
+        return {
+          ok: false,
+          message: `Could not delete the screenshots, so nothing was removed: ${storageError.message}`,
+        };
+      }
+    }
+
+    const { error } = await supabase.from("submissions").delete().eq("id", submissionId);
+    if (error) return { ok: false, message: `Could not delete this submission: ${error.message}` };
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/analytics");
+    return { ok: true };
+  });
 }

@@ -22,6 +22,12 @@ import type {
  */
 
 export interface SubmissionFilters {
+  /**
+   * Which side of the archive to show. Defaults to the working list, because
+   * that is what the dashboard is for: archiving something and still finding it
+   * in front of you would make the button pointless.
+   */
+  archived?: "active" | "archived" | "all";
   status?: SubmissionStatus | "all";
   areaId?: string;
   sourceApp?: string;
@@ -31,7 +37,7 @@ export interface SubmissionFilters {
 }
 
 const LIST_COLUMNS =
-  "id, reference_number, created_at, status, source_app, source_app_other, current_total, comparison_total, saving_amount, saving_percentage, contact_type, area_id, areas(id, name)";
+  "id, reference_number, created_at, status, source_app, source_app_other, current_total, comparison_total, saving_amount, saving_percentage, contact_type, area_id, archived_at, areas(id, name)";
 
 export interface SubmissionListRow {
   id: string;
@@ -46,6 +52,7 @@ export interface SubmissionListRow {
   saving_percentage: string | null;
   contact_type: "whatsapp" | "email";
   area_id: string | null;
+  archived_at: string | null;
   areas: { id: string; name: string } | null;
 }
 
@@ -59,6 +66,10 @@ export async function listSubmissions(
     .select(LIST_COLUMNS)
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  const archived = filters.archived ?? "active";
+  if (archived === "active") query = query.is("archived_at", null);
+  if (archived === "archived") query = query.not("archived_at", "is", null);
 
   if (filters.status && filters.status !== "all") query = query.eq("status", filters.status);
   if (filters.areaId) query = query.eq("area_id", filters.areaId);
@@ -99,8 +110,15 @@ export async function getDashboardCounts(): Promise<DashboardCounts> {
       4 * 60 * 60 * 1000,
   );
 
+  // Every count here is of the working list. An archived row is one somebody
+  // has already dealt with, and leaving it in "NEW: 2" would mean the number
+  // that is meant to say "go and do something" never reaches zero.
   const countFor = (status: SubmissionStatus) =>
-    supabase.from("submissions").select("id", { count: "exact", head: true }).eq("status", status);
+    supabase
+      .from("submissions")
+      .select("id", { count: "exact", head: true })
+      .is("archived_at", null)
+      .eq("status", status);
 
   const [newRes, reviewingRes, readyRes, sentRes] = await Promise.all([
     countFor("new"),
@@ -108,10 +126,12 @@ export async function getDashboardCounts(): Promise<DashboardCounts> {
     supabase
       .from("submissions")
       .select("id", { count: "exact", head: true })
+      .is("archived_at", null)
       .in("status", ["result_ready", "no_saving"]),
     supabase
       .from("submissions")
       .select("id", { count: "exact", head: true })
+      .is("archived_at", null)
       .eq("status", "result_sent")
       .gte("result_sent_at", startOfDubaiDay.toISOString()),
   ]);
@@ -224,11 +244,16 @@ export async function getSignedImageUrl(path: string | null): Promise<string | n
 export async function getAnalyticsRows(limit = 5000): Promise<AnalyticsRow[]> {
   const supabase = await createServerSupabaseClient();
 
+  // Archived rows are excluded on purpose. These are the numbers that decide
+  // whether the business works, and a test submission or a duplicate counted
+  // among them is worse than no number at all - archiving is how somebody says
+  // "this one was not real", so honouring it here is the point of the feature.
   const { data, error } = await supabase
     .from("submissions")
     .select(
       "status, source_app, current_total, comparison_total, saving_amount, restaurant_name, unavailable_reason, areas(name)",
     )
+    .is("archived_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
 

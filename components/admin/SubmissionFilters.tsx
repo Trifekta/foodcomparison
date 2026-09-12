@@ -25,7 +25,7 @@ export function SubmissionFilters({ areas }: { areas: PublicArea[] }) {
     apply("search", search.trim());
   };
 
-  const hasFilters = ["status", "area", "app", "from", "to", "search"].some((key) =>
+  const hasFilters = ["status", "archived", "area", "app", "from", "to", "search"].some((key) =>
     params.get(key),
   );
 
@@ -50,6 +50,25 @@ export function SubmissionFilters({ areas }: { areas: PublicArea[] }) {
               {statusLabel(status)}
             </option>
           ))}
+        </select>
+      </div>
+
+      {/* Sits next to Status because it reads as one: an archived submission
+          still has a status, and the two together are the whole answer to
+          "which rows am I looking at". */}
+      <div className="flex flex-col gap-1">
+        <label htmlFor="filter-archived" className="text-xs font-semibold text-ink-500">
+          Show
+        </label>
+        <select
+          id="filter-archived"
+          className={selectClass}
+          value={params.get("archived") ?? ""}
+          onChange={(event) => apply("archived", event.target.value)}
+        >
+          <option value="">Working list</option>
+          <option value="archived">Archived only</option>
+          <option value="all">Everything</option>
         </select>
       </div>
 

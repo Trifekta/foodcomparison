@@ -4,6 +4,7 @@ import type { SubmissionListRow } from "@/lib/admin/queries";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDecimalStringAsCurrency, formatPercentage } from "@/lib/calculations/money";
 import { formatDubaiTime } from "@/lib/utils/text";
+import { SubmissionRowActions } from "@/components/admin/SubmissionRowActions";
 
 function appLabel(row: SubmissionListRow): string {
   return row.source_app === "Other" && row.source_app_other
@@ -93,6 +94,13 @@ export function SubmissionsTable({ rows }: { rows: SubmissionListRow[] }) {
               {row.status === "new" ? "Review" : "Open"}
               <span className="sr-only"> submission {row.reference_number}</span>
             </Link>
+
+            <SubmissionRowActions
+              className="mt-2 flex-wrap"
+              submissionId={row.id}
+              reference={row.reference_number}
+              archivedAt={row.archived_at}
+            />
           </li>
         ))}
       </ul>
@@ -143,14 +151,21 @@ export function SubmissionsTable({ rows }: { rows: SubmissionListRow[] }) {
                   {row.contact_type === "whatsapp" ? "WhatsApp" : "Email"}
                 </span>
               </td>
-              <td className="px-4 py-3 text-right">
-                <Link
-                  href={`/admin/submissions/${row.id}`}
-                  className="inline-flex min-h-9 items-center rounded-lg border border-ink-200 px-3 font-semibold text-ink-800 hover:bg-ink-50"
-                >
-                  {row.status === "new" ? "Review" : "Open"}
-                  <span className="sr-only"> submission {row.reference_number}</span>
-                </Link>
+              <td className="px-4 py-3">
+                <div className="flex items-center justify-end gap-1">
+                  <Link
+                    href={`/admin/submissions/${row.id}`}
+                    className="inline-flex min-h-9 items-center rounded-lg border border-ink-200 px-3 font-semibold text-ink-800 hover:bg-ink-50"
+                  >
+                    {row.status === "new" ? "Review" : "Open"}
+                    <span className="sr-only"> submission {row.reference_number}</span>
+                  </Link>
+                  <SubmissionRowActions
+                    submissionId={row.id}
+                    reference={row.reference_number}
+                    archivedAt={row.archived_at}
+                  />
+                </div>
               </td>
             </tr>
           ))}
