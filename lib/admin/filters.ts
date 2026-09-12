@@ -1,6 +1,6 @@
 import { STATUS_ORDER } from "@/lib/utils/status";
 import type { SubmissionStatus } from "@/types/database";
-import type { SubmissionFilters } from "./queries";
+import type { DateRange, SubmissionFilters } from "./queries";
 
 /**
  * One reading of the dashboard's query string.
@@ -53,5 +53,41 @@ export function filtersToQueryString(filters: SubmissionFilters): string {
   if (filters.from) query.set("from", filters.from);
   if (filters.to) query.set("to", filters.to);
   if (filters.search) query.set("search", filters.search);
+  return query.toString();
+}
+
+
+/** Matches an ISO calendar date, which is what a date input produces. */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The report's date range, read from the same `from` and `to` the dashboard
+ * already uses — so a range typed on one screen means the same thing on the
+ * other, and the downloaded file matches the page it came from.
+ *
+ * Anything that is not a plain calendar date is dropped rather than passed
+ * through: an unparseable bound would otherwise reach Postgres and take the
+ * whole report down over a typo.
+ */
+export function parseDateRange(params: RawSearchParams): DateRange {
+  const from = single(params.from);
+  const to = single(params.to);
+  const range: DateRange = {};
+  if (from && ISO_DATE.test(from)) range.from = from;
+  if (to && ISO_DATE.test(to)) range.to = to;
+
+  // Backwards is almost always a slip, and an empty report is a confusing way
+  // to be told about it. Swapping gives the range they plainly meant.
+  if (range.from && range.to && range.from > range.to) {
+    return { from: range.to, to: range.from };
+  }
+  return range;
+}
+
+/** The range as a query string, for the report link. */
+export function rangeToQueryString(range: DateRange): string {
+  const query = new URLSearchParams();
+  if (range.from) query.set("from", range.from);
+  if (range.to) query.set("to", range.to);
   return query.toString();
 }

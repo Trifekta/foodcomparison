@@ -7,6 +7,7 @@ import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
 import { LastOrderBanner } from "@/components/customer/LastOrderBanner";
 import { track } from "@/lib/analytics/track";
+import { RESULT_PROMISE } from "@/lib/constants";
 
 interface StepUploadProps {
   cartFile: File | null;
@@ -91,6 +92,14 @@ export function StepUpload({
       <p className="mt-1.5 text-[0.95rem] leading-relaxed text-slate-600">
         Upload your cart screenshot. Adding the checkout screen helps us compare the final price
         more accurately.
+      </p>
+
+      {/* Repeated from the landing page on purpose. This is the screen where
+          somebody weighs the wait against the effort of finding a screenshot,
+          and the answer to "how long will this take" belongs next to that
+          decision, not one screen behind it. */}
+      <p className="mt-2.5 inline-block rounded-full bg-brand-100 px-3.5 py-1.5 text-[0.85rem] font-bold text-ink-800">
+        Your result, usually {RESULT_PROMISE}
       </p>
 
       <div className="mt-4 space-y-3">

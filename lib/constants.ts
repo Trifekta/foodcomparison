@@ -21,6 +21,21 @@ export const PRODUCT_NAME = "SnipSavor";
 export const WORDMARK_PRIMARY = "Snip";
 export const WORDMARK_ACCENT = "Savor";
 
+/**
+ * How long a customer is told to expect to wait.
+ *
+ * The number lives here because it appears on four screens - the landing page,
+ * the upload step, the submit button and the waiting page - and a promise that
+ * says five minutes in one place and ten in another is worse than no promise.
+ *
+ * It exists at all because the product only works before somebody orders. A
+ * person deciding whether to wait needs to know whether it is five minutes or
+ * an hour, and with nothing on the screen they assume the worst and order
+ * anyway. This is the cheapest conversion there is.
+ */
+export const RESULT_PROMISE_MINUTES = 5;
+export const RESULT_PROMISE = `under ${RESULT_PROMISE_MINUTES} minutes`;
+
 /** Phase 1 launches in Dubai only. */
 export const LAUNCH_CITY = "Dubai";
 export const LAUNCH_EMIRATE = "Dubai";

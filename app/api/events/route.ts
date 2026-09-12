@@ -23,6 +23,8 @@ export const dynamic = "force-dynamic";
  */
 const MAX_EVENTS_PER_WINDOW = 60;
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(request: Request) {
   const key = `events:${clientKeyFromHeaders(request.headers)}`;
   if (!checkRateLimit(key, MAX_EVENTS_PER_WINDOW, RATE_LIMIT_WINDOW_MS).allowed) {
@@ -34,6 +36,7 @@ export async function POST(request: Request) {
       event?: unknown;
       visitId?: unknown;
       token?: unknown;
+      areaId?: unknown;
     };
 
     const event = typeof body.event === "string" ? body.event : "";
@@ -57,9 +60,17 @@ export async function POST(request: Request) {
       submissionId = (data as { id: string } | null)?.id ?? null;
     }
 
+    // Shape-checked, not trusted: a value that is not a uuid is dropped rather
+    // than sent to Postgres, which would answer with an error this endpoint has
+    // promised never to show anybody. A uuid that is not a real area fails the
+    // foreign key, and the catch below swallows that too - a bad area costs the
+    // event, never the customer's screen.
+    const areaId =
+      typeof body.areaId === "string" && UUID_PATTERN.test(body.areaId) ? body.areaId : null;
+
     await supabase
       .from("funnel_events")
-      .insert({ event, visit_id: visitId, submission_id: submissionId });
+      .insert({ event, visit_id: visitId, submission_id: submissionId, area_id: areaId });
   } catch {
     // Counting is never worth an error in front of a customer.
   }

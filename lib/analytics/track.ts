@@ -34,14 +34,20 @@ function visitId(): string | null {
   }
 }
 
-export function track(event: FunnelEvent, token?: string): void {
+/**
+ * @param areaId Sent from the area step onwards, once the customer has said
+ *   where they are. It is the only attribute attached to a visit, and it is one
+ *   they volunteered from a fixed list of Dubai districts - coarse enough to
+ *   identify nobody, specific enough to say which areas stop converting.
+ */
+export function track(event: FunnelEvent, token?: string, areaId?: string | null): void {
   if (typeof window === "undefined") return;
 
   try {
     const id = visitId();
     if (!id) return;
 
-    const body = JSON.stringify({ event, visitId: id, token });
+    const body = JSON.stringify({ event, visitId: id, token, areaId: areaId || undefined });
 
     if (typeof navigator.sendBeacon === "function") {
       navigator.sendBeacon("/api/events", new Blob([body], { type: "application/json" }));

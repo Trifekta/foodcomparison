@@ -115,7 +115,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 
 ## 2. Run the migrations
 
-Open **SQL Editor → New query** in the Supabase dashboard and run these nine
+Open **SQL Editor → New query** in the Supabase dashboard and run these eleven
 files **in order**, one at a time:
 
 | Order | File | What it does |
@@ -128,7 +128,9 @@ files **in order**, one at a time:
 | 6 | `supabase/migrations/0006_extractions.sql` | The extraction audit trail (`submission_extractions`) |
 | 7 | `supabase/migrations/0007_result_link.sql` | `submissions.result_token` and `comparison_url` — the customer's result page |
 | 8 | `supabase/migrations/0008_unavailable_outcome.sql` | The `unavailable` status and `unavailable_reason` |
-| 9 | `supabase/migrations/0009_admin_submission_management.sql` | `archived_at`, the admin delete policy, and the new audit event types |
+| 9 | `supabase/migrations/0009_funnel_events.sql` | `funnel_events` — where visitors stop, from the advert onwards |
+| 10 | `supabase/migrations/0010_admin_submission_management.sql` | `archived_at`, the admin delete policy, the new audit event types, and the `landing_viewed` funnel step |
+| 11 | `supabase/migrations/0011_funnel_area.sql` | `funnel_events.area_id` — which area a visit came from, once it says |
 
 Each file is safe to run more than once.
 
@@ -163,7 +165,10 @@ where table_schema = 'public' and table_name = 'submissions'
   and column_name in ('result_token', 'comparison_url', 'unavailable_reason', 'archived_at')
 order by 1;
 -- expect all four: archived_at, comparison_url, result_token, unavailable_reason
--- anything missing means 0007, 0008 or 0009 has not been run
+-- anything missing means 0007, 0008 or 0010 has not been run
+
+-- and the funnel table, added by 0009:
+select to_regclass('public.funnel_events');  -- null means 0009 has not been run
 ```
 
 ---
@@ -704,6 +709,23 @@ comparison and never blocks a submission.
 
 ---
 
+## The five-minute promise
+
+`RESULT_PROMISE_MINUTES` in `lib/constants.ts` is the single place the wait is
+stated. It appears on the landing page, the upload step, the submit button and
+the waiting screen, because the product only works before somebody orders — a
+person deciding whether to wait needs a number, and with none on the screen they
+assume the worst and order anyway.
+
+The waiting screen also counts up (`Sent 3 minutes ago`) and, once the promise
+is past, stops repeating it: "usually under 5 minutes" said in the seventh
+minute is the one way to turn a short wait into a broken word. It changes to
+"taking a little longer than usual" instead. There is deliberately **no
+out-of-hours message** — every customer is told the same thing and gets the same
+promise, whatever time they arrive.
+
+---
+
 ## Managing submissions
 
 Four things an admin can do to a submission once it has arrived, all from the
@@ -722,13 +744,20 @@ dashboard or the submission's own page.
   is how somebody says "this one was not real", so a test submission stops
   distorting the numbers the pilot is being judged on.
 - **Delete** removes the row, its basket, its events, its extractions and its
-  screenshots. `0002` deliberately gave submissions no delete policy; `0009`
+  screenshots. `0002` deliberately gave submissions no delete policy; `0010`
   adds one, because archiving now covers "get this out of my way" and what is
   left is the case archiving cannot serve — a customer asking for their data to
   be removed. The screenshots go first: the database cascades its own tables but
   knows nothing about the bucket, so deleting the row first would strand a cart
   photo holding somebody's name and address. If the images cannot be deleted,
   nothing is.
+- **Report** downloads the Validation page as CSV, through `/admin/report`, for
+  whatever date range the picker on that page is set to — headline numbers, the
+  funnel, and the breakdowns by area, app and reason, in one file. The page and
+  the route read the range through the same parser, so the file and the screen
+  can never cover different dates. Days are bounded in **Dubai** time: a
+  submission at 1am Dubai on the 2nd is 9pm UTC on the 1st, and a daily report
+  that put it in the wrong day would disagree with the dashboard it came from.
 - **Export** downloads the list as CSV, through `/admin/export`. It reads the
   same query string the dashboard does, via `lib/admin/filters.ts`, so the file
   holds exactly the rows on screen — up to 5000 rather than the table's 100,
