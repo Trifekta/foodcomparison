@@ -16,7 +16,8 @@
     "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "predev": "node scripts/copy-ocr-assets.mjs",
     "prebuild": "node scripts/copy-ocr-assets.mjs",
-    "extract:eval": "node scripts/eval-extraction.mjs"
+    "extract:eval": "node scripts/eval-extraction.mjs",
+    "push:keys": "node scripts/generate-vapid-keys.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

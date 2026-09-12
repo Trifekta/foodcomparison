@@ -115,7 +115,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 
 ## 2. Run the migrations
 
-Open **SQL Editor → New query** in the Supabase dashboard and run these eleven
+Open **SQL Editor → New query** in the Supabase dashboard and run these twelve
 files **in order**, one at a time:
 
 | Order | File | What it does |
@@ -131,6 +131,7 @@ files **in order**, one at a time:
 | 9 | `supabase/migrations/0009_funnel_events.sql` | `funnel_events` — where visitors stop, from the advert onwards |
 | 10 | `supabase/migrations/0010_admin_submission_management.sql` | `archived_at`, the admin delete policy, the new audit event types, and the `landing_viewed` funnel step |
 | 11 | `supabase/migrations/0011_funnel_area.sql` | `funnel_events.area_id` — which area a visit came from, once it says |
+| 12 | `supabase/migrations/0012_push_subscriptions.sql` | `push_subscriptions` — browser push endpoints for customers and admins |
 
 Each file is safe to run more than once.
 
@@ -706,6 +707,93 @@ Two things in that mockup are **Phase 2**, and this build does not fake them:
 The checkout screenshot sits beside the cart screenshot on screen 1, as the
 mockup shows, but stays clearly marked **Optional** — it buys a more accurate
 comparison and never blocks a submission.
+
+---
+
+## Notifications
+
+Three things happen when a customer sends a basket, and only the first was ever
+built: the result page polls itself, the admin gets a Telegram or email alert,
+and — now — a browser push reaches whoever asked for one even with the tab shut.
+
+**The page already polls and always did.** `ResultView` refreshes every 5s for
+two minutes, then 15s, then 30s, pauses in a background tab, stops at a terminal
+state and gives up after thirty minutes. Push is an addition for the customer
+who closes the tab, not a replacement — and everything below is optional.
+
+**Without `WEB_PUSH_*` keys the app behaves exactly as before.** No button
+appears, nothing is stored, and the result still arrives on the page and in the
+message the admin sends. Push failing can never fail a submission or a saved
+comparison: every send is awaited only so its own errors get logged.
+
+### Setting it up
+
+```bash
+npm run push:keys        # prints a VAPID pair (same format as web-push)
+```
+
+Put the three values in `.env.local`, and in production as Worker secrets:
+
+```bash
+npx wrangler secret put WEB_PUSH_PRIVATE_KEY
+# WEB_PUSH_PUBLIC_KEY and WEB_PUSH_SUBJECT can be plain vars
+```
+
+The **private key never reaches the browser**. It is read only by
+`getWebPushConfig()` in server code. The public half is read on the server too
+and passed down as a prop, so no `WEB_PUSH_` value is ever inlined into the
+client bundle.
+
+### How it hangs together
+
+| Piece | Where |
+| --- | --- |
+| VAPID + RFC 8291 encryption | `lib/push/crypto.ts` |
+| Sending, and forgetting dead endpoints | `lib/push/send.ts` |
+| Browser side: permission, subscribe | `lib/push/client.ts` |
+| Service worker | `public/sw.js` |
+| Customer registers | `POST /api/push/subscribe` (result token authorises it) |
+| Admin registers | `subscribeAdminPush` server action (`requireAdmin`) |
+
+**No `web-push` package.** It needs Node's `https` and crypto bindings, and this
+runs on a Cloudflare Worker. Everything the protocol needs — ECDH on P-256,
+HKDF, AES-GCM, ECDSA — is in Web Crypto, which Workers implement natively, so
+the two RFCs are implemented directly. `tests/push.test.ts` plays the browser:
+it keeps the private half of a subscription, runs the decryption backwards and
+asserts the original payload comes back.
+
+### What a notification may say
+
+Nothing that identifies anybody. A notification is rendered by the operating
+system, shows on a lock screen, and passes through a push service on the way —
+so no name, number, address, restaurant or amount goes in one. The customer's
+message says a result is ready; the admin's says a request arrived and, at most,
+which area it came from. The numbers live behind the token in the link.
+
+The customer's subscription is authorised by their result token, exchanged for
+the submission id server-side so the row never stores the address of their page.
+Admin subscriptions are tied to the signed-in account, never to anything the
+browser claims — which is what stops a public client registering itself for
+admin notifications.
+
+Endpoints that answer 404 or 410 are deleted: that is a push service saying the
+browser is gone, as opposed to a transient failure, which leaves the row alone.
+
+### Where the buttons are
+
+- **Customer**: on the waiting screen, under the "we're comparing your basket"
+  line. The permission prompt only ever comes from that tap — browsers refuse
+  one no gesture asked for, and some count an unprompted request as a refusal
+  they then remember. A refusal is final: no second banner.
+- **Admin**: inside the existing alert panel on the dashboard, on its own line.
+  Per device, so a phone and a laptop are two rows and both get notified.
+
+### iPhone and Safari
+
+iOS supports Web Push only for a site **added to the Home Screen**, from iOS
+16.4 onwards. In a normal Safari tab the button will not appear at all, because
+`pushSupported()` is false there — which is the correct outcome, not a bug. Those
+customers keep the polling page, which is why it was left in place.
 
 ---
 

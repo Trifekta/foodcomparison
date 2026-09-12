@@ -16,6 +16,7 @@ import {
 import { filtersToQueryString, parseSubmissionFilters } from "@/lib/admin/filters";
 import { computeValidationMetrics } from "@/lib/calculations/analytics";
 import { alertChannels } from "@/lib/notifications/admin-alert";
+import { getWebPushPublicKey } from "@/lib/env";
 import { findMissingMigrations } from "@/lib/admin/schema-check";
 
 export const metadata: Metadata = {
@@ -71,7 +72,7 @@ export default async function AdminDashboardPage({
       </div>
 
       <SchemaWarning gaps={gaps} />
-      <AlertStatus channels={alertChannels()} />
+      <AlertStatus channels={alertChannels()} pushPublicKey={getWebPushPublicKey()} />
       <SummaryCards counts={counts} />
       <ValidationStrip metrics={metrics} />
 

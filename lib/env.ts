@@ -80,6 +80,45 @@ export function getResendConfig(): ResendConfig | null {
   return { apiKey, from };
 }
 
+export interface WebPushConfig {
+  publicKey: string;
+  privateKey: string;
+  /** Who a push service should contact about our traffic. RFC 8292 wants it. */
+  subject: string;
+}
+
+/**
+ * Browser push, when keys are configured.
+ *
+ * Null when they are not, and every caller treats that as "this feature is
+ * off" - the same rule Resend and Telegram follow here. The app has to work
+ * without it: the result page polls, the customer can keep the tab open, and
+ * the admin still has Telegram. Push is the improvement, not the mechanism.
+ *
+ * The private key is read only here and only on the server. It is never given
+ * to a client component, never prefixed NEXT_PUBLIC_, and the one value the
+ * browser does need - the public key - is passed down as a prop from a server
+ * component rather than inlined into the bundle.
+ */
+export function getWebPushConfig(): WebPushConfig | null {
+  const publicKey = process.env.WEB_PUSH_PUBLIC_KEY?.trim();
+  const privateKey = process.env.WEB_PUSH_PRIVATE_KEY?.trim();
+  if (!publicKey || !privateKey) return null;
+
+  return {
+    publicKey,
+    privateKey,
+    // A contact address is required by the spec; push services may use it if
+    // our traffic looks wrong. Configurable, with a sane default.
+    subject: process.env.WEB_PUSH_SUBJECT?.trim() || "mailto:admin@snipsavor.com",
+  };
+}
+
+/** The half of the keypair a browser needs to subscribe. Safe to hand out. */
+export function getWebPushPublicKey(): string | null {
+  return getWebPushConfig()?.publicKey ?? null;
+}
+
 export interface TelegramConfig {
   botToken: string;
   chatId: string;

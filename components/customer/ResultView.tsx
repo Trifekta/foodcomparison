@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ExternalLink, Loader2, UtensilsCrossed } from "lucide-react";
-import { CURRENCY, RESULT_PROMISE, RESULT_PROMISE_MINUTES } from "@/lib/constants";
+import {
+  COMPARISON_APP,
+  CURRENCY,
+  RESULT_PROMISE,
+  RESULT_PROMISE_MINUTES,
+} from "@/lib/constants";
 import { formatDecimalStringAsCurrency } from "@/lib/calculations/money";
 import { CopyReference } from "@/components/customer/CopyReference";
 import { Disclaimer } from "@/components/customer/Disclaimer";
@@ -11,6 +16,7 @@ import { TickBadge } from "@/components/customer/FoodArt";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { BrandTagline, ScriptBubble, ScriptNote, SkylineFooter, Sparks } from "@/components/customer/Motifs";
 import { Wordmark } from "@/components/customer/Wordmark";
+import { NotificationPrompt } from "@/components/customer/NotificationPrompt";
 import { track } from "@/lib/analytics/track";
 import type { PublicResult } from "@/lib/submissions/result";
 
@@ -35,7 +41,16 @@ function pollDelay(elapsedMs: number): number {
 /** After this, a forgotten tab stops asking. A refresh starts it again. */
 const GIVE_UP_AFTER_MS = 30 * 60_000;
 
-export function ResultView({ initial, token }: { initial: PublicResult; token: string }) {
+export function ResultView({
+  initial,
+  token,
+  pushPublicKey,
+}: {
+  initial: PublicResult;
+  token: string;
+  /** Null when push is not configured on the server, which hides the control. */
+  pushPublicKey?: string | null;
+}) {
   const [result, setResult] = useState(initial);
 
   // Counted against the submission, not the visit: this page is usually opened
@@ -108,6 +123,8 @@ export function ResultView({ initial, token }: { initial: PublicResult; token: s
           createdAt={result.createdAt}
           stalled={stalled}
           onRetry={() => void refresh()}
+          token={token}
+          pushPublicKey={pushPublicKey}
         />
       ) : null}
       {result.state === "saving" ? <Saving result={result} token={token} /> : null}
@@ -176,11 +193,15 @@ function Checking({
   createdAt,
   stalled,
   onRetry,
+  token,
+  pushPublicKey,
 }: {
   reference: string;
   createdAt: string;
   stalled: boolean;
   onRetry: () => void;
+  token: string;
+  pushPublicKey?: string | null;
 }) {
   const minutes = useMinutesSince(createdAt);
   // Past the promise, the copy changes rather than the promise being repeated.
@@ -213,7 +234,7 @@ function Checking({
         Price check received
       </p>
       <h1 className="relative mt-1 inline-flex items-start text-[2rem] font-extrabold leading-[1.12] text-ink-900">
-        We&apos;re checking your order
+        Your price check is in! <span aria-hidden="true">🎉</span>
         <Sparks className="ml-1 h-5 w-5 shrink-0" />
       </h1>
 
@@ -255,9 +276,15 @@ function Checking({
       </p>
 
       <p className="mt-3 text-[0.95rem] leading-relaxed text-slate-600">
-        Keep this page open and your result appears here. You can also close it — we&apos;ll send
-        you this same link. Nothing has been ordered.
+        We&apos;re comparing your basket with {COMPARISON_APP} now. You can stay on this page or
+        close it — we&apos;ll notify you as soon as your result is ready. Nothing has been ordered.
       </p>
+
+      {/* Only when the server has keys. Without them this is a button that
+          cannot work, and offering it would be worse than not mentioning it. */}
+      {pushPublicKey ? (
+        <NotificationPrompt token={token} publicKey={pushPublicKey} />
+      ) : null}
 
       <div className="mt-5 flex items-center gap-3 rounded-3xl bg-cream px-4 py-4 ring-1 ring-sand">
         <div className="min-w-0 flex-1">

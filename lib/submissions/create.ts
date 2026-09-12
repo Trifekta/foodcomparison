@@ -16,6 +16,7 @@ import {
 } from "@/lib/validation/submission";
 import { generateReferenceNumber, generateResultToken } from "@/lib/utils/reference";
 import { alertAdminOfNewSubmission } from "@/lib/notifications/admin-alert";
+import { pushToAdmins } from "@/lib/push/send";
 import { normalisePhone } from "@/lib/utils/phone";
 import { sanitiseText } from "@/lib/utils/text";
 import { formatMinorToDecimalString, parseAmountToMinor } from "@/lib/calculations/money";
@@ -353,6 +354,22 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   } catch {
     // Already swallowed inside, and swallowed again here on principle.
   }
+
+  // The same news, on the phone in their pocket. An addition to the Telegram
+  // and email alerts rather than a replacement: this one survives the browser
+  // being closed, those survive the browser not having permission.
+  //
+  // The area is the only detail carried. It is enough to judge whether this is
+  // worth getting up for, and a notification is rendered on a lock screen -
+  // so the restaurant, the total and anything about the customer stay out.
+  await pushToAdmins({
+    title: "New SnipSavor request 🔔",
+    body: area.name
+      ? `A customer in ${area.name} just submitted a price comparison.`
+      : "A customer just submitted a price comparison.",
+    url: `/admin/submissions/${submissionId}`,
+    tag: `submission-${submissionId}`,
+  });
 
   return { ok: true, referenceNumber, resultToken, id: submissionId };
 }
