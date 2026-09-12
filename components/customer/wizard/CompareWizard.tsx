@@ -237,7 +237,11 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   const goTo = (next: number) => {
     setStep(next);
     const event = STEP_EVENTS[next];
-    if (event) track(event);
+    // The area rides along from the moment it is known - which is leaving the
+    // area step, not arriving at it. Sent on every later step as well as the
+    // first, so a visit that stops at review is still attributable: the report
+    // resolves a visit's area from whichever of its events carries one.
+    if (event) track(event, undefined, getValues("areaId"));
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
 
@@ -326,7 +330,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       if (payload.referenceNumber) {
         rememberLastOrder(payload.referenceNumber, payload.resultPath);
       }
-      track("submitted");
+      track("submitted", undefined, parsed.data.areaId);
 
       // Straight to their own result page, which starts out saying we are
       // checking and turns into the answer without them doing anything.

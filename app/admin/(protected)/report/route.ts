@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/supabase/auth";
 import { getAnalyticsRows, getFunnelRows, type DateRange } from "@/lib/admin/queries";
 import { computeValidationMetrics } from "@/lib/calculations/analytics";
-import { computeFunnel } from "@/lib/analytics/funnel";
+import { computeAreaFunnel, computeFunnel } from "@/lib/analytics/funnel";
 import { buildReportCsv, reportCsvFilename } from "@/lib/admin/export";
 import { parseDateRange } from "@/lib/admin/filters";
 
@@ -33,7 +33,12 @@ export async function GET(request: Request) {
     getFunnelRows(30, 20000, range).catch(() => []),
   ]);
 
-  const csv = buildReportCsv(computeValidationMetrics(rows), computeFunnel(funnelRows), range);
+  const csv = buildReportCsv(
+    computeValidationMetrics(rows),
+    computeFunnel(funnelRows),
+    range,
+    computeAreaFunnel(funnelRows),
+  );
 
   return new Response(csv, {
     status: 200,

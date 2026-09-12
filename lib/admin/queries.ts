@@ -3,7 +3,7 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { SIGNED_URL_TTL_SECONDS, STORAGE_BUCKET } from "@/lib/constants";
 import type { AnalyticsRow } from "@/lib/calculations/analytics";
-import type { FunnelRow } from "@/lib/analytics/funnel";
+import type { FunnelAreaRow, FunnelRow } from "@/lib/analytics/funnel";
 import { withAmountStrings } from "@/lib/calculations/money";
 import type {
   AreaRow,
@@ -301,7 +301,7 @@ export async function getFunnelRows(
   days = 30,
   limit = 20000,
   range: DateRange = {},
-): Promise<FunnelRow[]> {
+): Promise<(FunnelRow & FunnelAreaRow)[]> {
   const supabase = await createServerSupabaseClient();
   // An explicit range wins; the rolling window is only the default view.
   const bounds = rangeToInstants(range);
@@ -310,12 +310,12 @@ export async function getFunnelRows(
 
   const { data, error } = await supabase
     .from("funnel_events")
-    .select("event, visit_id")
+    .select("event, visit_id, areas(name)")
     .gte("created_at", since)
     .lte("created_at", bounds.until ?? "2999-12-31T23:59:59Z")
     .order("created_at", { ascending: false })
     .limit(limit);
 
   if (error) throw new Error(`Could not load the funnel: ${error.message}`);
-  return (data ?? []) as unknown as FunnelRow[];
+  return (data ?? []) as unknown as (FunnelRow & FunnelAreaRow)[];
 }

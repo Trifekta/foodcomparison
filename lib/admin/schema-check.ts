@@ -42,6 +42,18 @@ const PROBES: MigrationProbe[] = [
   },
 ];
 
+/**
+ * Probes against other tables, which cannot use the submissions query above.
+ */
+const OTHER_PROBES: { file: string; table: string; column: string; breaks: string }[] = [
+  {
+    file: "0011_funnel_area.sql",
+    table: "funnel_events",
+    column: "area_id",
+    breaks: "the per-area funnel on the Validation page and in the report",
+  },
+];
+
 export interface SchemaGap {
   file: string;
   breaks: string;
@@ -62,7 +74,23 @@ export async function findMissingMigrations(): Promise<SchemaGap[]> {
     }),
   );
 
-  return results.filter((gap): gap is SchemaGap => gap !== null);
+  const others = await Promise.all(
+    OTHER_PROBES.map(async (probe) => {
+      const { error } = await supabase.from(probe.table).select(probe.column).limit(1);
+      // A missing TABLE is a different migration's problem - 0009 creates
+      // funnel_events - so only a missing column is reported here, or a
+      // database without the funnel at all would be told to run the wrong file.
+      const missingColumn =
+        error !== null &&
+        /column|schema cache/i.test(error.message) &&
+        !/relation .* does not exist/i.test(error.message);
+      return missingColumn
+        ? { file: probe.file, breaks: probe.breaks, detail: error.message }
+        : null;
+    }),
+  );
+
+  return [...results, ...others].filter((gap): gap is SchemaGap => gap !== null);
 }
 
 export interface Check {

@@ -85,3 +85,77 @@ export function computeFunnel(rows: FunnelRow[]): FunnelStepCount[] {
     return { event: step.event, label: step.label, count, shareOfStart, shareOfPrevious, dropFromPrevious };
   });
 }
+
+
+/**
+ * The steps an area can be judged on.
+ *
+ * Everything before the area step is excluded on purpose. A visit that stopped
+ * on the upload screen never said where it was, so counting it under any area
+ * would be inventing a number - and counting it under "unknown" beside the real
+ * areas would make every area look better than it is.
+ */
+export const AREA_FUNNEL_STEPS = FUNNEL_STEPS.filter((step) =>
+  ["step_where", "step_review", "submitted", "result_viewed", "keeta_opened"].includes(step.event),
+);
+
+export interface FunnelAreaRow {
+  event: string;
+  visit_id: string;
+  areas: { name: string } | null;
+}
+
+export interface AreaFunnelCount {
+  area: string;
+  /** Visits from this area that reached each step, in AREA_FUNNEL_STEPS order. */
+  counts: number[];
+  /** Of the visits that gave this area, the share that tapped through to Keeta. */
+  conversion: number;
+}
+
+/**
+ * How far visits from each area got.
+ *
+ * A visit's area is resolved once, from whichever of its events carries one,
+ * and then all of that visit's steps are counted under it. Reading the area off
+ * each event separately would drop any step recorded before the customer said
+ * where they were, and would double-count a visit that somehow reported two.
+ *
+ * Sorted by the widest step, so the areas sending the most people come first -
+ * an area with one visit and a 100% conversion is noise, and putting it at the
+ * top would be the most misleading way to order this.
+ */
+export function computeAreaFunnel(rows: FunnelAreaRow[]): AreaFunnelCount[] {
+  const areaOfVisit = new Map<string, string>();
+  for (const row of rows) {
+    const name = row.areas?.name?.trim();
+    if (name && !areaOfVisit.has(row.visit_id)) areaOfVisit.set(row.visit_id, name);
+  }
+
+  // area -> event -> the visits from that area that reached it
+  const byArea = new Map<string, Map<string, Set<string>>>();
+  for (const row of rows) {
+    const area = areaOfVisit.get(row.visit_id);
+    if (!area) continue;
+
+    const events = byArea.get(area) ?? new Map<string, Set<string>>();
+    const visits = events.get(row.event) ?? new Set<string>();
+    visits.add(row.visit_id);
+    events.set(row.event, visits);
+    byArea.set(area, events);
+  }
+
+  const result: AreaFunnelCount[] = [];
+  for (const [area, events] of byArea) {
+    const counts = AREA_FUNNEL_STEPS.map((step) => events.get(step.event)?.size ?? 0);
+    const reached = counts[0] ?? 0;
+    const converted = counts[counts.length - 1] ?? 0;
+    result.push({
+      area,
+      counts,
+      conversion: reached > 0 ? (converted / reached) * 100 : 0,
+    });
+  }
+
+  return result.sort((a, b) => b.counts[0] - a.counts[0] || a.area.localeCompare(b.area));
+}

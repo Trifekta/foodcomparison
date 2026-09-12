@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FUNNEL_STEPS,
+  computeAreaFunnel,
   computeFunnel,
   isFunnelEvent,
   isValidVisitId,
@@ -114,5 +115,71 @@ describe("what the endpoint will accept", () => {
     for (const bad of ["", "short", "0123456789ABCDEF", "0123456789abcdefg".repeat(3), "../etc"]) {
       expect(isValidVisitId(bad), `for ${bad}`).toBe(false);
     }
+  });
+});
+
+describe("computeAreaFunnel", () => {
+  const row = (event: string, visit_id: string, area: string | null) => ({
+    event,
+    visit_id,
+    areas: area ? { name: area } : null,
+  });
+
+  /**
+   * A visit's area is resolved once and applied to all of its steps. Reading it
+   * off each event separately would drop every step recorded before the
+   * customer said where they were.
+   */
+  it("counts a visit's later steps under the area it gave", () => {
+    const areas = computeAreaFunnel([
+      row("step_where", "a", "Al Karama"),
+      row("step_review", "a", null),
+      row("submitted", "a", null),
+    ]);
+
+    expect(areas).toHaveLength(1);
+    expect(areas[0].area).toBe("Al Karama");
+    // step_where, step_review, submitted, result_viewed, keeta_opened
+    expect(areas[0].counts).toEqual([1, 1, 1, 0, 0]);
+  });
+
+  it("ignores visits that never said where they were", () => {
+    const areas = computeAreaFunnel([
+      row("wizard_started", "a", null),
+      row("step_basket", "a", null),
+    ]);
+    expect(areas).toEqual([]);
+  });
+
+  it("reports the share of an area's visits that tapped through to Keeta", () => {
+    const areas = computeAreaFunnel([
+      row("step_where", "a", "Al Barsha"),
+      row("step_where", "b", "Al Barsha"),
+      row("keeta_opened", "a", "Al Barsha"),
+    ]);
+    expect(areas[0].conversion).toBe(50);
+  });
+
+  it("counts a visit once however often it records the same step", () => {
+    const areas = computeAreaFunnel([
+      row("step_where", "a", "Marina"),
+      row("step_where", "a", "Marina"),
+      row("step_where", "a", "Marina"),
+    ]);
+    expect(areas[0].counts[0]).toBe(1);
+  });
+
+  /**
+   * Busiest first. An area with one visit and a perfect conversion is noise,
+   * and sorting on conversion would put it at the top of the page.
+   */
+  it("puts the areas sending the most people first", () => {
+    const areas = computeAreaFunnel([
+      row("step_where", "a", "Quiet Area"),
+      row("keeta_opened", "a", "Quiet Area"),
+      row("step_where", "b", "Busy Area"),
+      row("step_where", "c", "Busy Area"),
+    ]);
+    expect(areas.map((entry) => entry.area)).toEqual(["Busy Area", "Quiet Area"]);
   });
 });

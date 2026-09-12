@@ -115,7 +115,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 
 ## 2. Run the migrations
 
-Open **SQL Editor → New query** in the Supabase dashboard and run these ten
+Open **SQL Editor → New query** in the Supabase dashboard and run these eleven
 files **in order**, one at a time:
 
 | Order | File | What it does |
@@ -130,6 +130,7 @@ files **in order**, one at a time:
 | 8 | `supabase/migrations/0008_unavailable_outcome.sql` | The `unavailable` status and `unavailable_reason` |
 | 9 | `supabase/migrations/0009_funnel_events.sql` | `funnel_events` — where visitors stop, from the advert onwards |
 | 10 | `supabase/migrations/0010_admin_submission_management.sql` | `archived_at`, the admin delete policy, the new audit event types, and the `landing_viewed` funnel step |
+| 11 | `supabase/migrations/0011_funnel_area.sql` | `funnel_events.area_id` — which area a visit came from, once it says |
 
 Each file is safe to run more than once.
 

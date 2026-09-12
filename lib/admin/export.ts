@@ -1,6 +1,10 @@
 import type { SubmissionListRow, DateRange } from "./queries";
 import type { ValidationMetrics } from "@/lib/calculations/analytics";
-import type { FunnelStepCount } from "@/lib/analytics/funnel";
+import {
+  AREA_FUNNEL_STEPS,
+  type AreaFunnelCount,
+  type FunnelStepCount,
+} from "@/lib/analytics/funnel";
 import { formatDecimalStringAsCurrency, formatMinorAsCurrency } from "@/lib/calculations/money";
 import { STATUS_LABELS } from "@/lib/utils/status";
 
@@ -128,6 +132,7 @@ export function buildReportCsv(
   metrics: ValidationMetrics,
   funnel: FunnelStepCount[],
   range: DateRange,
+  areaFunnel: AreaFunnelCount[] = [],
 ): string {
   const rows: string[][] = [];
   const blank = () => rows.push([""]);
@@ -164,6 +169,27 @@ export function buildReportCsv(
       String(step.count),
       `${step.shareOfStart.toFixed(1)}%`,
       `${step.dropFromPrevious.toFixed(1)}%`,
+    ]);
+  }
+  blank();
+
+  // Where the funnel and the areas meet, which is the actionable half: an area
+  // people reach the total step from and then abandon is a different problem
+  // from an area nobody arrives from at all.
+  rows.push(["How far visits got, by area"]);
+  rows.push([
+    "Area",
+    ...AREA_FUNNEL_STEPS.map((step) => step.label),
+    "Reached Keeta %",
+  ]);
+  if (areaFunnel.length === 0) {
+    rows.push(["(nobody has reached the area step in this range)"]);
+  }
+  for (const area of areaFunnel) {
+    rows.push([
+      area.area,
+      ...area.counts.map(String),
+      `${area.conversion.toFixed(1)}%`,
     ]);
   }
   blank();

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getAnalyticsRows, getFunnelRows } from "@/lib/admin/queries";
-import { computeFunnel } from "@/lib/analytics/funnel";
+import { computeAreaFunnel, computeFunnel } from "@/lib/analytics/funnel";
 import { FunnelChart } from "@/components/admin/FunnelChart";
+import { AreaFunnelTable } from "@/components/admin/AreaFunnelTable";
 import { ReportRange } from "@/components/admin/ReportRange";
 import { parseDateRange } from "@/lib/admin/filters";
 import { computeValidationMetrics, type CountByLabel } from "@/lib/calculations/analytics";
@@ -83,6 +84,7 @@ export default async function AdminAnalyticsPage({
   ]);
   const metrics = computeValidationMetrics(rows);
   const funnel = computeFunnel(funnelRows);
+  const areaFunnel = computeAreaFunnel(funnelRows);
 
   const savingTotal = metrics.savingDistribution.reduce((sum, bucket) => sum + bucket.count, 0);
 
@@ -174,6 +176,8 @@ export default async function AdminAnalyticsPage({
       </section>
 
       <FunnelChart steps={funnel} />
+
+      <AreaFunnelTable areas={areaFunnel} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <BreakdownList
