@@ -88,6 +88,10 @@ const ITEM_SECTION_ENDS = [
   "cutlery",
   "save on your order",
   "payment summary",
+  // Deliveroo's checkout heading. Closing the item list here is exactly right:
+  // everything below it is a fee, a tip chip or a charity button, and the fee
+  // rules keep reading past this point.
+  "price summary",
   "قد يعجبك",
   "طلبات خاصة",
 ];
@@ -127,6 +131,43 @@ function tidy(text: string): string {
 }
 
 /**
+ * The old price, struck through beside the new one.
+ *
+ * A discounted row reads "Gathering Box  AED 163  AED 114.10". The live price
+ * is taken as the item's total, and the struck-through one is left welded to
+ * the name - and it survives OCR mangled, "AED-463", precisely because a line
+ * through the digits is what the strike is. Anchored to the end and requiring
+ * the currency word, so a dish with a number in its name keeps it: "Box for 2"
+ * has no AED in front of the 2.
+ */
+const STRUCK_PRICE_TAIL = /\s*(?:AED|aed|Aed|د\.?إ|درهم)\s*[-–—.,]?\s*\d[\d.,]*\s*$/;
+
+function withoutStruckPrice(name: string): string {
+  const trimmed = name.replace(STRUCK_PRICE_TAIL, "").trim();
+  // Never strip it down to nothing: a row that was only a price is not an item
+  // name, and an empty name is worse than a noisy one.
+  return letterCount(trimmed) >= 2 ? trimmed : name;
+}
+
+/**
+ * An icon on the header row, read as a letter.
+ *
+ * The restaurant sits between a back arrow and a bin on most carts, and the bin
+ * comes back as a lone "w" or "t" welded to the end - "Zaatar W Zeit w". Only
+ * the last token, only a single letter, and only when at least two words remain
+ * after it: "Zaatar W Zeit" keeps the W in the middle, and a one-word name is
+ * never trimmed at all.
+ *
+ * Applied to the restaurant alone, not to dish names, where a trailing "1" from
+ * "Serves 1" is real and losing it costs more than the noise.
+ */
+function withoutTrailingGlyphLetter(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length < 3) return name.trim();
+  return /^[A-Za-z]$/.test(words[words.length - 1]) ? words.slice(0, -1).join(" ") : name.trim();
+}
+
+/**
  * A name split across two lines by the column being narrow.
  *
  * "Make Your Own Wok Box (Non" / "Veg)" is one dish, and the unclosed bracket
@@ -163,6 +204,25 @@ const PROMO = [
   "place order",
   "to get free delivery",
   "delivering in",
+  // "Deliver in 20 - 30 min" sits above the basket on Deliveroo with no price
+  // of its own, so it opens an item that then swallows the real one's name as
+  // a modifier and steals its price. Kept as a stem because the wording varies
+  // ("Deliver in", "Delivery in", "Arriving in") and only the verb survives
+  // OCR intact.
+  "deliver in",
+  "arriving in",
+  // The allergy notice sits between the "Basket" heading and the first dish on
+  // Deliveroo. It is a sentence with no price, so it opens an item that then
+  // eats the real one. No dish is called this.
+  "allergy",
+  "allergen",
+  // Tip and charity chips are rows of bare prices - "AED 2 AED 4 AED 6 AED 10"
+  // - under a heading. Caught here as well as by the section heading above, in
+  // case the heading is the line OCR loses.
+  "rider tip",
+  "tip goes to",
+  "charity",
+  "donating to",
   "yearly plan",
   "% off",
   "مبروك",
@@ -626,6 +686,15 @@ export function parseOcrText(raw: string): ParseResult {
     // both a marketing banner and the delivery fee, and the fee has to win.
     if (key && (priced || isFree)) {
       flush();
+      // A banner is never the grand total, however much it sounds like one.
+      // "You're saving a total of AED 52.35!" carries the word total and a
+      // price, so the rule below reads it as what the customer is paying - and
+      // then the saving we quote is measured against the discount instead of
+      // the bill. The fee rules still let a banner win, because "Congrats!
+      // Your delivery is FREE" really is the delivery fee; nothing phrased
+      // like an offer is ever the amount due.
+      if (key === "final_total" && matches(lower, PROMO)) continue;
+
       if (matches(lower, VAT_WORDS) && key !== "final_total") continue;
       // "Free delivery" with the old price struck through beside it is zero,
       // not 2.90 - and often the struck price does not survive OCR at all.
@@ -701,7 +770,13 @@ export function parseOcrText(raw: string): ParseResult {
     if (priced && letterCount(priced.rest) >= 2) {
       flush();
       const { quantity, name } = extractQuantity(priced.rest);
-      pending = { name, quantity, modifiers: [], unit_price: "", line_total: priced.price };
+      pending = {
+        name: withoutStruckPrice(name),
+        quantity,
+        modifiers: [],
+        unit_price: "",
+        line_total: priced.price,
+      };
       continue;
     }
 
@@ -713,7 +788,7 @@ export function parseOcrText(raw: string): ParseResult {
 
     // ---- text with no price ------------------------------------------------
     if (basket.restaurant_name === "" && items.length === 0 && pending === null) {
-      basket.restaurant_name = line;
+      basket.restaurant_name = withoutTrailingGlyphLetter(line);
       // Rules cannot tell a restaurant from a section heading, so this is
       // always worth the customer's eye.
       uncertain.add("restaurant_name");
