@@ -80,6 +80,16 @@ export function getResendConfig(): ResendConfig | null {
   return { apiKey, from };
 }
 
+/**
+ * The shared secret a scheduler proves itself with.
+ *
+ * Null turns the cron route off entirely rather than leaving it open: a chaser
+ * anybody can trigger is a way to make somebody's phone buzz on demand.
+ */
+export function getCronSecret(): string | null {
+  return process.env.CRON_SECRET?.trim() || null;
+}
+
 export interface WebPushConfig {
   publicKey: string;
   privateKey: string;

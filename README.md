@@ -115,7 +115,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 
 ## 2. Run the migrations
 
-Open **SQL Editor → New query** in the Supabase dashboard and run these twelve
+Open **SQL Editor → New query** in the Supabase dashboard and run these thirteen
 files **in order**, one at a time:
 
 | Order | File | What it does |
@@ -132,6 +132,7 @@ files **in order**, one at a time:
 | 10 | `supabase/migrations/0010_admin_submission_management.sql` | `archived_at`, the admin delete policy, the new audit event types, and the `landing_viewed` funnel step |
 | 11 | `supabase/migrations/0011_funnel_area.sql` | `funnel_events.area_id` — which area a visit came from, once it says |
 | 12 | `supabase/migrations/0012_push_subscriptions.sql` | `push_subscriptions` — browser push endpoints for customers and admins |
+| 13 | `supabase/migrations/0013_chase_unanswered.sql` | `submissions.chased_at` — so a reminder is sent once, not every run |
 
 Each file is safe to run more than once.
 
@@ -778,6 +779,47 @@ admin notifications.
 
 Endpoints that answer 404 or 410 are deleted: that is a push service saying the
 browser is gone, as opposed to a transient failure, which leaves the row alone.
+
+### Chasing what nobody opened
+
+Every other notification here fires at the moment something happens, which is
+useless if nobody was looking. The alert that matters most — *an order has
+arrived* — is the one most likely to be missed, because it lands while the admin
+is doing something else, and the customer then sits out a five-minute promise
+nobody knows they made.
+
+`/api/cron/chase-submissions` asks the opposite question on a schedule: what is
+**still** waiting. Anything `new`, not archived, and older than
+`UNANSWERED_AFTER_MINUTES` (10 — twice the promise, so a reminder only arrives
+when the promise is genuinely at risk) produces one notification to every
+subscribed admin device and, if it is configured, a Telegram message.
+
+One notification however many are waiting. Three orders at once is one thing to
+go and do; three buzzes in a row is how somebody learns to ignore the buzzing.
+
+Rows are marked `chased_at` **after** the send, not before — a reminder that
+failed to go out should be retried on the next run rather than silently recorded
+as done.
+
+**Scheduling it.** The route takes a shared secret in `x-cron-secret` (or as a
+bearer token, for schedulers that only offer `Authorization`). Without
+`CRON_SECRET` set the route refuses everything and the feature is off: a chaser
+anybody can trigger is a way to make somebody's phone buzz on demand. An
+unauthorised call gets a 404, so nobody learns the route exists.
+
+Call it every five minutes from whatever is easiest:
+
+```bash
+curl -H "x-cron-secret: $CRON_SECRET" https://your-domain/api/cron/chase-submissions
+```
+
+- **A free cron service** (cron-job.org, EasyCron) pointed at that URL — the
+  quickest, and enough for a pilot.
+- **Supabase `pg_cron` + `pg_net`**, if you would rather nothing outside the
+  stack is involved. Both extensions are enabled from the Supabase dashboard.
+- A Cloudflare **Cron Trigger** would need a `scheduled()` handler, which means
+  wrapping the OpenNext worker entry point — a build step to own for one
+  function, which is why a plain URL was chosen instead.
 
 ### Where the buttons are
 

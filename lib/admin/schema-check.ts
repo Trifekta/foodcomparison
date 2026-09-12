@@ -40,6 +40,11 @@ const PROBES: MigrationProbe[] = [
     column: "archived_at",
     breaks: "archiving and deleting a submission, the submissions list, and the export",
   },
+  {
+    file: "0013_chase_unanswered.sql",
+    column: "chased_at",
+    breaks: "reminders about submissions nobody has opened yet",
+  },
 ];
 
 /**
