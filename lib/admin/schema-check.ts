@@ -36,7 +36,7 @@ const PROBES: MigrationProbe[] = [
     breaks: "recording that a basket could not be compared, and the analytics page",
   },
   {
-    file: "0009_admin_submission_management.sql",
+    file: "0010_admin_submission_management.sql",
     column: "archived_at",
     breaks: "archiving and deleting a submission, the submissions list, and the export",
   },

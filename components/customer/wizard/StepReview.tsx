@@ -2,7 +2,13 @@
 
 import { useEffect, useId, useState } from "react";
 import { AlertCircle, Check, ChevronRight, MapPin, Minus, Receipt, Store } from "lucide-react";
-import { BRAND_NAME, COMPARISON_APP, CURRENCY, DIAL_CODES } from "@/lib/constants";
+import {
+  BRAND_NAME,
+  COMPARISON_APP,
+  CURRENCY,
+  DIAL_CODES,
+  RESULT_PROMISE,
+} from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
 import { FieldError } from "@/components/ui/FieldError";
 import { ImageLightbox } from "@/components/ui/ImageLightbox";
@@ -445,6 +451,9 @@ export function StepReview({
           <Button onClick={onSubmit} loading={submitting} loadingLabel="Sending…" arrow>
             Get a {COMPARISON_APP} price
           </Button>
+          <p className="mt-2.5 text-center text-[0.9rem] font-semibold text-slate-500">
+            Usually {RESULT_PROMISE}. Nothing is ordered.
+          </p>
         </div>
       </section>
 

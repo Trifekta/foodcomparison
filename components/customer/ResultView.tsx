@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ExternalLink, Loader2, UtensilsCrossed } from "lucide-react";
-import { CURRENCY } from "@/lib/constants";
+import { CURRENCY, RESULT_PROMISE, RESULT_PROMISE_MINUTES } from "@/lib/constants";
 import { formatDecimalStringAsCurrency } from "@/lib/calculations/money";
 import { CopyReference } from "@/components/customer/CopyReference";
 import { Disclaimer } from "@/components/customer/Disclaimer";
@@ -103,7 +103,12 @@ export function ResultView({ initial, token }: { initial: PublicResult; token: s
       </header>
 
       {result.state === "checking" ? (
-        <Checking reference={result.referenceNumber} stalled={stalled} onRetry={() => void refresh()} />
+        <Checking
+          reference={result.referenceNumber}
+          createdAt={result.createdAt}
+          stalled={stalled}
+          onRetry={() => void refresh()}
+        />
       ) : null}
       {result.state === "saving" ? <Saving result={result} token={token} /> : null}
       {result.state === "no_saving" ? <NoSaving result={result} /> : null}
@@ -131,15 +136,57 @@ export function ResultView({ initial, token }: { initial: PublicResult; token: s
   );
 }
 
+/**
+ * Whole minutes since the order was sent, ticking while the page is open.
+ *
+ * Counted from the server's timestamp rather than from when this component
+ * mounted, because the page is usually opened again later from a WhatsApp
+ * message - and "submitted 1 minute ago" on an order sent an hour earlier
+ * would be a lie told by a clock that started in the wrong place.
+ */
+function useMinutesSince(iso: string): number {
+  // Starts at zero rather than at the real elapsed time, so the server and the
+  // browser render the same first paint - reading the clock during render makes
+  // the two disagree by whatever the round trip took, which React reports as a
+  // hydration error. The timeout below corrects it on the first tick after
+  // mount, before anybody reads it.
+  const [minutes, setMinutes] = useState(0);
+
+  useEffect(() => {
+    const update = () => setMinutes(minutesSince(iso));
+    const first = setTimeout(update, 0);
+    const timer = setInterval(update, 15_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [iso]);
+
+  return minutes;
+}
+
+function minutesSince(iso: string): number {
+  const started = new Date(iso).getTime();
+  if (Number.isNaN(started)) return 0;
+  return Math.max(0, Math.floor((Date.now() - started) / 60_000));
+}
+
 function Checking({
   reference,
+  createdAt,
   stalled,
   onRetry,
 }: {
   reference: string;
+  createdAt: string;
   stalled: boolean;
   onRetry: () => void;
 }) {
+  const minutes = useMinutesSince(createdAt);
+  // Past the promise, the copy changes rather than the promise being repeated.
+  // Telling somebody it takes five minutes in the seventh minute is the one
+  // way to turn a short wait into a broken word.
+  const overdue = minutes >= RESULT_PROMISE_MINUTES;
   return (
     <>
       <div className="relative mt-3 h-64">
@@ -192,9 +239,19 @@ function Checking({
             <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin" />
             {/* What we are doing, not how. "Rebuilding your basket" sounded
                 like we were changing their order. */}
-            <span>Checking the price for you — hang tight…</span>
+            <span>
+              {overdue
+                ? "Taking a little longer than usual — we're on it."
+                : `Checking the price for you — usually ${RESULT_PROMISE}.`}
+            </span>
           </>
         )}
+      </p>
+
+      <p aria-live="polite" className="mt-2 text-center text-[0.85rem] font-semibold text-slate-500">
+        {minutes === 0
+          ? "Sent just now"
+          : `Sent ${minutes} minute${minutes === 1 ? "" : "s"} ago`}
       </p>
 
       <p className="mt-3 text-[0.95rem] leading-relaxed text-slate-600">

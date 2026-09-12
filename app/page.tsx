@@ -10,6 +10,8 @@ import {
   SkylineFooter,
   Sparks,
 } from "@/components/customer/Motifs";
+import { TrackLanding } from "@/components/customer/TrackLanding";
+import { RESULT_PROMISE } from "@/lib/constants";
 
 const STEPS = [
   {
@@ -35,6 +37,10 @@ const STEPS = [
 export default function LandingPage() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5">
+      {/* Renders nothing. It is here so the advert click is counted before the
+          customer decides whether to start. */}
+      <TrackLanding />
+
       <header className="flex items-start justify-between gap-3 pt-5">
         <Wordmark size="md" />
         <ScriptNote underline className="text-[0.95rem] text-slate-600">
@@ -92,7 +98,7 @@ export default function LandingPage() {
         </Link>
 
         <p className="mt-3 text-center text-[0.95rem] font-semibold text-slate-500">
-          Free to check · No account needed
+          Free to check · No account needed · Usually {RESULT_PROMISE}
         </p>
 
         <ol className="mt-5 space-y-2.5">

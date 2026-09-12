@@ -1,4 +1,10 @@
--- Managing a submission after it has arrived: archive it, correct it, remove it.
+-- Managing a submission after it has arrived, and counting the screen before
+-- the wizard.
+--
+-- Numbered 0010 rather than 0009. Two branches both wrote a 0009 - this one and
+-- 0009_funnel_events.sql - and git merged them without complaint because the
+-- filenames differ. Two migrations claiming one number is an ordering nobody
+-- can rely on, so this one moved.
 --
 -- Three things the dashboard could not do. A test submission, a duplicate from
 -- somebody who tapped twice, a basket typed wrong by the customer - each of
@@ -66,5 +72,34 @@ alter table public.submission_events
       'submission_created','review_started','comparison_added',
       'status_changed','result_generated','result_sent',
       'submission_edited','submission_archived','submission_unarchived'
+    )
+  );
+
+
+-- ---------------------------------------------------------------------------
+-- The landing page, as a funnel step
+-- ---------------------------------------------------------------------------
+-- 0009_funnel_events.sql starts counting at 'wizard_started', which fires when
+-- the upload screen appears. That misses the drop that matters most to a paid
+-- campaign: the people who arrive from the advert, look at the landing page and
+-- leave without ever starting. Without it there is no telling an advert that
+-- brings the wrong people from a first screen that loses the right ones.
+--
+-- Added here rather than by editing 0009, because a migration that may already
+-- have been applied somewhere is not a file to rewrite.
+alter table public.funnel_events
+  drop constraint if exists funnel_events_event_check;
+
+alter table public.funnel_events
+  add constraint funnel_events_event_check check (
+    event in (
+      'landing_viewed',
+      'wizard_started',
+      'step_basket',
+      'step_where',
+      'step_review',
+      'submitted',
+      'result_viewed',
+      'keeta_opened'
     )
   );

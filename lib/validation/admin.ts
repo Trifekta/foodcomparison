@@ -25,18 +25,27 @@ export const comparisonInputSchema = z.object({
   comparisonTotal: comparisonTotalSchema,
   /**
    * The restaurant's page on the comparison app, pasted from the page the
-   * admin is already looking at. It becomes the button on the customer's
-   * result, so it has to be a real https link or nothing at all.
+   * admin is already looking at.
+   *
+   * Required, not optional. It becomes the "Take me to Keeta" button, which is
+   * the single action the whole product exists to produce - without it the
+   * customer is shown a saving and given no way to act on it, and the last step
+   * of the funnel can never fire, so nobody can even tell that nobody switched.
+   * It was optional, and one forgotten paste silently cost a conversion.
+   *
+   * The admin is already on the page they are copying, so this asks for nothing
+   * they do not have in front of them. Recording that a basket could not be
+   * compared at all goes through markUnavailable, which has no link to give.
    */
   comparisonUrl: z
     .string()
     .trim()
+    .min(1, "Paste the restaurant's link from the comparison app — it becomes the customer's button.")
     .max(500)
     .refine(
-      (value) => value === "" || /^https:\/\/\S+$/i.test(value),
+      (value) => /^https:\/\/\S+$/i.test(value),
       "Paste the full https:// link from the app.",
-    )
-    .optional(),
+    ),
   restaurantFound: z.string().trim().max(160).optional(),
   comparisonLocationNote: z.string().trim().max(160).optional(),
   adminNotes: z.string().trim().max(2000).optional(),

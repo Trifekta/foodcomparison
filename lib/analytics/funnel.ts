@@ -7,6 +7,10 @@
  */
 
 export const FUNNEL_STEPS = [
+  // The advert lands here. Counting from the wizard instead would hide the
+  // most expensive drop there is: people who were paid for, arrived, and left
+  // without starting.
+  { event: "landing_viewed", label: "Landed from the advert" },
   { event: "wizard_started", label: "Opened the wizard" },
   { event: "step_basket", label: "Confirmed their basket" },
   { event: "step_where", label: "Gave area and total" },
@@ -64,7 +68,11 @@ export function computeFunnel(rows: FunnelRow[]): FunnelStepCount[] {
     visitsByEvent.set(row.event, visits);
   }
 
-  const started = visitsByEvent.get("wizard_started")?.size ?? 0;
+  // The baseline is whatever step comes first, read from the list rather than
+  // named here. It was hardcoded to "wizard_started", so when the landing page
+  // was added above it every share was quietly measured against the wrong
+  // denominator - and the new first step reported 100% of itself.
+  const started = visitsByEvent.get(FUNNEL_STEPS[0].event)?.size ?? 0;
   let previous = 0;
 
   return FUNNEL_STEPS.map((step, index) => {

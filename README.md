@@ -115,7 +115,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 
 ## 2. Run the migrations
 
-Open **SQL Editor → New query** in the Supabase dashboard and run these nine
+Open **SQL Editor → New query** in the Supabase dashboard and run these ten
 files **in order**, one at a time:
 
 | Order | File | What it does |
@@ -128,7 +128,8 @@ files **in order**, one at a time:
 | 6 | `supabase/migrations/0006_extractions.sql` | The extraction audit trail (`submission_extractions`) |
 | 7 | `supabase/migrations/0007_result_link.sql` | `submissions.result_token` and `comparison_url` — the customer's result page |
 | 8 | `supabase/migrations/0008_unavailable_outcome.sql` | The `unavailable` status and `unavailable_reason` |
-| 9 | `supabase/migrations/0009_admin_submission_management.sql` | `archived_at`, the admin delete policy, and the new audit event types |
+| 9 | `supabase/migrations/0009_funnel_events.sql` | `funnel_events` — where visitors stop, from the advert onwards |
+| 10 | `supabase/migrations/0010_admin_submission_management.sql` | `archived_at`, the admin delete policy, the new audit event types, and the `landing_viewed` funnel step |
 
 Each file is safe to run more than once.
 
@@ -163,7 +164,10 @@ where table_schema = 'public' and table_name = 'submissions'
   and column_name in ('result_token', 'comparison_url', 'unavailable_reason', 'archived_at')
 order by 1;
 -- expect all four: archived_at, comparison_url, result_token, unavailable_reason
--- anything missing means 0007, 0008 or 0009 has not been run
+-- anything missing means 0007, 0008 or 0010 has not been run
+
+-- and the funnel table, added by 0009:
+select to_regclass('public.funnel_events');  -- null means 0009 has not been run
 ```
 
 ---
@@ -704,6 +708,23 @@ comparison and never blocks a submission.
 
 ---
 
+## The five-minute promise
+
+`RESULT_PROMISE_MINUTES` in `lib/constants.ts` is the single place the wait is
+stated. It appears on the landing page, the upload step, the submit button and
+the waiting screen, because the product only works before somebody orders — a
+person deciding whether to wait needs a number, and with none on the screen they
+assume the worst and order anyway.
+
+The waiting screen also counts up (`Sent 3 minutes ago`) and, once the promise
+is past, stops repeating it: "usually under 5 minutes" said in the seventh
+minute is the one way to turn a short wait into a broken word. It changes to
+"taking a little longer than usual" instead. There is deliberately **no
+out-of-hours message** — every customer is told the same thing and gets the same
+promise, whatever time they arrive.
+
+---
+
 ## Managing submissions
 
 Four things an admin can do to a submission once it has arrived, all from the
@@ -722,7 +743,7 @@ dashboard or the submission's own page.
   is how somebody says "this one was not real", so a test submission stops
   distorting the numbers the pilot is being judged on.
 - **Delete** removes the row, its basket, its events, its extractions and its
-  screenshots. `0002` deliberately gave submissions no delete policy; `0009`
+  screenshots. `0002` deliberately gave submissions no delete policy; `0010`
   adds one, because archiving now covers "get this out of my way" and what is
   left is the case archiving cannot serve — a customer asking for their data to
   be removed. The screenshots go first: the database cascades its own tables but
