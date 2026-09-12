@@ -95,6 +95,8 @@ export interface SubmissionRow {
   completed_at: string | null;
   customer_latitude: number | null;
   customer_longitude: number | null;
+  /** When an admin archived this. Null means it is in the working list. */
+  archived_at: string | null;
 }
 
 export interface SubmissionWithArea extends SubmissionRow {

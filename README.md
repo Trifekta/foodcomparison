@@ -115,7 +115,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 
 ## 2. Run the migrations
 
-Open **SQL Editor → New query** in the Supabase dashboard and run these eight
+Open **SQL Editor → New query** in the Supabase dashboard and run these nine
 files **in order**, one at a time:
 
 | Order | File | What it does |
@@ -128,6 +128,7 @@ files **in order**, one at a time:
 | 6 | `supabase/migrations/0006_extractions.sql` | The extraction audit trail (`submission_extractions`) |
 | 7 | `supabase/migrations/0007_result_link.sql` | `submissions.result_token` and `comparison_url` — the customer's result page |
 | 8 | `supabase/migrations/0008_unavailable_outcome.sql` | The `unavailable` status and `unavailable_reason` |
+| 9 | `supabase/migrations/0009_admin_submission_management.sql` | `archived_at`, the admin delete policy, and the new audit event types |
 
 Each file is safe to run more than once.
 
@@ -159,10 +160,10 @@ Then check the columns the later migrations add, which a table list cannot show:
 ```sql
 select column_name from information_schema.columns
 where table_schema = 'public' and table_name = 'submissions'
-  and column_name in ('result_token', 'comparison_url', 'unavailable_reason')
+  and column_name in ('result_token', 'comparison_url', 'unavailable_reason', 'archived_at')
 order by 1;
--- expect all three: comparison_url, result_token, unavailable_reason
--- anything missing means 0007 or 0008 has not been run
+-- expect all four: archived_at, comparison_url, result_token, unavailable_reason
+-- anything missing means 0007, 0008 or 0009 has not been run
 ```
 
 ---
@@ -700,6 +701,50 @@ Two things in that mockup are **Phase 2**, and this build does not fake them:
 The checkout screenshot sits beside the cart screenshot on screen 1, as the
 mockup shows, but stays clearly marked **Optional** — it buys a more accurate
 comparison and never blocks a submission.
+
+---
+
+## Managing submissions
+
+Four things an admin can do to a submission once it has arrived, all from the
+dashboard or the submission's own page.
+
+- **Edit** corrects what the customer sent: restaurant, area, the total they are
+  paying, which app it came from, and how to reach them. Nothing the comparison
+  derives is editable here — `saveComparison` owns the Keeta total, the saving
+  and the message, and a second way to set those is how two numbers that should
+  agree stop agreeing. Every edit appends a `submission_edited` event naming the
+  fields that moved and their before and after.
+- **Archive** takes a row out of the working list without losing it. It is a
+  timestamp (`archived_at`), not a status, so an archived submission keeps
+  whatever outcome it reached. Archived rows leave the list, the dashboard
+  counts **and the validation metrics** — that last one is the point: archiving
+  is how somebody says "this one was not real", so a test submission stops
+  distorting the numbers the pilot is being judged on.
+- **Delete** removes the row, its basket, its events, its extractions and its
+  screenshots. `0002` deliberately gave submissions no delete policy; `0009`
+  adds one, because archiving now covers "get this out of my way" and what is
+  left is the case archiving cannot serve — a customer asking for their data to
+  be removed. The screenshots go first: the database cascades its own tables but
+  knows nothing about the bucket, so deleting the row first would strand a cart
+  photo holding somebody's name and address. If the images cannot be deleted,
+  nothing is.
+- **Export** downloads the list as CSV, through `/admin/export`. It reads the
+  same query string the dashboard does, via `lib/admin/filters.ts`, so the file
+  holds exactly the rows on screen — up to 5000 rather than the table's 100,
+  because an export that silently stops at 100 looks complete.
+
+**Why CSV and not `.xlsx`.** Excel opens both; a real workbook writer is around a
+megabyte, and the Worker is measured against a size limit the OCR assets already
+eat into. The file carries a byte-order mark so Excel reads Arabic correctly,
+quotes every field so an area name with a comma cannot shift a column, and
+prefixes anything starting with `=`, `+`, `-` or `@` so a spreadsheet treats it
+as text instead of a formula.
+
+**No contact details are exported.** The file has the reference, timestamp,
+status, area, app, totals, saving and which channel the customer chose — but not
+their number or email. The export exists to be worked on in a spreadsheet, and
+that is a much easier thing to forward than a dashboard behind a login.
 
 ---
 

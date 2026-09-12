@@ -8,6 +8,7 @@ import {
   getSubmission,
   getSubmissionEvents,
   getSubmissionItems,
+  listAreas,
 } from "@/lib/admin/queries";
 import { isEmailConfigured } from "@/lib/notifications/resend";
 import { isExtractionConfigured } from "@/lib/env";
@@ -17,6 +18,8 @@ import { ScreenshotViewer } from "@/components/admin/ScreenshotViewer";
 import { ComparisonPanel } from "@/components/admin/ComparisonPanel";
 import { ResultPanel } from "@/components/admin/ResultPanel";
 import { StartReviewButton } from "@/components/admin/StartReviewButton";
+import { EditSubmissionPanel } from "@/components/admin/EditSubmissionPanel";
+import { SubmissionRowActions } from "@/components/admin/SubmissionRowActions";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDecimalStringAsCurrency, formatMinorAsCurrency } from "@/lib/calculations/money";
 import { formatDubaiDateTime } from "@/lib/utils/text";
@@ -72,12 +75,13 @@ export default async function SubmissionDetailPage({
   const submission = await getSubmission(id);
   if (!submission) notFound();
 
-  const [cartUrl, checkoutUrl, events, items, extraction] = await Promise.all([
+  const [cartUrl, checkoutUrl, events, items, extraction, areas] = await Promise.all([
     getSignedImageUrl(submission.cart_image_path),
     getSignedImageUrl(submission.checkout_image_path),
     getSubmissionEvents(submission.id),
     getSubmissionItems(submission.id),
     getLatestExtraction(submission.id),
+    listAreas(false),
   ]);
 
   const appLabel =
@@ -109,11 +113,32 @@ export default async function SubmissionDetailPage({
         </h1>
         <StatusBadge status={submission.status} />
 
+        {submission.archived_at ? (
+          <span className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-ink-600">
+            Archived
+          </span>
+        ) : null}
+
         {submission.status === "new" ? (
           <div className="ml-auto w-full sm:w-auto">
             <StartReviewButton submissionId={submission.id} />
           </div>
         ) : null}
+      </div>
+
+      {/* Editing and removing sit together, above the record rather than inside
+          it: they act on the submission as a whole, not on any one panel. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <EditSubmissionPanel
+          submission={submission}
+          areas={areas.map((area) => ({ id: area.id, name: area.name }))}
+        />
+        <SubmissionRowActions
+          submissionId={submission.id}
+          reference={submission.reference_number}
+          archivedAt={submission.archived_at}
+          redirectAfterDelete
+        />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">

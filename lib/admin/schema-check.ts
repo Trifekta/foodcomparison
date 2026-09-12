@@ -35,6 +35,11 @@ const PROBES: MigrationProbe[] = [
     column: "unavailable_reason",
     breaks: "recording that a basket could not be compared, and the analytics page",
   },
+  {
+    file: "0009_admin_submission_management.sql",
+    column: "archived_at",
+    breaks: "archiving and deleting a submission, the submissions list, and the export",
+  },
 ];
 
 export interface SchemaGap {
@@ -119,6 +124,10 @@ export async function runDiagnostics(): Promise<Check[]> {
       .from("submissions")
       .select("status, source_app, current_total, restaurant_name, unavailable_reason")
       .limit(1),
+  );
+
+  await record("Archive a submission (writes archived_at)", () =>
+    supabase.from("submissions").select("archived_at").limit(1),
   );
 
   await record("Write an event row", () =>

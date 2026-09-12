@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { Download } from "lucide-react";
 import { AlertStatus } from "@/components/admin/AlertStatus";
 import { SchemaWarning } from "@/components/admin/SchemaWarning";
 import { SummaryCards } from "@/components/admin/SummaryCards";
@@ -11,13 +12,11 @@ import {
   getDashboardCounts,
   listAreas,
   listSubmissions,
-  type SubmissionFilters as Filters,
 } from "@/lib/admin/queries";
+import { filtersToQueryString, parseSubmissionFilters } from "@/lib/admin/filters";
 import { computeValidationMetrics } from "@/lib/calculations/analytics";
 import { alertChannels } from "@/lib/notifications/admin-alert";
 import { findMissingMigrations } from "@/lib/admin/schema-check";
-import { STATUS_ORDER } from "@/lib/utils/status";
-import type { SubmissionStatus } from "@/types/database";
 
 export const metadata: Metadata = {
   title: "Submissions",
@@ -28,11 +27,6 @@ export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-function single(value: string | string[] | undefined): string | undefined {
-  const raw = Array.isArray(value) ? value[0] : value;
-  return raw && raw.trim() !== "" ? raw.trim() : undefined;
-}
-
 export default async function AdminDashboardPage({
   searchParams,
 }: {
@@ -40,17 +34,10 @@ export default async function AdminDashboardPage({
 }) {
   const params = await searchParams;
 
-  const statusParam = single(params.status);
-  const filters: Filters = {
-    status: STATUS_ORDER.includes(statusParam as SubmissionStatus)
-      ? (statusParam as SubmissionStatus)
-      : "all",
-    areaId: single(params.area),
-    sourceApp: single(params.app),
-    from: single(params.from),
-    to: single(params.to),
-    search: single(params.search),
-  };
+  // The export route reads the URL through this same parser, so the file that
+  // downloads holds exactly the rows the table is showing.
+  const filters = parseSubmissionFilters(params);
+  const exportQuery = filtersToQueryString(filters);
 
   // Analytics is allowed to fail here. It is the query that names the newest
   // columns, so on a database that is behind it throws - and if that took the
@@ -69,7 +56,18 @@ export default async function AdminDashboardPage({
     <div className="space-y-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-xl font-bold text-ink-900">Submissions</h1>
-        <p className="text-sm text-ink-500">Newest first · {rows.length} shown</p>
+        <div className="flex items-baseline gap-4">
+          <p className="text-sm text-ink-500">Newest first · {rows.length} shown</p>
+          {/* A plain link, not a button: the response is a file, so the browser
+              should do what it does with files and nothing should re-render. */}
+          <a
+            href={exportQuery ? `/admin/export?${exportQuery}` : "/admin/export"}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-ink-200 px-3 text-sm font-medium text-ink-700 hover:bg-ink-50"
+          >
+            <Download aria-hidden="true" className="h-3.5 w-3.5" />
+            Export CSV
+          </a>
+        </div>
       </div>
 
       <SchemaWarning gaps={gaps} />

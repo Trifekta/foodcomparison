@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { MAX_TOTAL_AED } from "@/lib/constants";
+import { MAX_RESTAURANT_NAME_LENGTH, MAX_TOTAL_AED } from "@/lib/constants";
+import { isNormalisablePhone } from "@/lib/utils/phone";
 
 /** Validation for the admin comparison workflow. */
 
@@ -72,3 +73,61 @@ export const adminCredentialsSchema = z.object({
   email: z.email({ message: "Enter a valid email address." }),
   password: z.string().min(8, "Password must be at least 8 characters."),
 });
+
+/**
+ * Correcting a submission after it has arrived.
+ *
+ * The customer's own numbers, not ours: what they said they were paying, where
+ * they are, which restaurant, and how to reach them. Everything the comparison
+ * produces - the Keeta total, the saving, the message - is left to
+ * saveComparison, because those are derived and recomputing them by hand here
+ * would be a second source of truth for the arithmetic.
+ *
+ * The total is the one that matters most. It is the baseline the whole saving
+ * is measured against, so a customer who typed 85.69 when they meant 86.59
+ * makes every number downstream wrong, and before this there was no way to put
+ * it right.
+ */
+export const currentTotalSchema = z
+  .string()
+  .trim()
+  .min(1, "Enter the amount the customer is paying.")
+  .regex(/^\d{1,7}(\.\d{1,2})?$/, "Enter a valid amount, e.g. 85.69")
+  .refine((value) => Number(value) > 0, "Amount must be more than zero.")
+  .refine(
+    (value) => Number(value) <= MAX_TOTAL_AED,
+    `Enter an amount under AED ${MAX_TOTAL_AED.toLocaleString("en-AE")}.`,
+  );
+
+export const submissionEditSchema = z
+  .object({
+    submissionId: z.uuid(),
+    restaurantName: z.string().trim().max(MAX_RESTAURANT_NAME_LENGTH).optional(),
+    areaId: z.uuid({ message: "Choose the customer's area." }),
+    currentTotal: currentTotalSchema,
+    sourceApp: z.string().trim().max(80),
+    contactType: z.enum(["whatsapp", "email"]),
+    dialCode: z.string().trim().max(8),
+    whatsappNumber: z.string().trim().max(40),
+    email: z.string().trim().max(200),
+  })
+  .superRefine((value, ctx) => {
+    // The same rule the wizard enforces: exactly one channel, and it has to be
+    // a real one. An admin correcting a typo must not be able to leave the
+    // submission with no way to answer it.
+    if (value.contactType === "whatsapp") {
+      if (!isNormalisablePhone(value.dialCode, value.whatsappNumber)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["whatsappNumber"],
+          message: "Enter a valid mobile number.",
+        });
+      }
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value.email)) {
+      ctx.addIssue({ code: "custom", path: ["email"], message: "Enter a valid email address." });
+    }
+  });
+
+export type SubmissionEditInput = z.infer<typeof submissionEditSchema>;
