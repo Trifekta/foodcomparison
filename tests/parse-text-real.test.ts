@@ -449,3 +449,115 @@ describe("On The Wood payment screen", () => {
     expect(basket.uncertain_fields).toEqual([]);
   });
 });
+
+/**
+ * Deliveroo, a discounted order at Zaatar W Zeit.
+ *
+ * Verbatim tesseract output for the two screenshots a customer sent. This app
+ * broke the parser in four separate ways at once, and the worst of them was
+ * silent: "You're saving a total of AED 52.35!" contains the word total and a
+ * price, so it was read as the amount the customer is paying - and every saving
+ * we quote is measured against that number.
+ *
+ * The others: the delivery estimate and the allergy notice both open an item,
+ * because they are sentences with no price, and the real dish is then swallowed
+ * as one of their modifiers; the struck-through original price stays welded to
+ * the dish name, because a line through the digits is what OCR reads as "-463";
+ * and the bin icon on the header comes back as a lone "w" after the restaurant.
+ */
+const DELIVEROO_CART = `10:26 MT ie Zo all all €
+Your order
+« Zaatar W Zeit w
+Delivery
+3 Deliver in 20 - 30 min Change
+Basket
+If anyone eating has an allergy, contact the restaurant >
+1x Gathering Box AED-463 AED 114.10
+Taouk Wrap, Spizy
+Chicken, Famous
+Chicken, Halloumi
+Sticks, Fries
+Popular with orders like yours
+— Honey Mustard
+— AED 3.00 \\
+ad
+Rider tip ® ®  AEDO0.00
+Order total AED 119.05
+You're saving a total of AED 52.35!
+I O <`;
+
+const DELIVEROO_CHECKOUT = `1027 OEM 24 all all €
+« Checkout
+Zaatar W Zeit
+Price summary ®
+Subtotal AEB-463 AED 114.10
+Service fee AED 4.95
+Delivery fee os] AED-345 Free
+Total AEBL7440 AED 119.05
+Add rider tip
+100% of your tip goes to the rider
+AED 2 AED 4 AED 6 AED 10
+Charity donation
+Support underprivileged communities by donating to
+the 'Bread for All' initiative.
+No AED 5 AED 20 AED 50
+Saving AED 52.35 A
+I O <`;
+
+describe("Deliveroo cart", () => {
+  const { basket } = parseOcrText(DELIVEROO_CART);
+
+  /**
+   * The one that mattered. 52.35 is the discount; 119.05 is the bill. Reading
+   * the first as the total would have made every comparison nonsense, and
+   * nothing on the screen would have said so.
+   */
+  it("does not mistake the savings banner for the amount due", () => {
+    expect(basket.final_total).toBe("119.05");
+  });
+
+  it("finds the real dish, not the delivery estimate", () => {
+    expect(basket.items).toHaveLength(1);
+    expect(basket.items[0].name).toBe("Gathering Box");
+    expect(basket.items[0].quantity).toBe(1);
+  });
+
+  /** The live price, not the struck-through 163 beside it. */
+  it("takes the discounted price", () => {
+    expect(basket.items[0].line_total).toBe("114.10");
+  });
+
+  it("keeps the description as modifiers rather than as dishes", () => {
+    expect(basket.items[0].modifiers.join(" ")).toContain("Taouk Wrap");
+  });
+
+  it("drops the bin icon the header leaves after the restaurant", () => {
+    expect(basket.restaurant_name).toBe("Zaatar W Zeit");
+  });
+
+  /** An upsell shelf, not part of the order. */
+  it("leaves the suggested dip out of the basket", () => {
+    expect(JSON.stringify(basket.items)).not.toContain("Honey Mustard");
+  });
+});
+
+describe("Deliveroo checkout", () => {
+  const { basket } = parseOcrText(DELIVEROO_CHECKOUT);
+
+  it("reads every line of the price summary", () => {
+    expect(basket.subtotal).toBe("114.10");
+    expect(basket.service_fee).toBe("4.95");
+    // Struck through and replaced by the word Free, which is what is charged.
+    expect(basket.delivery_fee).toBe("0.00");
+    expect(basket.final_total).toBe("119.05");
+  });
+
+  /**
+   * Tip chips and charity buttons are rows of bare prices. Read as items they
+   * put "AED 50" in somebody's basket, which is the kind of number that makes
+   * a customer distrust everything else on the screen.
+   */
+  it("treats tip and charity chips as furniture, not food", () => {
+    expect(basket.items).toEqual([]);
+  });
+});
