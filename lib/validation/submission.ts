@@ -30,8 +30,27 @@ export const ERROR_MESSAGES = {
   contactMissing: "Please tell us where to send your result.",
   invalidPhone: "Enter a valid mobile number.",
   invalidEmail: "Enter a valid email address.",
+  /**
+   * Three ways a submission can fail without any field being wrong, worded
+   * differently on purpose.
+   *
+   * They used to share one sentence, which meant a screenshot of the failure
+   * told us nothing: a dropped connection, a body the server could not read and
+   * a crash inside the handler all read identically, and the first question -
+   * did this even reach us? - could not be answered from the screen. Each now
+   * names its own half of the journey, so the customer's screenshot points at
+   * the layer to look in before anybody opens a log.
+   *
+   * All three keep "your information hasn't been lost", which is the only part
+   * the customer actually needs: the wizard holds its state, so trying again
+   * costs a tap rather than four screens.
+   */
   network:
-    "We couldn't submit your order. Your information hasn't been lost. Please try again.",
+    "We couldn't reach the server. Your information hasn't been lost. Please try again.",
+  unreadable:
+    "We couldn't read your upload. Your information hasn't been lost. Please try again.",
+  serverError:
+    "Something went wrong on our end. Your information hasn't been lost. Please try again.",
 } as const;
 
 /** Amount typed by the customer: positive, at most two decimals, sane ceiling. */

@@ -287,7 +287,19 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
         | null;
 
       if (!response.ok || !payload?.resultPath) {
-        setSubmitError(payload?.error ?? ERROR_MESSAGES.network);
+        // A JSON error is the server explaining itself, and it is always the
+        // better message. Without one the reply came from something in front of
+        // the app - a platform error page, a gateway timeout - which is worth
+        // saying differently: "we couldn't reach the server" would be wrong when
+        // the server answered, just not in a language we speak.
+        if (!payload?.error) {
+          console.error("[submissions] no JSON error in a failed response", {
+            status: response.status,
+            contentType: response.headers.get("content-type"),
+          });
+        }
+
+        setSubmitError(payload?.error ?? ERROR_MESSAGES.serverError);
         return;
       }
 
@@ -301,7 +313,10 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       // checking and turns into the answer without them doing anything.
       router.replace(payload.resultPath);
       return;
-    } catch {
+    } catch (error) {
+      // fetch itself threw: the request never completed. On a phone this is
+      // usually the connection rather than us, which is what the message says.
+      console.error("[submissions] the request did not complete", error);
       setSubmitError(ERROR_MESSAGES.network);
     } finally {
       submitLock.current = false;

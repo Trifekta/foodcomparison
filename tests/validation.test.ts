@@ -256,3 +256,28 @@ describe("admin comparison amount", () => {
     expect(comparisonTotalSchema.safeParse("6000").success).toBe(false);
   });
 });
+
+describe("the three failures that are nobody's typo", () => {
+  const failures = [
+    ERROR_MESSAGES.network,
+    ERROR_MESSAGES.unreadable,
+    ERROR_MESSAGES.serverError,
+  ];
+
+  /**
+   * These three used to share one sentence, and a screenshot of the failure
+   * could not say which had happened - a dropped connection, a body the server
+   * could not read, and a crash inside the handler all read the same. Keeping
+   * them distinct is the whole point, so it is worth a test rather than a
+   * comment somebody will paste over.
+   */
+  it("says something different for each", () => {
+    expect(new Set(failures).size).toBe(failures.length);
+  });
+
+  it("tells the customer their answers are still there", () => {
+    for (const message of failures) {
+      expect(message).toContain("hasn't been lost");
+    }
+  });
+});

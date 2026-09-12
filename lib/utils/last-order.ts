@@ -13,7 +13,7 @@
  * the link in their message still works - and never worth an error.
  */
 
-const KEY = "findfoodae.last-order";
+const KEY = "snipsavor.last-order";
 
 /** Old enough that it is no longer "your last order" in any useful sense. */
 const KEEP_FOR_MS = 7 * 24 * 60 * 60 * 1000;

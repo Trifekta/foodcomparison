@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { AlertCircle, Check, ChevronRight, MapPin, Minus, Receipt, Store } from "lucide-react";
-import { COMPARISON_APP, CURRENCY, DIAL_CODES } from "@/lib/constants";
+import { BRAND_NAME, COMPARISON_APP, CURRENCY, DIAL_CODES } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
 import { FieldError } from "@/components/ui/FieldError";
 import { ImageLightbox } from "@/components/ui/ImageLightbox";
@@ -395,7 +395,7 @@ export function StepReview({
             className="mt-0.5 h-5 w-5 shrink-0 rounded accent-ink-900"
           />
           <span className="text-[0.85rem] leading-snug text-ink-600">
-            I&apos;d like to hear about future FindFoodae offers.
+            I&apos;d like to hear about future {BRAND_NAME} offers.
           </span>
         </label>
       </section>

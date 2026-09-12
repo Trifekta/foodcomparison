@@ -1,8 +1,8 @@
-# FindFoodae
+# SnipSavor
 
 Before you order, check if you can save.
 
-FindFoodae lets a Dubai food-delivery customer send the basket they are about to
+SnipSavor lets a Dubai food-delivery customer send the basket they are about to
 order, and get back an answer: is the same order cheaper on another app?
 
 **Phase 1 is deliberately manual.** A customer uploads a cart screenshot; their
@@ -68,12 +68,15 @@ works fully without it.
 
 ### Brand
 
-The wordmark is **FindFoodae**, set as **FindFood** + **UAE** — the "ae" is the
-UAE country code — with a golden rule under "Food". It lives in one place,
-`components/customer/Wordmark.tsx`, and the strings come from
-`lib/constants.ts` (`BRAND_NAME`, `WORDMARK_PRIMARY`, `WORDMARK_SUFFIX`).
+The wordmark is **SnipSavor**, set as **Snip** + **Savor** with a golden rule
+under "Savor". It lives in one place, `components/customer/Wordmark.tsx`, and
+the two halves come from `lib/constants.ts` (`BRAND_NAME`, `WORDMARK_PRIMARY`,
+`WORDMARK_ACCENT`). The component reads those constants rather than slicing the
+brand name, so renaming the product again means editing `lib/constants.ts` and
+nothing else.
 
-Customer references are `FFA-YYMMDD-NNNN`. Palette and type are tokens in
+Customer references are six characters from a confusable-free alphabet — see
+`lib/utils/reference.ts`. Palette and type are tokens in
 `app/globals.css`: golden yellow `--color-brand-400` for primary actions,
 near-black `--color-ink-900` for text and high-emphasis buttons, green for
 savings, white ground.
@@ -95,7 +98,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 ## 1. Create the Supabase project
 
 1. Go to <https://supabase.com/dashboard> and click **New project**.
-2. Give it a name (e.g. `findfoodae`), set a database password, and pick a region
+2. Give it a name (e.g. `snipsavor`), set a database password, and pick a region
    close to your users — **Central EU (Frankfurt)** or **Asia (Singapore)** are
    both reasonable for Dubai.
 3. Wait for provisioning to finish (a minute or two).
@@ -112,7 +115,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 
 ## 2. Run the migrations
 
-Open **SQL Editor → New query** in the Supabase dashboard and run these six
+Open **SQL Editor → New query** in the Supabase dashboard and run these eight
 files **in order**, one at a time:
 
 | Order | File | What it does |
@@ -123,8 +126,16 @@ files **in order**, one at a time:
 | 4 | `supabase/migrations/0004_cart_items.sql` | Adds `submissions.restaurant_name` and the optional `submission_items` table |
 | 5 | `supabase/migrations/0005_item_prices.sql` | Adds row prices and where each row came from |
 | 6 | `supabase/migrations/0006_extractions.sql` | The extraction audit trail (`submission_extractions`) |
+| 7 | `supabase/migrations/0007_result_link.sql` | `submissions.result_token` and `comparison_url` — the customer's result page |
+| 8 | `supabase/migrations/0008_unavailable_outcome.sql` | The `unavailable` status and `unavailable_reason` |
 
 Each file is safe to run more than once.
+
+> **Run every one of them.** `0007` and `0008` add columns rather than tables,
+> and the code writes `result_token` on every single submission. Skip them and
+> the app deploys, the wizard runs, and then every submission fails at the last
+> step with "We couldn't submit your order" — which is why the check below looks
+> at columns and not only at table names.
 
 If you prefer the CLI:
 
@@ -141,6 +152,17 @@ select table_name from information_schema.tables
 where table_schema = 'public' order by 1;
 -- expect: admin_profiles, areas, submission_events, submission_extractions,
 --         submission_items, submissions
+```
+
+Then check the columns the later migrations add, which a table list cannot show:
+
+```sql
+select column_name from information_schema.columns
+where table_schema = 'public' and table_name = 'submissions'
+  and column_name in ('result_token', 'comparison_url', 'unavailable_reason')
+order by 1;
+-- expect all three: comparison_url, result_token, unavailable_reason
+-- anything missing means 0007 or 0008 has not been run
 ```
 
 ---
@@ -209,7 +231,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # Optional — leave blank and the dashboard falls back to "Copy email message"
 RESEND_API_KEY=
-EMAIL_FROM=FindFoodae <results@yourdomain.com>
+EMAIL_FROM=SnipSavor <results@yourdomain.com>
 
 # Optional — leave blank and the confirm step starts empty instead of pre-filled
 ANTHROPIC_API_KEY=
@@ -430,7 +452,7 @@ non-admin sessions, and an admin cannot grant admin rights from inside the app.
    **Continue**.
 6. Enter a WhatsApp number → **Continue**.
 7. Review, then **Get a Keeta price**.
-8. You land on the success screen with a reference like `FFA-260910-0042`.
+8. You land on the success screen with a reference like `K7M2PQ`.
 
 **Admin:**
 
@@ -657,7 +679,7 @@ images will not break old submissions.
 
 ## Design notes
 
-The customer screens follow the FindFoodae mockup: numbered upload slots with
+The customer screens follow the SnipSavor mockup: numbered upload slots with
 Uploaded / Optional state, a "Delivery area in Dubai" type-ahead, a review that
 ends in a golden "Can Keeta beat AED X?" panel, and a yellow celebration on the
 confirmation screen. The admin's verdict card is the same "Keeta beats the
@@ -708,5 +730,5 @@ market outside Dubai.
 
 ---
 
-FindFoodae is an independent comparison service and is not affiliated with
+SnipSavor is an independent comparison service and is not affiliated with
 Talabat, Keeta, Careem, Deliveroo or Noon Food.
