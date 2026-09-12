@@ -1,8 +1,8 @@
-# FindFoodae
+# SnipSavor
 
 Before you order, check if you can save.
 
-FindFoodae lets a Dubai food-delivery customer send the basket they are about to
+SnipSavor lets a Dubai food-delivery customer send the basket they are about to
 order, and get back an answer: is the same order cheaper on another app?
 
 **Phase 1 is deliberately manual.** A customer uploads a cart screenshot; their
@@ -68,12 +68,15 @@ works fully without it.
 
 ### Brand
 
-The wordmark is **FindFoodae**, set as **FindFood** + **UAE** — the "ae" is the
-UAE country code — with a golden rule under "Food". It lives in one place,
-`components/customer/Wordmark.tsx`, and the strings come from
-`lib/constants.ts` (`BRAND_NAME`, `WORDMARK_PRIMARY`, `WORDMARK_SUFFIX`).
+The wordmark is **SnipSavor**, set as **Snip** + **Savor** with a golden rule
+under "Savor". It lives in one place, `components/customer/Wordmark.tsx`, and
+the two halves come from `lib/constants.ts` (`BRAND_NAME`, `WORDMARK_PRIMARY`,
+`WORDMARK_ACCENT`). The component reads those constants rather than slicing the
+brand name, so renaming the product again means editing `lib/constants.ts` and
+nothing else.
 
-Customer references are `FFA-YYMMDD-NNNN`. Palette and type are tokens in
+Customer references are six characters from a confusable-free alphabet — see
+`lib/utils/reference.ts`. Palette and type are tokens in
 `app/globals.css`: golden yellow `--color-brand-400` for primary actions,
 near-black `--color-ink-900` for text and high-emphasis buttons, green for
 savings, white ground.
@@ -95,7 +98,7 @@ You still need a Supabase project — the steps below take about ten minutes.
 ## 1. Create the Supabase project
 
 1. Go to <https://supabase.com/dashboard> and click **New project**.
-2. Give it a name (e.g. `findfoodae`), set a database password, and pick a region
+2. Give it a name (e.g. `snipsavor`), set a database password, and pick a region
    close to your users — **Central EU (Frankfurt)** or **Asia (Singapore)** are
    both reasonable for Dubai.
 3. Wait for provisioning to finish (a minute or two).
@@ -228,7 +231,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # Optional — leave blank and the dashboard falls back to "Copy email message"
 RESEND_API_KEY=
-EMAIL_FROM=FindFoodae <results@yourdomain.com>
+EMAIL_FROM=SnipSavor <results@yourdomain.com>
 
 # Optional — leave blank and the confirm step starts empty instead of pre-filled
 ANTHROPIC_API_KEY=
@@ -449,7 +452,7 @@ non-admin sessions, and an admin cannot grant admin rights from inside the app.
    **Continue**.
 6. Enter a WhatsApp number → **Continue**.
 7. Review, then **Get a Keeta price**.
-8. You land on the success screen with a reference like `FFA-260910-0042`.
+8. You land on the success screen with a reference like `K7M2PQ`.
 
 **Admin:**
 
@@ -676,7 +679,7 @@ images will not break old submissions.
 
 ## Design notes
 
-The customer screens follow the FindFoodae mockup: numbered upload slots with
+The customer screens follow the SnipSavor mockup: numbered upload slots with
 Uploaded / Optional state, a "Delivery area in Dubai" type-ahead, a review that
 ends in a golden "Can Keeta beat AED X?" panel, and a yellow celebration on the
 confirmation screen. The admin's verdict card is the same "Keeta beats the
@@ -727,5 +730,5 @@ market outside Dubai.
 
 ---
 
-FindFoodae is an independent comparison service and is not affiliated with
+SnipSavor is an independent comparison service and is not affiliated with
 Talabat, Keeta, Careem, Deliveroo or Noon Food.

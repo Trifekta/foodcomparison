@@ -4,6 +4,7 @@ import { absoluteUrl, getAdminAlertEmail } from "@/lib/env";
 import { getEmailProvider } from "./resend";
 import { isTelegramConfigured, sendTelegramMessage } from "./telegram";
 import { formatDecimalStringAsCurrency } from "@/lib/calculations/money";
+import { BRAND_NAME } from "@/lib/constants";
 
 /**
  * Telling the admin a price check has arrived.
@@ -96,7 +97,7 @@ export function alertChannels(): string[] {
 export async function sendTestAdminAlert(): Promise<boolean> {
   const link = absoluteUrl("/admin");
   const body = [
-    "Test alert from FindFoodae.",
+    `Test alert from ${BRAND_NAME}.`,
     "",
     "If you can read this, a new price check will reach you the same way.",
     ...(link ? ["", link] : []),
@@ -112,7 +113,7 @@ export async function sendTestAdminAlert(): Promise<boolean> {
     if (provider.configured) {
       const outcome = await provider.send({
         to: email,
-        subject: "Test alert from FindFoodae",
+        subject: `Test alert from ${BRAND_NAME}`,
         body,
         reference: "test",
       });

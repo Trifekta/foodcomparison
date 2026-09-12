@@ -4,14 +4,22 @@
  */
 
 /**
- * The wordmark is "FindFoodae" set as FindFood + ae, where "ae" is the UAE
- * country code rendered as "UAE". Keep the two halves separate so the lockup
- * can be styled consistently wherever it appears.
+ * The wordmark is "SnipSavor", set as two halves: "Snip" plain and "Savor"
+ * carrying the golden rule.
+ *
+ * The halves are named rather than sliced out of the whole. The lockup used to
+ * cut the brand name at the fourth character, which worked only for the one
+ * name it was written for - and a brand name is exactly the kind of thing that
+ * changes. Spelling the two parts out means the next change is this file alone.
+ *
+ * BRAND_NAME must stay the concatenation of the two: it is the accessible name
+ * of the lockup, so a mismatch is a screen reader saying something the screen
+ * does not.
  */
-export const BRAND_NAME = "FindFoodae";
-export const PRODUCT_NAME = "FindFoodae";
-export const WORDMARK_PRIMARY = "FindFood";
-export const WORDMARK_SUFFIX = "UAE";
+export const BRAND_NAME = "SnipSavor";
+export const PRODUCT_NAME = "SnipSavor";
+export const WORDMARK_PRIMARY = "Snip";
+export const WORDMARK_ACCENT = "Savor";
 
 /** Phase 1 launches in Dubai only. */
 export const LAUNCH_CITY = "Dubai";

@@ -27,12 +27,12 @@ export function TickBadge({ className }: Art) {
   return (
     <Frame className={className} viewBox="0 0 120 120">
       <defs>
-        <linearGradient id="ffa-tick" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id="brand-tick" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#ffe066" />
           <stop offset="1" stopColor="#f5bf12" />
         </linearGradient>
       </defs>
-      <circle cx="60" cy="60" r="46" fill="url(#ffa-tick)" />
+      <circle cx="60" cy="60" r="46" fill="url(#brand-tick)" />
       <path
         d="m38 62 15 15 30-34"
         fill="none"

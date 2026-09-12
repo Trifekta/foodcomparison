@@ -17,7 +17,7 @@ let alertEmail: string | null = "admin@example.com";
 let emailConfigured = true;
 
 vi.mock("@/lib/env", () => ({
-  absoluteUrl: (path: string) => `https://findfoodae.example${path}`,
+  absoluteUrl: (path: string) => `https://snipsavor.example${path}`,
   getAdminAlertEmail: () => alertEmail,
 }));
 
@@ -71,7 +71,7 @@ describe("alertAdminOfNewSubmission", () => {
     expect(message).toContain("Dubai Marina");
     expect(message).toContain("90.90");
     expect(message).toContain("cart + checkout");
-    expect(message).toContain("https://findfoodae.example/admin");
+    expect(message).toContain("https://snipsavor.example/admin");
   });
 
   it("carries nothing about the customer to a third party", async () => {

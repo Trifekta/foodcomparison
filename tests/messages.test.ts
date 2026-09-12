@@ -23,7 +23,7 @@ describe("buildResultMessage", () => {
     expect(result.message).toContain("AED 19.00");
     expect(result.message).toContain("That's about 23% less.");
     expect(result.message).toContain("Prices and promotions can change");
-    expect(result.message.trimEnd().endsWith("— FindFoodae")).toBe(true);
+    expect(result.message.trimEnd().endsWith("— SnipSavor")).toBe(true);
   });
 
   it("never claims a guaranteed saving", () => {
@@ -144,9 +144,9 @@ describe("the result link in a message", () => {
   it("sends the customer back to their own result page", () => {
     const { message } = buildResultMessage({
       ...base,
-      resultUrl: "https://findfoodae.example/r/0123456789abcdef0123456789abcdef",
+      resultUrl: "https://snipsavor.example/r/0123456789abcdef0123456789abcdef",
     });
-    expect(message).toContain("https://findfoodae.example/r/0123456789abcdef0123456789abcdef");
+    expect(message).toContain("https://snipsavor.example/r/0123456789abcdef0123456789abcdef");
   });
 
   it("reads perfectly well without one", () => {
@@ -185,7 +185,7 @@ describe("buildUnavailableMessage", () => {
   it("carries the result link when there is one", () => {
     const message = buildUnavailableMessage({
       restaurantName: "ALBAIK",
-      resultUrl: "https://findfoodae.example/r/0123456789abcdef0123456789abcdef",
+      resultUrl: "https://snipsavor.example/r/0123456789abcdef0123456789abcdef",
     });
     expect(message).toContain("/r/0123456789abcdef0123456789abcdef");
   });

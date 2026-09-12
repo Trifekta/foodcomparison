@@ -1,4 +1,4 @@
-# FindFood UAE visual assets
+# SnipSavor visual assets
 
 Standalone AI-generated renders, transparent PNG, no UI chrome in the pixels.
 
