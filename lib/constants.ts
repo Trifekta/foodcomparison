@@ -34,6 +34,15 @@ export const WORDMARK_ACCENT = "Savor";
  * anyway. This is the cheapest conversion there is.
  */
 export const RESULT_PROMISE_MINUTES = 5;
+
+/**
+ * How long a submission may sit unopened before somebody is reminded.
+ *
+ * Twice the promise. Chasing at five would fire while the admin is already
+ * rebuilding the basket, which teaches them to ignore it; ten means the
+ * reminder only ever arrives when the promise is genuinely at risk.
+ */
+export const UNANSWERED_AFTER_MINUTES = 10;
 export const RESULT_PROMISE = `under ${RESULT_PROMISE_MINUTES} minutes`;
 
 /** Phase 1 launches in Dubai only. */
