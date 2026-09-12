@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { getAnalyticsRows, getFunnelRows } from "@/lib/admin/queries";
 import { computeFunnel } from "@/lib/analytics/funnel";
 import { FunnelChart } from "@/components/admin/FunnelChart";
+import { ReportRange } from "@/components/admin/ReportRange";
+import { parseDateRange } from "@/lib/admin/filters";
 import { computeValidationMetrics, type CountByLabel } from "@/lib/calculations/analytics";
 import { formatMinorAsCurrency } from "@/lib/calculations/money";
 
@@ -61,12 +64,22 @@ function BreakdownList({
   );
 }
 
-export default async function AdminAnalyticsPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function AdminAnalyticsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  // The report route reads the range through the same parser, so the file and
+  // the screen can never cover different dates.
+  const range = parseDateRange(await searchParams);
+
   const [rows, funnelRows] = await Promise.all([
-    getAnalyticsRows(),
+    getAnalyticsRows(5000, range),
     // The funnel is new; a database that has not run 0009 must not take the
     // whole page down over it.
-    getFunnelRows().catch(() => []),
+    getFunnelRows(30, 20000, range).catch(() => []),
   ]);
   const metrics = computeValidationMetrics(rows);
   const funnel = computeFunnel(funnelRows);
@@ -82,6 +95,10 @@ export default async function AdminAnalyticsPage() {
           saves money, and by how much.
         </p>
       </div>
+
+      <Suspense fallback={<div className="h-20 rounded-2xl border border-ink-200 bg-white" />}>
+        <ReportRange />
+      </Suspense>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Metric label="Total submissions" value={String(metrics.totalSubmissions)} />

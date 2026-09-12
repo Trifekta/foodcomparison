@@ -1,10 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildReportCsv,
   buildSubmissionsCsv,
   formatDubaiTimestamp,
+  reportCsvFilename,
   submissionsCsvFilename,
 } from "@/lib/admin/export";
-import { parseSubmissionFilters, filtersToQueryString } from "@/lib/admin/filters";
+import {
+  filtersToQueryString,
+  parseDateRange,
+  parseSubmissionFilters,
+  rangeToQueryString,
+} from "@/lib/admin/filters";
+import { rangeToInstants } from "@/lib/admin/queries";
+import { computeValidationMetrics } from "@/lib/calculations/analytics";
+import { computeFunnel } from "@/lib/analytics/funnel";
 import type { SubmissionListRow } from "@/lib/admin/queries";
 
 function row(overrides: Partial<SubmissionListRow> = {}): SubmissionListRow {
@@ -147,5 +157,96 @@ describe("the filters the table and the export share", () => {
 
   it("leaves the defaults out of the query string", () => {
     expect(filtersToQueryString(parseSubmissionFilters({}))).toBe("");
+  });
+});
+
+describe("the report, and the range it covers", () => {
+  const metrics = computeValidationMetrics([
+    {
+      status: "result_sent",
+      source_app: "Talabat",
+      current_total: "85.69",
+      comparison_total: "73.00",
+      saving_amount: "12.69",
+      restaurant_name: "Al Safadi",
+      unavailable_reason: null,
+      areas: { name: "Al Karama" },
+    },
+  ]);
+
+  const funnel = computeFunnel([
+    { event: "landing_viewed", visit_id: "a" },
+    { event: "landing_viewed", visit_id: "b" },
+    { event: "wizard_started", visit_id: "a" },
+  ]);
+
+  it("says what range it covers, because a forwarded report without one is wrong", () => {
+    expect(buildReportCsv(metrics, funnel, { from: "2026-09-01", to: "2026-09-12" })).toContain(
+      '"2026-09-01 to 2026-09-12"',
+    );
+    expect(buildReportCsv(metrics, funnel, {})).toContain('"All time"');
+  });
+
+  it("carries the headline numbers and the funnel in one file", () => {
+    const csv = buildReportCsv(metrics, funnel, {});
+    expect(csv).toContain('"Submissions","1"');
+    expect(csv).toContain('"Customer funnel (counted by visit, not by person)"');
+    expect(csv).toContain('"Landed from the advert","2"');
+    // Half of the people who landed went on to open the wizard.
+    expect(csv).toContain('"Opened the wizard","1","50.0%","50.0%"');
+  });
+
+  it("keeps the spreadsheet defences the submissions export has", () => {
+    const csv = buildReportCsv(metrics, funnel, {});
+    expect(csv).toMatch(/^﻿/);
+    expect(csv).toContain('"Al Karama","1"');
+  });
+
+  it("names the file after the range", () => {
+    expect(reportCsvFilename({ from: "2026-09-01", to: "2026-09-12" })).toBe(
+      "snipsavor-report-2026-09-01-to-2026-09-12.csv",
+    );
+    expect(reportCsvFilename({}, new Date("2026-09-11T21:30:00Z"))).toBe(
+      "snipsavor-report-all-time-2026-09-12.csv",
+    );
+  });
+});
+
+describe("reading a date range off the URL", () => {
+  it("takes a pair of calendar dates", () => {
+    expect(parseDateRange({ from: "2026-09-01", to: "2026-09-12" })).toEqual({
+      from: "2026-09-01",
+      to: "2026-09-12",
+    });
+  });
+
+  it("drops anything that is not a date, rather than sending it to Postgres", () => {
+    expect(parseDateRange({ from: "last tuesday", to: "2026-09-12" })).toEqual({
+      to: "2026-09-12",
+    });
+    expect(parseDateRange({})).toEqual({});
+  });
+
+  /** Typing them the wrong way round should not silently produce nothing. */
+  it("swaps a backwards range into the one they meant", () => {
+    expect(parseDateRange({ from: "2026-09-12", to: "2026-09-01" })).toEqual({
+      from: "2026-09-01",
+      to: "2026-09-12",
+    });
+  });
+
+  it("turns a range into the same two parameters the page uses", () => {
+    expect(rangeToQueryString({ from: "2026-09-01", to: "2026-09-12" })).toBe(
+      "from=2026-09-01&to=2026-09-12",
+    );
+    expect(rangeToQueryString({})).toBe("");
+  });
+
+  /** Dubai is UTC+4, so a day has to start and end four hours early in UTC. */
+  it("bounds a day in Dubai time, not UTC", () => {
+    expect(rangeToInstants({ from: "2026-09-01", to: "2026-09-01" })).toEqual({
+      since: "2026-09-01T00:00:00+04:00",
+      until: "2026-09-01T23:59:59+04:00",
+    });
   });
 });

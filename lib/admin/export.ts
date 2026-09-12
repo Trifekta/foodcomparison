@@ -1,5 +1,7 @@
-import type { SubmissionListRow } from "./queries";
-import { formatDecimalStringAsCurrency } from "@/lib/calculations/money";
+import type { SubmissionListRow, DateRange } from "./queries";
+import type { ValidationMetrics } from "@/lib/calculations/analytics";
+import type { FunnelStepCount } from "@/lib/analytics/funnel";
+import { formatDecimalStringAsCurrency, formatMinorAsCurrency } from "@/lib/calculations/money";
 import { STATUS_LABELS } from "@/lib/utils/status";
 
 /**
@@ -108,4 +110,94 @@ export function submissionsCsvFilename(now = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   const stamp = `${dubai.getUTCFullYear()}-${pad(dubai.getUTCMonth() + 1)}-${pad(dubai.getUTCDate())}`;
   return `snipsavor-submissions-${stamp}.csv`;
+}
+
+
+/**
+ * The Validation page as a file.
+ *
+ * One CSV with labelled sections rather than several files. A spreadsheet has
+ * no idea what a section is, but a person opening it does - and "one download"
+ * is what was asked for. Each block keeps its own header row so the columns
+ * underneath it still mean something.
+ *
+ * The range is printed at the top. A report that does not say what it covers
+ * becomes wrong the moment it is forwarded.
+ */
+export function buildReportCsv(
+  metrics: ValidationMetrics,
+  funnel: FunnelStepCount[],
+  range: DateRange,
+): string {
+  const rows: string[][] = [];
+  const blank = () => rows.push([""]);
+
+  rows.push(["SnipSavor report"]);
+  rows.push([
+    "Range",
+    range.from || range.to
+      ? `${range.from ?? "the beginning"} to ${range.to ?? "today"}`
+      : "All time",
+  ]);
+  rows.push(["Generated (Dubai)", formatDubaiTimestamp(new Date().toISOString())]);
+  blank();
+
+  rows.push(["Headline"]);
+  rows.push(["Metric", "Value"]);
+  rows.push(["Submissions", String(metrics.totalSubmissions)]);
+  rows.push(["Comparisons completed", String(metrics.completedComparisons)]);
+  rows.push(["Saving found", String(metrics.savingFoundCount)]);
+  rows.push(["Saving found %", `${metrics.savingFoundPercentage.toFixed(1)}%`]);
+  rows.push(["No saving %", `${metrics.noSavingPercentage.toFixed(1)}%`]);
+  rows.push(["Average saving", formatMinorAsCurrency(metrics.averageSavingMinor)]);
+  rows.push(["Average saving %", `${metrics.averageSavingPercentage.toFixed(1)}%`]);
+  rows.push(["Couldn't compare", String(metrics.unavailableCount)]);
+  rows.push(["Couldn't compare %", `${metrics.unavailablePercentage.toFixed(1)}%`]);
+  blank();
+
+  // The funnel is the reason the range exists, so it comes before the slices.
+  rows.push(["Customer funnel (counted by visit, not by person)"]);
+  rows.push(["Step", "Visits", "Share of first step %", "Drop from previous %"]);
+  for (const step of funnel) {
+    rows.push([
+      step.label,
+      String(step.count),
+      `${step.shareOfStart.toFixed(1)}%`,
+      `${step.dropFromPrevious.toFixed(1)}%`,
+    ]);
+  }
+  blank();
+
+  const section = (title: string, header: string, counts: { label: string; count: number }[]) => {
+    rows.push([title]);
+    rows.push([header, "Submissions"]);
+    if (counts.length === 0) rows.push(["(none)", "0"]);
+    for (const entry of counts) rows.push([entry.label, String(entry.count)]);
+    blank();
+  };
+
+  section("By area", "Area", metrics.byArea);
+  section("By app the order came from", "App", metrics.bySourceApp);
+  section("Why we couldn't compare", "Reason", metrics.unavailableByReason);
+  section("Restaurants not on the comparison app", "Restaurant", metrics.unavailableRestaurants);
+
+  rows.push(["Saving distribution"]);
+  rows.push(["Band", "Comparisons"]);
+  for (const bucket of metrics.savingDistribution) {
+    rows.push([bucket.label, String(bucket.count)]);
+  }
+
+  const body = rows.map((cells) => cells.map(field).join(",")).join("\r\n");
+  return `\ufeff${body}\r\n`;
+}
+
+/** Names the file by the range it covers, so downloads do not collide. */
+export function reportCsvFilename(range: DateRange, now = new Date()): string {
+  if (range.from || range.to) {
+    return `snipsavor-report-${range.from ?? "start"}-to-${range.to ?? "today"}.csv`;
+  }
+  const dubai = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const stamp = `${dubai.getUTCFullYear()}-${pad(dubai.getUTCMonth() + 1)}-${pad(dubai.getUTCDate())}`;
+  return `snipsavor-report-all-time-${stamp}.csv`;
 }

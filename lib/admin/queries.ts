@@ -242,8 +242,33 @@ export async function getSignedImageUrl(path: string | null): Promise<string | n
  * single small query, and keeping the maths in TypeScript means the same
  * functions are unit-tested. Move it into a database view if volume grows.
  */
-export async function getAnalyticsRows(limit = 5000): Promise<AnalyticsRow[]> {
+export interface DateRange {
+  /** Inclusive, as YYYY-MM-DD. Undefined means "no bound on this side". */
+  from?: string;
+  to?: string;
+}
+
+/**
+ * Turns a YYYY-MM-DD range into the instants either side of it, in Dubai time.
+ *
+ * A report for "1 September" has to mean the day the person asking lived
+ * through, not the UTC day - a submission at 1am Dubai on the 2nd is 9pm UTC on
+ * the 1st, and putting it in the wrong day makes a daily report disagree with
+ * the dashboard it was downloaded from.
+ */
+export function rangeToInstants(range: DateRange): { since?: string; until?: string } {
+  return {
+    since: range.from ? `${range.from}T00:00:00+04:00` : undefined,
+    until: range.to ? `${range.to}T23:59:59+04:00` : undefined,
+  };
+}
+
+export async function getAnalyticsRows(
+  limit = 5000,
+  range: DateRange = {},
+): Promise<AnalyticsRow[]> {
   const supabase = await createServerSupabaseClient();
+  const { since, until } = rangeToInstants(range);
 
   // Archived rows are excluded on purpose. These are the numbers that decide
   // whether the business works, and a test submission or a duplicate counted
@@ -256,7 +281,9 @@ export async function getAnalyticsRows(limit = 5000): Promise<AnalyticsRow[]> {
     )
     .is("archived_at", null)
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .limit(limit)
+    .gte("created_at", since ?? "1970-01-01T00:00:00Z")
+    .lte("created_at", until ?? "2999-12-31T23:59:59Z");
 
   if (error) throw new Error(`Could not load analytics: ${error.message}`);
   return ((data ?? []) as unknown as AnalyticsRow[]).map(withAmountStrings);
@@ -270,14 +297,22 @@ export async function getAnalyticsRows(limit = 5000): Promise<AnalyticsRow[]> {
  * rows is nothing. The window keeps it that way: a funnel is a question about
  * now, and a run from three months ago answers nothing about this week's ad.
  */
-export async function getFunnelRows(days = 30, limit = 20000): Promise<FunnelRow[]> {
+export async function getFunnelRows(
+  days = 30,
+  limit = 20000,
+  range: DateRange = {},
+): Promise<FunnelRow[]> {
   const supabase = await createServerSupabaseClient();
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  // An explicit range wins; the rolling window is only the default view.
+  const bounds = rangeToInstants(range);
+  const since =
+    bounds.since ?? new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
     .from("funnel_events")
     .select("event, visit_id")
     .gte("created_at", since)
+    .lte("created_at", bounds.until ?? "2999-12-31T23:59:59Z")
     .order("created_at", { ascending: false })
     .limit(limit);
 

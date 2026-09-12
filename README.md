@@ -750,6 +750,13 @@ dashboard or the submission's own page.
   knows nothing about the bucket, so deleting the row first would strand a cart
   photo holding somebody's name and address. If the images cannot be deleted,
   nothing is.
+- **Report** downloads the Validation page as CSV, through `/admin/report`, for
+  whatever date range the picker on that page is set to — headline numbers, the
+  funnel, and the breakdowns by area, app and reason, in one file. The page and
+  the route read the range through the same parser, so the file and the screen
+  can never cover different dates. Days are bounded in **Dubai** time: a
+  submission at 1am Dubai on the 2nd is 9pm UTC on the 1st, and a daily report
+  that put it in the wrong day would disagree with the dashboard it came from.
 - **Export** downloads the list as CSV, through `/admin/export`. It reads the
   same query string the dashboard does, via `lib/admin/filters.ts`, so the file
   holds exactly the rows on screen — up to 5000 rather than the table's 100,
