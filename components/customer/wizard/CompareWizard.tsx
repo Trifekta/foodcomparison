@@ -13,6 +13,8 @@ import {
   whereStepSchema,
 } from "@/lib/validation/submission";
 import { rememberLastOrder } from "@/lib/utils/last-order";
+import { track } from "@/lib/analytics/track";
+import type { FunnelEvent } from "@/lib/analytics/funnel";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
 import { StepBasket } from "./StepBasket";
@@ -218,8 +220,24 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     })();
   };
 
+  /**
+   * Which step is which, for counting.
+   *
+   * Recorded on arrival rather than on the tap that caused it, so a customer
+   * who goes back and comes forward again is not counted as having got further
+   * than they did - the dashboard counts distinct visits per step, and this
+   * only has to name the step honestly.
+   */
+  const STEP_EVENTS: Record<number, FunnelEvent> = {
+    [STEP_BASKET]: "step_basket",
+    [STEP_WHERE]: "step_where",
+    [STEP_REVIEW]: "step_review",
+  };
+
   const goTo = (next: number) => {
     setStep(next);
+    const event = STEP_EVENTS[next];
+    if (event) track(event);
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
 
@@ -308,6 +326,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       if (payload.referenceNumber) {
         rememberLastOrder(payload.referenceNumber, payload.resultPath);
       }
+      track("submitted");
 
       // Straight to their own result page, which starts out saying we are
       // checking and turns into the answer without them doing anything.

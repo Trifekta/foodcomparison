@@ -11,6 +11,7 @@ import { TickBadge } from "@/components/customer/FoodArt";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { BrandTagline, ScriptBubble, ScriptNote, SkylineFooter, Sparks } from "@/components/customer/Motifs";
 import { Wordmark } from "@/components/customer/Wordmark";
+import { track } from "@/lib/analytics/track";
 import type { PublicResult } from "@/lib/submissions/result";
 
 /**
@@ -36,6 +37,12 @@ const GIVE_UP_AFTER_MS = 30 * 60_000;
 
 export function ResultView({ initial, token }: { initial: PublicResult; token: string }) {
   const [result, setResult] = useState(initial);
+
+  // Counted against the submission, not the visit: this page is usually opened
+  // from a message, hours later, on a browser that has never seen the wizard.
+  useEffect(() => {
+    track("result_viewed", token);
+  }, [token]);
   // Set on the first tick rather than during render: reading the clock while
   // rendering makes the component's output depend on when React happened to
   // call it.
@@ -98,7 +105,7 @@ export function ResultView({ initial, token }: { initial: PublicResult; token: s
       {result.state === "checking" ? (
         <Checking reference={result.referenceNumber} stalled={stalled} onRetry={() => void refresh()} />
       ) : null}
-      {result.state === "saving" ? <Saving result={result} /> : null}
+      {result.state === "saving" ? <Saving result={result} token={token} /> : null}
       {result.state === "no_saving" ? <NoSaving result={result} /> : null}
       {result.state === "unavailable" ? <Unavailable result={result} /> : null}
       {result.state === "cancelled" ? <Cancelled reference={result.referenceNumber} /> : null}
@@ -241,7 +248,7 @@ function PriceRows({ result }: { result: PublicResult }) {
   );
 }
 
-function Saving({ result }: { result: PublicResult }) {
+function Saving({ result, token }: { result: PublicResult; token: string }) {
   const saving = formatDecimalStringAsCurrency(result.savingAmount);
 
   return (
@@ -316,6 +323,7 @@ function Saving({ result }: { result: PublicResult }) {
             href={result.comparisonUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => track("keeta_opened", token)}
             className="relative inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-brand-400 px-6 text-base font-bold text-ink-900 shadow-sm hover:bg-brand-300"
           >
             Open on {result.comparisonApp}

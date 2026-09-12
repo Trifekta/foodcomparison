@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import { getAnalyticsRows } from "@/lib/admin/queries";
+import { getAnalyticsRows, getFunnelRows } from "@/lib/admin/queries";
+import { computeFunnel } from "@/lib/analytics/funnel";
+import { FunnelChart } from "@/components/admin/FunnelChart";
 import { computeValidationMetrics, type CountByLabel } from "@/lib/calculations/analytics";
 import { formatMinorAsCurrency } from "@/lib/calculations/money";
 
@@ -60,8 +62,14 @@ function BreakdownList({
 }
 
 export default async function AdminAnalyticsPage() {
-  const rows = await getAnalyticsRows();
+  const [rows, funnelRows] = await Promise.all([
+    getAnalyticsRows(),
+    // The funnel is new; a database that has not run 0009 must not take the
+    // whole page down over it.
+    getFunnelRows().catch(() => []),
+  ]);
   const metrics = computeValidationMetrics(rows);
+  const funnel = computeFunnel(funnelRows);
 
   const savingTotal = metrics.savingDistribution.reduce((sum, bucket) => sum + bucket.count, 0);
 
@@ -147,6 +155,8 @@ export default async function AdminAnalyticsPage() {
           ))}
         </ul>
       </section>
+
+      <FunnelChart steps={funnel} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <BreakdownList

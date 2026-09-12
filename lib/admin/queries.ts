@@ -3,6 +3,7 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { SIGNED_URL_TTL_SECONDS, STORAGE_BUCKET } from "@/lib/constants";
 import type { AnalyticsRow } from "@/lib/calculations/analytics";
+import type { FunnelRow } from "@/lib/analytics/funnel";
 import { withAmountStrings } from "@/lib/calculations/money";
 import type {
   AreaRow,
@@ -234,4 +235,27 @@ export async function getAnalyticsRows(limit = 5000): Promise<AnalyticsRow[]> {
 
   if (error) throw new Error(`Could not load analytics: ${error.message}`);
   return ((data ?? []) as unknown as AnalyticsRow[]).map(withAmountStrings);
+}
+
+/**
+ * The funnel rows, for the dashboard to count.
+ *
+ * Counted in JS rather than in SQL because the honest measure is distinct
+ * visits per step, PostgREST has no way to express that, and a pilot's worth of
+ * rows is nothing. The window keeps it that way: a funnel is a question about
+ * now, and a run from three months ago answers nothing about this week's ad.
+ */
+export async function getFunnelRows(days = 30, limit = 20000): Promise<FunnelRow[]> {
+  const supabase = await createServerSupabaseClient();
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from("funnel_events")
+    .select("event, visit_id")
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(`Could not load the funnel: ${error.message}`);
+  return (data ?? []) as unknown as FunnelRow[];
 }

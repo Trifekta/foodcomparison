@@ -6,6 +6,7 @@ import { ImageUpload } from "@/components/forms/ImageUpload";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
 import { LastOrderBanner } from "@/components/customer/LastOrderBanner";
+import { track } from "@/lib/analytics/track";
 
 interface StepUploadProps {
   cartFile: File | null;
@@ -43,6 +44,12 @@ export function StepUpload({
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // The top of the funnel. Recorded once when this screen first appears, which
+  // is the only moment that means "somebody arrived".
+  useEffect(() => {
+    track("wizard_started");
   }, []);
 
   return (
