@@ -52,6 +52,12 @@ const OTHER_PROBES: { file: string; table: string; column: string; breaks: strin
     column: "area_id",
     breaks: "the per-area funnel on the Validation page and in the report",
   },
+  {
+    file: "0012_push_subscriptions.sql",
+    table: "push_subscriptions",
+    column: "endpoint",
+    breaks: "browser notifications for customers and admins",
+  },
 ];
 
 export interface SchemaGap {
@@ -80,11 +86,19 @@ export async function findMissingMigrations(): Promise<SchemaGap[]> {
       // A missing TABLE is a different migration's problem - 0009 creates
       // funnel_events - so only a missing column is reported here, or a
       // database without the funnel at all would be told to run the wrong file.
-      const missingColumn =
+      // 0011 adds a column to a table another migration creates, so a missing
+      // TABLE there is 0009's problem and must not be reported as 0011's. 0012
+      // creates its own table, so for that one a missing table IS the gap.
+      const createsOwnTable = probe.table === "push_subscriptions";
+      const missing =
         error !== null &&
-        /column|schema cache/i.test(error.message) &&
-        !/relation .* does not exist/i.test(error.message);
-      return missingColumn
+        (createsOwnTable
+          ? /column|schema cache|relation .* does not exist|could not find the table/i.test(
+              error.message,
+            )
+          : /column|schema cache/i.test(error.message) &&
+            !/relation .* does not exist/i.test(error.message));
+      return missing
         ? { file: probe.file, breaks: probe.breaks, detail: error.message }
         : null;
     }),

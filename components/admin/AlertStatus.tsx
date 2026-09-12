@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Bell, BellOff, CheckCircle2 } from "lucide-react";
 import { sendTestAlert } from "@/lib/admin/actions";
+import { AdminPushToggle } from "@/components/admin/AdminPushToggle";
 
 /**
  * Whether anybody will be told when an order arrives.
@@ -12,7 +13,14 @@ import { sendTestAlert } from "@/lib/admin/actions";
  * hand, and an alert that quietly stopped working looks exactly like a quiet
  * day. One tap answers it.
  */
-export function AlertStatus({ channels }: { channels: string[] }) {
+export function AlertStatus({
+  channels,
+  pushPublicKey,
+}: {
+  channels: string[];
+  /** Null when push is not configured on the server. */
+  pushPublicKey?: string | null;
+}) {
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -64,6 +72,16 @@ export function AlertStatus({ channels }: { channels: string[] }) {
           {pending ? "Sending…" : "Send a test"}
         </button>
       </div>
+
+      {/* This device, on the browser's own notifications. It belongs here
+          rather than in a settings page, beside the other answer to "will
+          anybody be told" - but on its own line, so it never competes with the
+          warning above it. */}
+      {pushPublicKey ? (
+        <div className="mt-3 border-t border-ink-100 pt-3">
+          <AdminPushToggle publicKey={pushPublicKey} />
+        </div>
+      ) : null}
 
       {feedback ? (
         <p

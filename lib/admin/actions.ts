@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminClient as createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getAdminSession, requireAdmin } from "@/lib/supabase/auth";
 import {
   areaInputSchema,
@@ -18,15 +19,17 @@ import {
   sourceAppLabel,
 } from "@/lib/notifications/messages";
 import { alertChannels, sendTestAdminAlert } from "@/lib/notifications/admin-alert";
+import { pushToCustomer } from "@/lib/push/send";
 import { getEmailProvider } from "@/lib/notifications/resend";
 import { sanitiseMultiline, sanitiseText } from "@/lib/utils/text";
 import { normalisePhone } from "@/lib/utils/phone";
 import {
+  COMPARISON_APP,
   MAX_RESTAURANT_NAME_LENGTH,
   STORAGE_BUCKET,
   UNKNOWN_SOURCE_APP,
 } from "@/lib/constants";
-import { absoluteUrl } from "@/lib/env";
+import { absoluteUrl, getWebPushConfig } from "@/lib/env";
 import { resultPath } from "@/lib/utils/reference";
 import {
   formatMinorToDecimalString,
@@ -108,6 +111,36 @@ async function recordEvent(input: {
     metadata: input.metadata ?? null,
     created_by: input.actorId,
   });
+}
+
+/**
+ * Tell the customer their answer is ready.
+ *
+ * One sentence for every outcome - a saving, no saving, or a basket nobody
+ * could price. The notification is shown on a lock screen and stored by a push
+ * service on the way, so it carries no amount, no restaurant and nothing about
+ * the person: the number lives behind the token in the link, which is the only
+ * place it is safe.
+ *
+ * Never throws. Every caller has already saved the thing that matters.
+ */
+async function notifyCustomerResultReady(
+  submissionId: string,
+  resultToken: string,
+): Promise<void> {
+  try {
+    await pushToCustomer(submissionId, {
+      title: "Your SnipSavor result is ready 🎉",
+      body: `We checked your basket on ${COMPARISON_APP}. Tap to see the result.`,
+      url: resultPath(resultToken),
+      // Replaces rather than stacks, so a correction later does not leave two.
+      tag: `result-${submissionId}`,
+    });
+  } catch (error) {
+    console.error("[push] could not notify the customer", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 async function loadSubmission(id: string) {
@@ -248,6 +281,12 @@ export async function saveComparison(formData: FormData): Promise<ActionResult> 
 
     if (error) return { ok: false, message: "Could not save the comparison." };
 
+    // Last, and unable to fail the save: the comparison is already written, the
+    // result page already shows it, and a push that does not go out costs a
+    // notification rather than the work. Awaited only so its own errors are
+    // logged rather than lost to an unhandled rejection.
+    await notifyCustomerResultReady(parsed.data.submissionId, submission.result_token);
+
     await recordEvent({
       submissionId: parsed.data.submissionId,
       eventType: "comparison_added",
@@ -323,6 +362,10 @@ export async function markUnavailable(formData: FormData): Promise<ActionResult>
       .eq("id", parsed.data.submissionId);
 
     if (error) return { ok: false, message: "Could not save the outcome." };
+
+    // "We could not compare this one" is an answer too, and the customer has
+    // been waiting for it exactly as long.
+    await notifyCustomerResultReady(parsed.data.submissionId, submission.result_token);
 
     await recordEvent({
       submissionId: parsed.data.submissionId,
@@ -806,6 +849,76 @@ export async function deleteSubmission(submissionId: string): Promise<ActionResu
 
     revalidatePath("/admin");
     revalidatePath("/admin/analytics");
+    return { ok: true };
+  });
+}
+
+/**
+ * Register this admin browser for new-submission notifications.
+ *
+ * A server action rather than a route, so the admin check is the same one every
+ * other write here uses. The row is written with the service role because the
+ * table has no insert policy on purpose: the account a subscription belongs to
+ * is decided here, from the session, never from anything the browser sends.
+ *
+ * Keyed on the endpoint, so one person with a phone and a laptop is two rows
+ * and both are notified. Nothing assumes a single admin or a single device.
+ */
+export async function subscribeAdminPush(input: {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}): Promise<ActionResult> {
+  const { user } = await requireAdmin();
+  return reported(async () => {
+    if (!getWebPushConfig()) {
+      return { ok: false, message: "Push notifications are not configured on the server." };
+    }
+
+    if (
+      !/^https:\/\/\S+$/.test(input.endpoint) ||
+      !/^[A-Za-z0-9_-]{16,200}$/.test(input.p256dh) ||
+      !/^[A-Za-z0-9_-]{16,200}$/.test(input.auth)
+    ) {
+      return { ok: false, message: "That subscription is not usable." };
+    }
+
+    const { error } = await createAdminSupabaseClient()
+      .from("push_subscriptions")
+      .upsert(
+        {
+          kind: "admin",
+          endpoint: input.endpoint,
+          p256dh: input.p256dh,
+          auth: input.auth,
+          admin_id: user.id,
+          submission_id: null,
+          failure_count: 0,
+        },
+        { onConflict: "endpoint" },
+      );
+
+    if (error) return { ok: false, message: `Could not save the subscription: ${error.message}` };
+
+    revalidatePath("/admin");
+    return { ok: true };
+  });
+}
+
+/** Stop notifying this browser. Scoped to the signed-in admin by RLS. */
+export async function unsubscribeAdminPush(endpoint: string): Promise<ActionResult> {
+  const { user } = await requireAdmin();
+  return reported(async () => {
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase
+      .from("push_subscriptions")
+      .delete()
+      .eq("endpoint", endpoint)
+      .eq("admin_id", user.id);
+
+    if (error) return { ok: false, message: `Could not turn them off: ${error.message}` };
+
+    revalidatePath("/admin");
     return { ok: true };
   });
 }
