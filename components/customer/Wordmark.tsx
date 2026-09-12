@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils/cn";
 const SCALE = {
   sm: {
     text: "text-base",
-    frame: "px-1.5 py-0.5",
+    frame: "px-1 py-0",
     arm: "h-1.5 w-1.5",
     spark: "h-2.5 w-2.5",
     corners: {
@@ -44,7 +44,7 @@ const SCALE = {
   },
   md: {
     text: "text-xl",
-    frame: "px-2 py-1",
+    frame: "px-1.5 py-0",
     arm: "h-2 w-2",
     spark: "h-3.5 w-3.5",
     corners: {
@@ -56,7 +56,7 @@ const SCALE = {
   },
   lg: {
     text: "text-2xl",
-    frame: "px-2.5 py-1.5",
+    frame: "px-2 py-0.5",
     arm: "h-2.5 w-2.5",
     spark: "h-4 w-4",
     corners: {
@@ -102,7 +102,7 @@ export function Wordmark({
         {WORDMARK_PRIMARY}
       </span>
 
-      <span aria-hidden="true" className={cn(scale.text, "text-brand-600")}>
+      <span aria-hidden="true" className={cn(scale.text, "text-brand-500")}>
         {WORDMARK_ACCENT}
       </span>
 
