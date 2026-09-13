@@ -10,6 +10,12 @@
 /art/*
   Cache-Control: public, max-age=2592000, immutable
 
+# App icons. Not fingerprinted, so a month rather than forever - long enough
+# that nobody refetches them, short enough that changing the mark reaches
+# everybody without a new filename.
+/icons/*
+  Cache-Control: public, max-age=2592000
+
 # Customer screenshots are private and never served from here, but be explicit
 # that nothing under this origin should be cached by shared proxies by default.
 /*

@@ -22,6 +22,17 @@ export const WORDMARK_PRIMARY = "Snip";
 export const WORDMARK_ACCENT = "Savor";
 
 /**
+ * One sentence saying what this is.
+ *
+ * It is read in three places that are not the site itself - a search result, a
+ * shared link, and the install prompt when somebody adds this to a phone's home
+ * screen - and those are the places a person decides whether to open it at all.
+ * Kept here so the three never drift apart.
+ */
+export const PRODUCT_DESCRIPTION =
+  "Upload your food cart and we'll check whether the same order may cost less on another delivery app in Dubai.";
+
+/**
  * How long a customer is told to expect to wait.
  *
  * The number lives here because it appears on four screens - the landing page,

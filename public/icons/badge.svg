@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SnipSavor">
+  <!-- The status-bar badge, which is not a small icon.
+       Android draws the badge as a mask: every colour is thrown away and only
+       the alpha channel survives, at roughly 18px. The tile and the crop frame
+       would arrive as a solid grey lozenge, so this is the S on its own, set
+       larger than it sits in the tile because it has the whole canvas to use. -->
+  <path fill="#ffffff" d="M33.28 58.0Q28.55 58.0 24.39 56.28Q20.23 54.55 17.22 51.37Q14.22 48.2 12.73 43.87L21.32 40.01Q23.21 44.14 26.56 46.5Q29.9 48.87 33.96 48.87Q36.12 48.87 37.68 48.2Q39.24 47.52 40.11 46.34Q40.99 45.15 40.99 43.53Q40.99 41.77 39.91 40.52Q38.83 39.27 36.53 38.53L26.66 35.28Q20.64 33.32 17.6 29.7Q14.55 26.08 14.55 21.01Q14.55 16.55 16.75 13.17Q18.95 9.79 22.91 7.89Q26.86 6.0 32.0 6.0Q36.53 6.0 40.38 7.56Q44.24 9.11 47.05 11.95Q49.85 14.79 51.27 18.78L42.75 22.63Q41.33 19.12 38.49 17.12Q35.65 15.13 32.0 15.13Q29.9 15.13 28.28 15.8Q26.66 16.48 25.78 17.73Q24.9 18.98 24.9 20.61Q24.9 22.36 26.05 23.68Q27.2 25.0 29.5 25.75L39.17 28.86Q45.25 30.82 48.26 34.33Q51.27 37.85 51.27 42.92Q51.27 47.32 48.97 50.73Q46.67 54.15 42.65 56.07Q38.63 58.0 33.28 58.0Z"/>
+</svg>

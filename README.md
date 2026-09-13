@@ -81,6 +81,28 @@ Customer references are six characters from a confusable-free alphabet — see
 near-black `--color-ink-900` for text and high-emphasis buttons, green for
 savings, white ground.
 
+#### The icon
+
+`app/icon.svg` is the mark and the only place it is drawn: the wordmark's **S**,
+in Plus Jakarta Sans ExtraBold, inside the crop frame, on the brand gold. The
+letter is a path rather than text so it renders where there is no webfont, which
+is most of the places an icon turns up.
+
+Every other size is rendered from it by `npm run icons`, and committed:
+
+| File | Where it shows up |
+| --- | --- |
+| `app/icon.svg` | Browser tabs, at any size |
+| `app/favicon.ico` | 16/32/48, for whatever asks for `/favicon.ico` by reflex |
+| `app/apple-icon.png` | iOS Home Screen — full bleed, because iOS rounds it itself |
+| `public/icons/icon-192.png`, `icon-512.png` | The manifest's icons |
+| `public/icons/maskable-512.png` | Android, which crops to its own shape |
+| `public/icons/badge.png` | The status-bar badge on a notification — alpha only |
+
+Change `app/icon.svg`, run `npm run icons`, and read the diff. `app/manifest.ts`
+names the icons, the app and the colours behind it, which is what a phone shows
+when somebody adds this to their Home Screen.
+
 ---
 
 ## Quick start
@@ -265,6 +287,7 @@ npm run dev          # http://localhost:3000
 | `npm run typecheck` | TypeScript, no emit |
 | `npm run lint` | ESLint |
 | `npm test` | Vitest suite |
+| `npm run icons` | Re-render every app icon from `app/icon.svg` |
 | `npm run cf:build` | Build the Cloudflare Worker bundle into `.open-next/` |
 | `npm run cf:preview` | Build and run the real Worker locally on workerd |
 | `npm run cf:deploy` | Build and deploy to Cloudflare |
@@ -836,6 +859,12 @@ iOS supports Web Push only for a site **added to the Home Screen**, from iOS
 16.4 onwards. In a normal Safari tab the button will not appear at all, because
 `pushSupported()` is false there — which is the correct outcome, not a bug. Those
 customers keep the polling page, which is why it was left in place.
+
+What that customer sees while adding it — the icon, the name under it, the
+colour behind it as it opens — comes from `app/manifest.ts` and
+`app/apple-icon.png`. Without them iOS falls back to a screenshot of the page,
+which is the difference between an app and a bookmark at the exact moment
+somebody decides whether to bother.
 
 ---
 

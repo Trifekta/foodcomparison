@@ -40,8 +40,15 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon: "/icon.svg",
-      badge: "/icon.svg",
+      // PNG rather than the site's SVG icon: a notification is drawn by the
+      // operating system, not the page, and SVG is the one image format that
+      // some of them still refuse.
+      icon: "/icons/icon-192.png",
+      // The badge is the small mark in the status bar, and Android renders it
+      // as a mask - it keeps the alpha and throws the colour away, so the gold
+      // tile would arrive as a grey lozenge. Hence a separate drawing: see
+      // public/icons/badge.svg.
+      badge: "/icons/badge.png",
       // Replaces an earlier notification about the same thing instead of
       // stacking a second one under it.
       tag: typeof data.tag === "string" && data.tag ? data.tag : undefined,

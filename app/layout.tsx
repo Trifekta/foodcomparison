@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Caveat, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { PRODUCT_NAME } from "@/lib/constants";
+import { PRODUCT_NAME, PRODUCT_DESCRIPTION } from "@/lib/constants";
 
 // Self-hosted at build time by next/font, so there is no runtime request to
 // Google and no layout shift.
@@ -25,8 +25,7 @@ export const metadata: Metadata = {
     default: `${PRODUCT_NAME} — check if your food order is cheaper elsewhere`,
     template: `%s · ${PRODUCT_NAME}`,
   },
-  description:
-    "Upload your food cart and we'll check whether the same order may cost less on another delivery app in Dubai.",
+  description: PRODUCT_DESCRIPTION,
   applicationName: PRODUCT_NAME,
   robots: { index: true, follow: true },
 };
