@@ -43,6 +43,7 @@ The MVP exists to answer four questions:
 - [Security model](#security-model)
 - [Screenshot retention](#screenshot-retention)
 - [Design notes](#design-notes)
+- [The launch ad](#the-launch-ad)
 - [What comes next](#what-comes-next)
 
 ---
@@ -731,6 +732,20 @@ Two things in that mockup are **Phase 2**, and this build does not fake them:
 The checkout screenshot sits beside the cart screenshot on screen 1, as the
 mockup shows, but stays clearly marked **Optional** — it buys a more accurate
 comparison and never blocks a submission.
+
+### The launch ad
+
+`npm run ad:render` renders an eighteen-second product ad to
+`out/snipsavor-ad.mp4`. It is a Remotion composition under `remotion/`, built
+from the same wordmark, mark, tokens, fonts and sentences the app ships, so it
+restates the brand instead of re-drawing it — change the gold in `globals.css`
+and re-render, and the ad is gold in the new sense.
+
+Nothing in `app/` imports it and it is not in the app bundle. Two shots in it are
+photographic and are left as slots with still-image fallbacks, so the cut can be
+approved before any footage is commissioned. See
+[design/video-ad.md](design/video-ad.md) for the beats, the slots and what to
+settle before it runs anywhere.
 
 ---
 

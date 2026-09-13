@@ -18,7 +18,10 @@
     "prebuild": "node scripts/copy-ocr-assets.mjs",
     "extract:eval": "node scripts/eval-extraction.mjs",
     "push:keys": "node scripts/generate-vapid-keys.mjs",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "ad:studio": "remotion studio",
+    "ad:render": "remotion render SnipSavorAd out/snipsavor-ad.mp4",
+    "ad:still": "remotion still SnipSavorAd out/snipsavor-frame.png"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -38,6 +41,9 @@
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.20.6",
+    "@remotion/cli": "^4.0.524",
+    "@remotion/fonts": "^4.0.524",
+    "@remotion/tailwind-v4": "^4.0.524",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.20.2",
     "@types/react": "^19.3.0",
@@ -47,6 +53,7 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.4",
     "postcss": "^8.5.28",
+    "remotion": "^4.0.524",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "vitest": "^5.0.0",
