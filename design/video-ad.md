@@ -1,4 +1,221 @@
-# The launch ad
+# The ads
+
+Two ads live in this repository, both rendered from it.
+
+| | V1 | V2 |
+| --- | --- | --- |
+| Shape | 1920x1080, 16:9 | 1080x1920, 9:16 |
+| Length | 18s | 17.5s |
+| For | Site, YouTube, decks | Instagram Reels, TikTok, Stories |
+| Reads as | Product film | Performance ad |
+| Render | `npm run ad:render` | `npm run ad2:render` |
+
+```bash
+npm run ad:studio     # the editor - both compositions are in it
+npm run ad2:render    # out/snipsavor-ad-v2.mp4
+npm run ad2:still     # a frame, for a thumbnail or a static post
+npm run ad:audio      # regenerates the music bed and the sound design
+```
+
+V1 is unchanged and still renders. V2 is a separate composition under
+`remotion/ad-v2/` and shares V1's fonts and the product's components; neither
+imports the other's scenes.
+
+---
+
+## Why V2 exists
+
+V1 explains what SnipSavor does, evenly, in nine two-second beats on a flat
+ground. It is a good product film and it would die in a feed, because a feed
+does not grant a product film its first two seconds.
+
+V2 is built the other way round:
+
+- **It opens on the problem, not the brand.** A dark room, a bright screen, AED
+  112, and a thumb moving towards "Place order". No logo for four seconds.
+- **It is cut to music, not scored afterwards.** The track is 120bpm, which at
+  30fps is fifteen frames to the beat. Every cut in `spec.ts` is divisible by
+  fifteen, and the two that matter - the saving, and the end card - are on bar
+  downbeats.
+- **It holds the brand back.** Everything before 4.0s is a cold room; everything
+  after is cream and gold. The turn lands as relief rather than as decoration.
+- **It spends its length where the money is.** Three seconds on the payoff, three
+  and a half on the end card, and the first ten seconds move fast.
+
+---
+
+## The beat grid
+
+`remotion/ad-v2/spec.ts` is the edit. Marks are frames; all are on beats.
+
+| Act | In | Out | What |
+| --- | --- | --- | --- |
+| Hook | 0 | 75 | "About to pay AED 112 for dinner?" |
+| Interrupt | 75 | 120 | Screenshot. "Check first." |
+| Upload | 120 | 195 | Into SnipSavor; the brand turn |
+| Compare | 195 | 255 | Six basket lines matched on eighth notes |
+| **Reveal** | 255 | 345 | 112 -> 87 at 285, **save at 300** |
+| Human | 345 | 420 | The result read, then the food |
+| CTA | 420 | 525 | End card |
+
+Frame 300 is the ad: the saving lands, the loudest accent in the track hits, and
+the voiceover says "twenty-five". Changing a beat length moves everything after
+it automatically - nothing downstream carries a hard-coded start frame.
+
+---
+
+## Who does what
+
+The division is enforced by where things live, not by discipline.
+
+**Remotion draws anything with a price, a logo, an interface or a word in it.**
+The cart, the SnipSavor screens, every figure, the wordmark, the CTA. Figures
+come from `spec.ts`, which throws at import time if the cart lines do not total
+the headline price or if the saving is not the difference between the two - so
+the ad cannot render showing AED 24.98 anywhere.
+
+**Runway supplies anything with a face, a hand, a room or a plate of food in
+it.** Three slots in `slots.ts`, none filled. Each has a drawn stand-in so the
+ad renders complete and the cut can be approved before a credit is spent.
+
+Never ask a generative model for the interface. Whatever it paints on the glass
+is thrown away: `phone.tsx` exports `screenTransform`, which solves the
+homography onto four tracked screen corners, and `ScreenComposite`, which
+corner-pins the real UI over them.
+
+### The three shots to generate
+
+Prompts are in `slots.ts`, ready to paste. In order of value:
+
+1. **`HOOK`** - the opening. A person seeing what dinner costs. The premise is an
+   expression, and this is the shot the ad most needs.
+2. **`REACTION`** - 11.5s. The same person, same sofa, same light, quietly
+   pleased. Generate it in the same session as HOOK, from the same reference
+   frame, or it reads as two different ads.
+3. **`FOOD`** - 13.0s, one second. No continuity burden, easiest to get right,
+   and the safest place to spend the first credit.
+
+Reject and regenerate any take with: extra or deformed fingers, a warped phone,
+different clothes or face between shots, eyes not on the phone, overacting,
+readable generated text, floating objects, or motion that could not happen.
+
+To drop a clip in: put it in `public/ad/`, set `src` on the slot, set `trimAfter`
+to the beat length. Nothing else changes.
+
+---
+
+## Audio
+
+### Music
+
+`scripts/build_ad_audio.py` synthesises the bed and every effect from
+oscillators and noise, standard library only.
+
+That is a licensing decision before it is a creative one. An ad that will run as
+paid media cannot carry a track whose commercial terms nobody has read, and the
+cheapest way to be certain is to own every sample in it. It also means the bed is
+exactly on the grid the picture is cut to rather than nearly on it, and that
+re-timing an act and re-running the script keeps them together.
+
+The arrangement follows the acts: sparse and immediate over the hook, a hole
+after "Check first.", hats and a pluck motif arriving with the product, a riser
+into the reveal, the biggest hit of the track on frame 300, everything pulled out
+for the human beat, and a clean resolution under the end card.
+
+### Sound design
+
+Nine effects, placed in `mix.tsx` on frames that already exist in `spec.ts` - the
+shutter on the cut, the ticks on the same eighth notes the basket lines match on,
+the big impact on the same downbeat the saving lands. Nothing is placed by ear,
+so the picture and the audio cannot drift apart.
+
+They are mixed to be felt rather than noticed: every effect sits well under the
+voice, and the AED 25 impact is the only one that is meant to be heard as an
+event.
+
+### Voiceover - NOT YET RECORDED
+
+**The ad currently renders without speech.** This is the one part of the brief
+that is not done, and it is not something the edit can paper over: the ad is
+built for a voice and is materially weaker without one.
+
+Everything around it is ready. `vo.ts` holds the script, the exact frame each
+line starts on, how long it has, and why it is timed there. `mix.tsx` reads the
+same file to duck the music under speech, so the ducking is already correct and
+already follows the timing.
+
+To finish it:
+
+1. Record the eight lines in `vo.ts` - the script is also available as `SCRIPT`.
+2. Save each as `public/ad/vo/<id>.wav`, named by the line's `id`.
+3. Set `AUDIO.voiceDir = "ad/vo"` in `slots.ts`.
+4. `npm run ad2:render`.
+
+Each line is placed individually rather than as one continuous take, because a
+single take drifts: one breath half a second long in the wrong place walks every
+later line off its picture. If a read runs longer than its `atMost`, lose a word
+rather than speeding the delivery - the script is already shorter than the brief's
+for that reason.
+
+Direction: 20-35, natural conversational English, clear international accent,
+energetic and confident with a little attitude, not a salesperson and not an
+over-excited influencer. No synthetic read should ship, even temporarily.
+
+### Mix
+
+Voice, then music, then effects. The music sits at 0.78 with no voice and drops
+to 0.62 once there is one, ducking to 0.30 under each line with a six-frame fall
+and a ten-frame recovery - smooth, not a gate. Rendered output peaks at
+-2.0 dBFS with no clipped samples, and is balanced for a phone speaker: nothing
+below 32Hz survives one, so it is rolled off rather than left to eat headroom.
+
+---
+
+## Before this runs anywhere
+
+- **The saving claim.** One basket, AED 112 against AED 87. Whatever ships must be
+  a real comparison somebody can produce, with whatever qualifier legal asks for.
+  The in-app result card says "You could save" - the product's own hedge - and
+  should stay hedged.
+- **Naming Keeta.** V2 names Keeta on screen and in the voiceover. That is
+  comparative advertising and in the UAE it wants sign-off and substantiation for
+  the basket shown. V1 deliberately did not name an app; V2 does because the
+  brief calls for it. `COMPARISON.app` in `spec.ts` is the one edit if that
+  changes. The "before" app is left generic on purpose - the claim is about
+  price, and dressing that screen as a named competitor adds a passing-off
+  problem for nothing in return.
+- **What SnipSavor is.** It does not cook, deliver, or place an order. Nothing in
+  the ad says order, get, or delivered; every line is a form of "check before you
+  pay". Keep it that way.
+- **Remotion's licence.** Free for individuals and companies under four people;
+  larger companies need a paid company licence.
+
+---
+
+## Notes for whoever renders it next
+
+- Rendering downloads a Chrome Headless Shell on first run. Behind a restrictive
+  network, point it at an existing browser:
+  `npm run ad2:render -- --browser-executable=/path/to/chrome`.
+- `npx remotion versions` warns that zod is newer than the version Remotion pins.
+  It only affects `@remotion/zod-types`, which neither ad uses, and zod is a core
+  app dependency - do not downgrade it for the video.
+- Fonts are self-hosted in `public/fonts/`, so a render works offline and in CI.
+  A render that cannot reach Google still produces a video, just one silently set
+  in a system sans.
+- `screenTransform` is verified against its own corner correspondences to 1e-13;
+  if a composite ever looks skewed, the tracked corners are wrong, not the maths.
+- The generated audio lives in `public/ad/` because that is where `staticFile()`
+  reads from, which means about 1.9MB of it is also served by the app and
+  deployed with it. Nothing requests it, so nobody downloads it, but it is dead
+  weight in the bundle - the same build step the food renders want (see the
+  weight note in `design/food-assets.md`) should emit compressed copies of these
+  too, or move the ad's media to its own public directory via
+  `Config.setPublicDir()` once nothing else in `public/` is shared with it.
+
+---
+
+## V1 reference
 
 An eighteen-second product ad, rendered from this repository.
 

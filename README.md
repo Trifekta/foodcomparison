@@ -733,19 +733,31 @@ The checkout screenshot sits beside the cart screenshot on screen 1, as the
 mockup shows, but stays clearly marked **Optional** — it buys a more accurate
 comparison and never blocks a submission.
 
-### The launch ad
+### The ads
 
-`npm run ad:render` renders an eighteen-second product ad to
-`out/snipsavor-ad.mp4`. It is a Remotion composition under `remotion/`, built
-from the same wordmark, mark, tokens, fonts and sentences the app ships, so it
-restates the brand instead of re-drawing it — change the gold in `globals.css`
-and re-render, and the ad is gold in the new sense.
+Two ads render from this repository, both Remotion compositions under
+`remotion/`, both built from the same wordmark, mark, tokens, fonts and
+sentences the app ships — so they restate the brand instead of re-drawing it.
+Change the gold in `globals.css` and re-render, and the ads are gold in the new
+sense.
 
-Nothing in `app/` imports it and it is not in the app bundle. Two shots in it are
-photographic and are left as slots with still-image fallbacks, so the cut can be
-approved before any footage is commissioned. See
-[design/video-ad.md](design/video-ad.md) for the beats, the slots and what to
-settle before it runs anywhere.
+| | | |
+| --- | --- | --- |
+| `npm run ad:render` | 16:9, 18s | product film, for the site and decks |
+| `npm run ad2:render` | 9:16, 17.5s | performance ad, for Reels and TikTok |
+
+V2 is cut to a 120bpm grid, carries a synthesised music bed and sound design
+(`npm run ad:audio`), and composites the real SnipSavor interface onto phone
+screens rather than letting a generative model draw them. Its lifestyle shots
+are slots with drawn stand-ins, so the cut is watchable before any footage is
+commissioned.
+
+**V2 has no voiceover yet** — the script and its frame-accurate timing map are in
+`remotion/ad-v2/vo.ts` and the mix already ducks to them; it needs a recorded
+read dropped into `public/ad/vo/`.
+
+See [design/video-ad.md](design/video-ad.md) for the beat grid, the Runway
+prompts, the mix, and what to settle before either runs anywhere.
 
 ---
 

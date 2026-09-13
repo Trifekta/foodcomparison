@@ -21,7 +21,10 @@
     "icons": "node scripts/generate-icons.mjs",
     "ad:studio": "remotion studio",
     "ad:render": "remotion render SnipSavorAd out/snipsavor-ad.mp4",
-    "ad:still": "remotion still SnipSavorAd out/snipsavor-frame.png"
+    "ad:still": "remotion still SnipSavorAd out/snipsavor-frame.png",
+    "ad:audio": "python3 scripts/build_ad_audio.py",
+    "ad2:render": "remotion render SnipSavorAdV2 out/snipsavor-ad-v2.mp4",
+    "ad2:still": "remotion still SnipSavorAdV2 out/snipsavor-v2-frame.png"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
