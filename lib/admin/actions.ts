@@ -19,7 +19,7 @@ import {
   sourceAppLabel,
 } from "@/lib/notifications/messages";
 import { alertChannels, sendTestAdminAlert } from "@/lib/notifications/admin-alert";
-import { pushToCustomer } from "@/lib/push/send";
+import { pushToAdmins, pushToCustomer } from "@/lib/push/send";
 import { getEmailProvider } from "@/lib/notifications/resend";
 import { sanitiseMultiline, sanitiseText } from "@/lib/utils/text";
 import { normalisePhone } from "@/lib/utils/phone";
@@ -510,26 +510,70 @@ export async function updateStatus(
  * worth being able to answer in one tap, on the day it is configured and every
  * time afterwards.
  */
+/**
+ * A real alert down every channel that is configured, said plainly to be a test.
+ *
+ * Push is included because it is the channel most likely to be silently broken
+ * and the only one with no other way to check: Telegram either arrives or the
+ * token is wrong, while push can fail at the keys, at the device, or at the
+ * push service, and all three look the same from here. So this reports each
+ * channel separately and repeats the push service's own words when it refuses.
+ *
+ * The same code path as a genuine alert, deliberately. A test that proved a
+ * different path worked would be worth nothing.
+ */
 export async function sendTestAlert(): Promise<ActionResult> {
   await requireAdmin();
   return reported(async () => {
-
     const channels = alertChannels();
-    if (channels.length === 0) {
+
+    const push = await pushToAdmins({
+      title: "Test from SnipSavor 🔔",
+      body: "If you can read this, a new price check will reach you the same way.",
+      url: "/admin",
+      tag: "test",
+    });
+
+    const pushConfigured = getWebPushConfig() !== null;
+
+    if (channels.length === 0 && !pushConfigured) {
       return {
         ok: false,
         message:
-          "No alert channel is configured. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, or ADMIN_ALERT_EMAIL.",
+          "No alert channel is configured. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, or ADMIN_ALERT_EMAIL, or the WEB_PUSH keys.",
       };
     }
 
-    const delivered = await sendTestAdminAlert();
-    return delivered
-      ? { ok: true, message: `Sent to ${channels.join(" and ")}. Check your phone.` }
-      : {
-          ok: false,
-          message: `${channels.join(" and ")} configured, but the send failed. Check the token and chat id.`,
-        };
+    const said: string[] = [];
+    let ok = false;
+
+    if (channels.length > 0) {
+      const delivered = await sendTestAdminAlert();
+      ok = ok || delivered;
+      said.push(
+        delivered
+          ? `Sent to ${channels.join(" and ")}.`
+          : `${channels.join(" and ")} configured, but the send failed — check the token and chat id.`,
+      );
+    }
+
+    if (pushConfigured) {
+      if (push.attempted === 0) {
+        said.push(
+          "No device is registered for browser notifications. Press Enable on the device you want to be notified on — on an iPhone, from the copy added to your Home Screen.",
+        );
+      } else {
+        ok = ok || push.delivered > 0;
+        said.push(
+          `Pushed to ${push.delivered} of ${push.attempted} device${push.attempted === 1 ? "" : "s"}.`,
+        );
+        // The push service's own words. This is the only place they reach a
+        // screen; everywhere else they are a log line nobody reads.
+        if (push.failures.length > 0) said.push(push.failures.join(" "));
+      }
+    }
+
+    return { ok, message: said.join(" ") };
   });
 }
 

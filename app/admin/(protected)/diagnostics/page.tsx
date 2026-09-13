@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
 import { runDiagnostics } from "@/lib/admin/schema-check";
+import { getPushStatus, pushNextStep } from "@/lib/push/status";
 import { alertChannels } from "@/lib/notifications/admin-alert";
 import { isExtractionConfigured } from "@/lib/env";
 import { isEmailConfigured } from "@/lib/notifications/resend";
@@ -25,6 +26,9 @@ export default async function DiagnosticsPage() {
   const checks = await runDiagnostics();
   const channels = alertChannels();
   const failures = checks.filter((check) => !check.ok);
+
+  const push = await getPushStatus();
+  const pushStep = pushNextStep(push);
 
   return (
     <div className="space-y-5">
@@ -81,6 +85,7 @@ export default async function DiagnosticsPage() {
             ["New order alerts", channels.length > 0 ? channels.join(" and ") : "none configured"],
             ["Email sending", isEmailConfigured() ? "configured" : "not configured"],
             ["Screenshot extraction", isExtractionConfigured() ? "configured" : "not configured"],
+            ["Site address (links in alerts)", push.appUrl ?? "not set — alerts go out without a link"],
           ].map(([label, value]) => (
             <div key={label} className="flex items-baseline justify-between gap-4 px-5 py-3">
               <dt className="text-sm text-ink-600">{label}</dt>
@@ -88,6 +93,73 @@ export default async function DiagnosticsPage() {
             </div>
           ))}
         </dl>
+      </section>
+
+      {/* Push has four things that must all be true and one symptom when any of
+          them is not: nothing happens. Each one gets its own line, and the
+          sentence underneath says which to fix first. */}
+      <section className="overflow-hidden rounded-2xl border border-ink-200 bg-white">
+        <h2 className="border-b border-ink-100 px-5 py-3 text-base font-semibold text-ink-900">
+          Browser notifications
+        </h2>
+        <dl className="divide-y divide-ink-100">
+          {[
+            [
+              "Subscriptions table",
+              push.tableReadable ? "readable" : (push.tableError ?? "could not be read"),
+              push.tableReadable,
+            ],
+            [
+              "VAPID keys on the server",
+              push.configured ? `set — contact ${push.subject}` : "not set",
+              push.configured,
+            ],
+            [
+              "Admin devices registered",
+              push.adminDevices === 0
+                ? "none — nothing to notify"
+                : `${push.adminDevices} device${push.adminDevices === 1 ? "" : "s"}`,
+              push.adminDevices > 0,
+            ],
+            [
+              "Customers waiting on a result",
+              String(push.customerDevices),
+              true,
+            ],
+            [
+              "Chaser for unopened requests",
+              push.chaserConfigured
+                ? `on — after ${push.chaserAfterMinutes} minutes`
+                : "CRON_SECRET not set, so /api/cron/chase-submissions refuses every caller",
+              push.chaserConfigured,
+            ],
+          ].map(([label, value, ok]) => (
+            <div
+              key={String(label)}
+              className="flex items-baseline justify-between gap-4 px-5 py-3"
+            >
+              <dt className="text-sm text-ink-600">{label}</dt>
+              <dd
+                className={`text-right text-sm font-medium ${
+                  ok ? "text-ink-900" : "text-rose-700"
+                }`}
+              >
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <p className="border-t border-ink-100 px-5 py-3 text-sm text-ink-600">
+          {pushStep ? (
+            <>
+              <span className="font-semibold text-ink-900">Next: </span>
+              {pushStep}
+            </>
+          ) : (
+            "Everything push needs is in place. Use “Send a test” on the dashboard to prove it end to end."
+          )}
+        </p>
       </section>
     </div>
   );

@@ -853,6 +853,27 @@ curl -H "x-cron-secret: $CRON_SECRET" https://your-domain/api/cron/chase-submiss
 - **Admin**: inside the existing alert panel on the dashboard, on its own line.
   Per device, so a phone and a laptop are two rows and both get notified.
 
+### When nothing arrives
+
+`/admin/diagnostics` has a **Browser notifications** section. It asks each of
+the four things push needs separately — the table, the keys, whether any device
+is registered, whether the chaser can run — and prints one sentence saying which
+to fix first. Every one of them fails the same way otherwise: silence.
+
+The likeliest answer is the third. The keys being set is not enough; somebody
+has to open the dashboard on the device they want notified and press **Enable
+new request notifications**. Until then `push_subscriptions` has no admin row
+and `pushToAdmins` correctly does nothing.
+
+**Send a test** on the dashboard goes down every configured channel, push
+included, and repeats the push service's own words when it refuses. A 401 or 403
+there means the private key on the server is not the pair of the public key the
+browser subscribed with — after any key change, every device must subscribe
+again.
+
+A subscription also belongs to one **origin**. Moving the site to a new hostname
+leaves every existing subscription behind on the old one.
+
 ### iPhone and Safari
 
 iOS supports Web Push only for a site **added to the Home Screen**, from iOS
