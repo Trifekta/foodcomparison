@@ -17,7 +17,8 @@
     "predev": "node scripts/copy-ocr-assets.mjs",
     "prebuild": "node scripts/copy-ocr-assets.mjs",
     "extract:eval": "node scripts/eval-extraction.mjs",
-    "push:keys": "node scripts/generate-vapid-keys.mjs"
+    "push:keys": "node scripts/generate-vapid-keys.mjs",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
