@@ -723,6 +723,23 @@ export function parseOcrText(raw: string): ParseResult {
       continue;
     }
 
+    // Tax is a charge, not a dish.
+    //
+    // Nothing above claims it: the breakdown this product keeps is subtotal,
+    // fees, discount and total, and there is no key for tax - so "VAT 5% AED
+    // 5.35" falls past the fee rules with a name and a price and is listed
+    // among the food. A basket with VAT in it as an item is one the admin has
+    // to notice and delete by hand on every order from an app that itemises it.
+    //
+    // Only a short priced line, because these stems are short enough to appear
+    // inside a real dish name and losing a dish costs far more than keeping a
+    // stray fee. A line naming the grand total never reaches here - it is
+    // claimed by the fee rules above, so "Total incl. VAT" keeps working.
+    if (priced && line.length <= 24 && matches(lower, VAT_WORDS)) {
+      flush();
+      continue;
+    }
+
     if (matches(lower, ITEM_SECTION_ENDS)) {
       flush();
       itemsClosed = true;

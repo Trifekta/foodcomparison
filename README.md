@@ -354,6 +354,32 @@ EMAIL_FROM          (optional)
 `EXTRACTION_MODEL` is a plain build/runtime variable, not a secret - set it only
 if you want something other than the default.
 
+**Nothing tells you a customer is waiting until one of these is set too.** A
+Worker with only the list above deploys, serves and takes orders perfectly, and
+notifies nobody - `/admin/diagnostics` is where that shows up:
+
+```
+TELEGRAM_BOT_TOKEN     free, instant, two minutes - see .env.example for the
+TELEGRAM_CHAT_ID       @BotFather steps. The quickest way to be told anything.
+ADMIN_ALERT_EMAIL      email alerts instead of, or as well as, Telegram.
+                       Needs RESEND_API_KEY.
+WEB_PUSH_PUBLIC_KEY    browser push. Generate a pair with `npm run push:keys`
+WEB_PUSH_PRIVATE_KEY   or `npx web-push generate-vapid-keys`. Both must be set
+WEB_PUSH_SUBJECT       or the Enable button never appears on the dashboard.
+CRON_SECRET            any long random string. Without it the chaser route
+                       refuses every caller, so nothing reminds you about an
+                       order nobody opened.
+```
+
+Setting the push keys is not the last step: push is per device, so somebody
+then has to open the dashboard **on the phone that should buzz** and press
+*Enable new request notifications*. On an iPhone that button only exists in a
+copy added to the Home Screen - iOS does not offer push to a Safari tab at all.
+
+Point a scheduler at `https://your-domain/api/cron/chase-submissions` every few
+minutes, sending `CRON_SECRET` as an `X-Cron-Secret` header or a bearer token.
+A Cloudflare Worker Cron Trigger, an uptime monitor or cron-job.org all work.
+
 You can also set them from the CLI:
 
 ```bash
