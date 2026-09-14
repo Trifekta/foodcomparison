@@ -5,7 +5,7 @@ import { DURATION_IN_FRAMES, sec } from "./spec";
 import { brackets, groundDark } from "./path";
 import { Brackets } from "./brand";
 import { Cart, Headline } from "./acts/Cart";
-import { CheckFirst, Food, Scan } from "./acts/Middle";
+import { CheckFirst, Deconstruct, Food } from "./acts/Middle";
 import { Payoff } from "./acts/Payoff";
 import { Resolve, wordmarkOpacity } from "./acts/Resolve";
 import { Mix } from "./mix";
@@ -58,7 +58,7 @@ export function SnipSavorAdV3() {
         <Cart />
         <Headline />
         <CheckFirst />
-        <Scan />
+        <Deconstruct />
       </div>
 
       {/* Act 4: the dark act. */}
@@ -68,7 +68,7 @@ export function SnipSavorAdV3() {
       <Food />
 
       {/* Act 6: home. */}
-      <div style={{ opacity: ramp(frame, sec(13.55), sec(13.95)) }}>
+      <div style={{ opacity: ramp(frame, sec(13.5), sec(13.9)) }}>
         <Resolve />
       </div>
 

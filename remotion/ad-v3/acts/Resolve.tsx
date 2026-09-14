@@ -14,10 +14,15 @@ import { LogoCircle, Wordmark, circleForWordmark } from "../brand";
  * logo - only pays off if this landing is exact, which is why the rect they
  * land on is computed from the supplied asset rather than placed by eye.
  *
- * The ring closes last. Because the circular treatment contains the same
- * wordmark at the same size, it cross-fades over the drawn lockup without
- * anything moving: what the viewer sees is a circle closing around a mark that
- * was already there.
+ * The ring closes last, at 15.45s, and everything is final by 15.8 - which
+ * leaves two and a quarter seconds on a completed, motionless call to action.
+ * The previous cut was still assembling logo states at 16.9s and held the
+ * finished frame for under a second, which is the wrong way round for an ad
+ * whose whole job is the last thing on screen.
+ *
+ * Because the circular treatment contains the same wordmark at the same size,
+ * it cross-fades over the drawn lockup without anything moving: what the viewer
+ * sees is a circle closing around a mark that was already there.
  */
 const CIRCLE = circleForWordmark(
   RESOLVE_WORDMARK.x,
@@ -27,18 +32,18 @@ const CIRCLE = circleForWordmark(
 
 /** The drawn lockup fades out exactly as the full asset fades in. */
 export function wordmarkOpacity(frame: number): number {
-  return 1 - ramp(frame, sec(16.5), sec(16.9));
+  return 1 - ramp(frame, sec(15.45), sec(15.8));
 }
 
 export function Resolve() {
   const frame = useCurrentFrame();
 
-  const wordIn = ramp(frame, sec(14.0), sec(14.5), CURVE.out);
-  const ringIn = ramp(frame, sec(16.5), sec(16.9));
+  const wordIn = ramp(frame, sec(13.6), sec(14.0), CURVE.out);
+  const ringIn = ramp(frame, sec(15.45), sec(15.8));
 
-  const headIn = ramp(frame, sec(14.9), sec(15.4), CURVE.out);
-  const subIn = ramp(frame, sec(15.3), sec(15.75));
-  const btnIn = ramp(frame, sec(15.7), sec(16.1), CURVE.out);
+  const headIn = ramp(frame, sec(14.6), sec(15.0), CURVE.out);
+  const subIn = ramp(frame, sec(14.95), sec(15.3));
+  const btnIn = ramp(frame, sec(15.2), sec(15.5), CURVE.out);
 
   return (
     <div style={{ position: "absolute", inset: 0 }}>

@@ -1,19 +1,26 @@
 import React from "react";
-import { Img, staticFile, useCurrentFrame } from "remotion";
+import { Img, interpolate, staticFile, useCurrentFrame } from "remotion";
 import { Check } from "lucide-react";
 import { CURVE, ramp, track } from "../motion";
-import { CART, COMPARISON, COPY, sec } from "../spec";
+import { CART, COMPARISON, COPY, PRICE, sec } from "../spec";
+import { FEE_KEETA, FEE_LINES, ITEM_KEETA, ITEM_LINES, byId } from "../elements";
 
-/** "Check first." Two words, alone, while the cart is being carried away. */
+/**
+ * "Check first." Punctuation, not a scene.
+ *
+ * Two thirds of a second. It used to hold for one and a third, which is long
+ * enough for the eye to finish reading it, leave, and start waiting - and a beat
+ * the audience is waiting through is a beat that has stopped working.
+ */
 export function CheckFirst() {
   const frame = useCurrentFrame();
-  const show = Math.min(ramp(frame, sec(3.15), sec(3.5)), 1 - ramp(frame, sec(4.25), sec(4.5)));
-  const rise = (1 - ramp(frame, sec(3.15), sec(3.6), CURVE.out)) * 34;
+  const show = Math.min(ramp(frame, sec(3.06), sec(3.24)), 1 - ramp(frame, sec(3.56), sec(3.74)));
+  const rise = (1 - ramp(frame, sec(3.06), sec(3.3), CURVE.out)) * 26;
 
   return (
     <div
       style={{
-        position: "absolute", left: 90, right: 90, top: 1120,
+        position: "absolute", left: 90, right: 90, top: 1150,
         textAlign: "center", opacity: show, transform: `translateY(${rise}px)`,
       }}
     >
@@ -24,160 +31,274 @@ export function CheckFirst() {
   );
 }
 
-/**
- * The check running.
- *
- * Findings appear where they are found rather than filling a dashboard: a
- * restaurant, then the basket ticking off line by line, then Keeta. The ticks
- * are the film's rhythm section - the sound design is built on them, not under
- * them.
- */
-export function Scan() {
+/** Where the compressed card sits when it comes apart. Everything starts here. */
+const SOURCE = { x: 325, y: 470, w: 430, h: 150 };
+
+/** One piece of the cart, travelling out of the card and into its own place. */
+function Piece({
+  id,
+  outAt,
+  children,
+}: {
+  id: string;
+  outAt: number;
+  children: React.ReactNode;
+}) {
   const frame = useCurrentFrame();
-  const show = Math.min(ramp(frame, sec(4.7), sec(5.0)), 1 - ramp(frame, sec(7.3), sec(7.5)));
+  const g = byId(id);
+  const t = ramp(frame, outAt, outAt + 14, CURVE.out);
 
-  // One line every 4.5 frames from 5.1s - eighth notes at 100bpm.
-  const matched = Math.max(0, Math.min(CART.lines.length, Math.floor((frame - sec(5.1)) / 4.5) + 1));
+  const x = interpolate(t, [0, 1], [SOURCE.x, g.rect.x]);
+  const y = interpolate(t, [0, 1], [SOURCE.y, g.rect.y]);
+  const w = interpolate(t, [0, 1], [SOURCE.w, g.rect.w]);
+  const h = interpolate(t, [0, 1], [SOURCE.h, g.rect.h]);
 
-  const label = (at: number) => Math.min(ramp(frame, at, at + 6), 1 - ramp(frame, at + 30, at + 40));
+  // Verified when the brackets arrive on it, and it stays verified.
+  const seen = ramp(frame, g.visitAt - 2, g.visitAt + 8, CURVE.out);
 
   return (
-    <div style={{ position: "absolute", inset: 0, opacity: show }}>
-      <p
+    <div
+      style={{
+        position: "absolute", left: x, top: y, width: w, height: h,
+        opacity: t * (0.5 + seen * 0.5),
+      }}
+    >
+      {children}
+      <span
         style={{
-          position: "absolute", left: 96, top: 690, fontSize: 30, fontWeight: 700,
-          letterSpacing: 2.2, color: "#9a9aa3", opacity: label(sec(4.8)),
+          position: "absolute", right: -8, top: -8,
+          width: 46, height: 46, borderRadius: 999, background: "#FFC61A",
+          color: "#12121a", display: "flex", alignItems: "center", justifyContent: "center",
+          opacity: seen, transform: `scale(${0.6 + seen * 0.4})`,
         }}
       >
-        {COPY.scanRestaurant.toUpperCase()}
-      </p>
-      <p
-        style={{
-          position: "absolute", left: 96, top: 736, fontSize: 56, fontWeight: 800,
-          letterSpacing: -1.6, color: "#12121a",
-          opacity: ramp(frame, sec(4.85), sec(5.1)),
-        }}
-      >
-        {CART.restaurant}
-      </p>
+        <Check size={26} strokeWidth={4} />
+      </span>
+    </div>
+  );
+}
 
-      {/* The basket, ticking. */}
-      <div style={{ position: "absolute", left: 96, right: 96, top: 850 }}>
-        {CART.lines.map((l, i) => {
-          const on = i < matched;
-          const t = ramp(frame, sec(5.1) + i * 4.5, sec(5.1) + i * 4.5 + 7, CURVE.out);
-          return (
-            <div
-              key={l.name}
-              style={{
-                display: "flex", alignItems: "center", gap: 20, height: 74,
-                opacity: on ? 0.35 + t * 0.65 : 0.16,
-                transform: `translateX(${(1 - (on ? t : 0)) * 18}px)`,
-              }}
-            >
-              <span
-                style={{
-                  width: 40, height: 40, borderRadius: 999,
-                  border: `2px solid ${on ? "#FFC61A" : "rgba(18,18,26,0.12)"}`,
-                  background: on ? "#FFC61A" : "transparent",
-                  color: "#12121a", display: "flex", alignItems: "center", justifyContent: "center",
-                  transform: `scale(${on ? 0.7 + t * 0.3 : 0.7})`,
-                }}
-              >
-                {on ? <Check size={22} strokeWidth={4} /> : null}
-              </span>
-              <span style={{ fontSize: 32, fontWeight: 600, color: "#12121a" }}>{l.name}</span>
-              <span
-                style={{
-                  marginLeft: "auto", fontSize: 32, fontWeight: 700,
-                  fontVariantNumeric: "tabular-nums",
-                  color: on ? "#12121a" : "#c9c9d0",
-                }}
-              >
-                {on ? l.price : "··"}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+/** A priced row, with the other app's number arriving beside it. */
+function Row({
+  name,
+  qty,
+  price,
+  keeta,
+  at,
+}: {
+  name: string;
+  qty: number | null;
+  price: string;
+  keeta: string;
+  at: number;
+}) {
+  const frame = useCurrentFrame();
+  const swap = ramp(frame, at, at + 12, CURVE.out);
 
-      <p
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 16, height: 104 }}>
+      {qty ? (
+        <span
+          style={{
+            width: 40, height: 40, borderRadius: 11, background: "rgba(18,18,26,0.06)",
+            fontSize: 24, fontWeight: 800, color: "#55555f",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          {qty}
+        </span>
+      ) : null}
+      <span style={{ fontSize: 32, fontWeight: 600 }}>{name}</span>
+      <span
         style={{
-          position: "absolute", left: 96, top: 1400, fontSize: 30, fontWeight: 700,
-          letterSpacing: 2.2, color: "#9a9aa3", opacity: label(sec(6.4)),
+          marginLeft: "auto", fontSize: 30, fontWeight: 700,
+          fontVariantNumeric: "tabular-nums",
+          color: "#9a9aa3", opacity: 1 - swap * 0.55,
+          textDecoration: swap > 0.5 ? "line-through" : "none",
         }}
       >
-        {COPY.scanItems.toUpperCase()}
-      </p>
-      <p
+        {price}
+      </span>
+      <span
         style={{
-          position: "absolute", left: 96, right: 96, top: 1444, fontSize: 60, fontWeight: 800,
-          letterSpacing: -1.8, color: "#12121a",
-          opacity: ramp(frame, sec(6.5), sec(6.8)),
+          width: 132, textAlign: "right", fontSize: 34, fontWeight: 800,
+          fontVariantNumeric: "tabular-nums", color: "#12121a",
+          opacity: swap, transform: `translateX(${(1 - swap) * 26}px)`,
         }}
       >
-        {COPY.scanKeeta}
-      </p>
+        {Number(keeta) === 0 ? "Free" : keeta}
+      </span>
     </div>
   );
 }
 
 /**
- * The food.
+ * The cart, taken apart and checked.
  *
- * Held for barely a second and framed tight. The asset is a render rather than
- * a photograph, and a render survives a fast, cropped, half-lit second far
- * better than it survives a beauty shot - so it gets the second, not the shot.
+ * The old version of this act was a list that ticked itself off while the
+ * brackets drifted past - a dashboard, which is exactly what the brief rules
+ * out. Here the compressed card physically comes apart: four objects travel out
+ * of it to their own places in the frame, the brackets visit each one in turn,
+ * and then the other app's prices arrive next to ours without any of it
+ * reassembling into a table.
  */
-export function Food() {
+export function Deconstruct() {
   const frame = useCurrentFrame();
-  const show = Math.min(ramp(frame, sec(11.7), sec(11.95)), 1 - ramp(frame, sec(13.6), sec(14.05)));
+  const show = Math.min(ramp(frame, sec(4.35), sec(4.6)), 1 - ramp(frame, sec(7.3), sec(7.48)));
 
-  // A yellow sweep uncovers it, travelling the same direction the brackets opened.
-  const sweep = ramp(frame, sec(11.72), sec(12.18), CURVE.inOut);
-  const push = track(frame, [
-    { f: sec(11.7), v: 1.14 },
-    { f: sec(13.8), v: 1.03, ease: CURVE.drift },
-  ]);
-
-  const copy = Math.min(ramp(frame, sec(12.35), sec(12.7)), 1 - ramp(frame, sec(13.5), sec(13.8)));
+  const compareAt = sec(6.62);
+  const label = ramp(frame, sec(6.5), sec(6.75));
 
   return (
     <div style={{ position: "absolute", inset: 0, opacity: show }}>
-      <div
+      <Piece id="restaurant" outAt={sec(4.4)}>
+        <p style={{ fontSize: 26, fontWeight: 700, letterSpacing: 2.4, color: "#9a9aa3" }}>
+          RESTAURANT
+        </p>
+        <p style={{ fontSize: 62, fontWeight: 800, letterSpacing: -1.8, marginTop: 4 }}>
+          {CART.restaurant}
+        </p>
+        <p style={{ fontSize: 26, fontWeight: 600, color: "#9a9aa3" }}>{CART.meta}</p>
+      </Piece>
+
+      <Piece id="items" outAt={sec(4.53)}>
+        {ITEM_LINES.map((l, i) => (
+          <Row
+            key={l.name}
+            name={l.name}
+            qty={l.qty}
+            price={l.price}
+            keeta={ITEM_KEETA[i]}
+            at={compareAt + i * 3}
+          />
+        ))}
+      </Piece>
+
+      <Piece id="fees" outAt={sec(4.66)}>
+        {FEE_LINES.map((l, i) => (
+          <Row
+            key={l.name}
+            name={l.name}
+            qty={null}
+            price={l.price}
+            keeta={FEE_KEETA[i]}
+            at={compareAt + 12 + i * 3}
+          />
+        ))}
+      </Piece>
+
+      <Piece id="total" outAt={sec(4.79)}>
+        <p style={{ fontSize: 26, fontWeight: 700, letterSpacing: 2.4, color: "#9a9aa3" }}>
+          TOTAL
+        </p>
+        <p
+          style={{
+            fontSize: 96, fontWeight: 800, letterSpacing: -3, marginTop: 2,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {PRICE.currency} {CART.total}
+        </p>
+      </Piece>
+
+      {/* The only label in the act. It says what is being done, once. */}
+      <p
         style={{
-          position: "absolute", left: 86, top: 628, width: 908, height: 912,
-          borderRadius: 8, overflow: "hidden",
-          clipPath: `inset(0 ${(1 - sweep) * 100}% 0 0)`,
+          position: "absolute", left: 96, top: 1810, fontSize: 34, fontWeight: 700,
+          letterSpacing: 2, color: "#9a9aa3", opacity: label,
         }}
       >
+        {COPY.scanKeeta.toUpperCase()}
+      </p>
+      <span style={{ display: "none" }}>{COMPARISON.app}</span>
+    </div>
+  );
+}
+
+/**
+ * The food, uncovered by the same yellow stroke that framed the saving.
+ *
+ * A bar travels down the frame and the burger is revealed in its wake. It is
+ * the bracket stroke flattened - the same object that has been framing things
+ * for eleven seconds, doing one more job - so the food is not a new image that
+ * appears, it is what was behind the last one.
+ *
+ * The image fills the frame and runs off all four edges. A render survives that
+ * far better than it survives sitting in the middle of a dark field with its own
+ * cut edge visible, which is what it was doing before.
+ */
+export function Food() {
+  const frame = useCurrentFrame();
+
+  const wipe = ramp(frame, sec(11.42), sec(12.02), CURVE.inOut);
+  const wipeY = interpolate(wipe, [0, 1], [-140, 2060]);
+
+  const out = 1 - ramp(frame, sec(13.35), sec(13.72));
+
+  // Two speeds, so the frame has depth rather than one flat scale.
+  const push = track(frame, [
+    { f: sec(11.4), v: 1.26 },
+    { f: sec(13.8), v: 1.06, ease: CURVE.drift },
+  ]);
+  const drift = track(frame, [
+    { f: sec(11.4), v: 46 },
+    { f: sec(13.8), v: -22, ease: CURVE.drift },
+  ]);
+  const vignetteDrift = track(frame, [
+    { f: sec(11.4), v: -30 },
+    { f: sec(13.8), v: 18, ease: CURVE.drift },
+  ]);
+
+  const copy = Math.min(ramp(frame, sec(12.3), sec(12.62)), 1 - ramp(frame, sec(13.3), sec(13.6)));
+
+  return (
+    <div style={{ position: "absolute", inset: 0, opacity: out, pointerEvents: "none" }}>
+      {/* Revealed above the travelling bar. */}
+      <div
+        style={{
+          position: "absolute", inset: 0, overflow: "hidden",
+          clipPath: `inset(0 0 ${Math.max(0, 100 - (wipeY / 1920) * 100)}% 0)`,
+        }}
+      >
+        <div style={{ position: "absolute", inset: 0, background: "#0B0A08" }} />
         <Img
           src={staticFile("food/burger.png")}
           style={{
             position: "absolute", left: "50%", top: "50%",
-            width: "185%", transform: `translate(-50%,-46%) scale(${push})`,
-            filter: "saturate(1.1) contrast(1.08) brightness(0.96)",
+            width: "196%", maxWidth: "none",
+            transform: `translate(-50%, calc(-50% + ${drift}px)) scale(${push})`,
+            filter: "saturate(1.12) contrast(1.1) brightness(0.97)",
           }}
         />
         <div
           style={{
-            position: "absolute", inset: 0,
-            background: "radial-gradient(62% 44% at 50% 46%, transparent 34%, rgba(8,6,4,0.72) 100%)",
+            position: "absolute", inset: "-12%",
+            transform: `translateY(${vignetteDrift}px)`,
+            background:
+              "radial-gradient(58% 40% at 50% 44%, transparent 30%, rgba(8,6,4,0.62) 74%, rgba(6,4,3,0.94) 100%)",
           }}
         />
+        <p
+          style={{
+            position: "absolute", left: 96, right: 96, bottom: 210,
+            fontFamily: "var(--font-serif)", fontSize: 104, lineHeight: 1.0,
+            letterSpacing: -1.5, color: "#F7F2E7", whiteSpace: "pre-line",
+            opacity: copy, transform: `translateY(${(1 - copy) * 16}px)`,
+          }}
+        >
+          {COPY.foodLine}
+        </p>
       </div>
 
-      <p
-        style={{
-          position: "absolute", left: 96, right: 96, top: 1612,
-          fontFamily: "var(--font-serif)", fontSize: 92, lineHeight: 1.02,
-          letterSpacing: -1.5, color: "#F6F1E6", whiteSpace: "pre-line",
-          opacity: copy,
-        }}
-      >
-        {COPY.foodLine}
-      </p>
-      <span style={{ display: "none" }}>{COMPARISON.app}</span>
+      {/* The bar itself: the bracket stroke, flattened, doing the uncovering. */}
+      {wipe > 0 && wipe < 1 ? (
+        <div
+          style={{
+            position: "absolute", left: -40, right: -40, top: wipeY,
+            height: 16, background: "#FFC61A",
+          }}
+        />
+      ) : null}
     </div>
   );
 }

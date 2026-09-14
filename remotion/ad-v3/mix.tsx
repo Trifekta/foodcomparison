@@ -1,6 +1,7 @@
 import React from "react";
 import { Audio, Sequence, staticFile } from "remotion";
-import { CART, PAYOFF, VOICE, sec } from "./spec";
+import { PAYOFF, VOICE, sec } from "./spec";
+import { GROUPS } from "./elements";
 
 /**
  * Sound design as the rhythm, with no bed under it.
@@ -48,8 +49,6 @@ function VoiceOver() {
 }
 
 export function Mix() {
-  const ticks = CART.lines.map((_, i) => sec(5.1) + i * 4.5);
-
   return (
     <>
       <VoiceOver />
@@ -58,16 +57,19 @@ export function Mix() {
       <Hit at={sec(1.42)} name="snap" volume={0.22} />
       <Hit at={sec(1.95)} name="impact-87" volume={0.30} />
 
-      {/* Act 2 - the capture, and the carry. */}
+      {/* Act 2 - the capture, the punctuation, the carry. */}
       <Hit at={sec(3.05)} name="shutter" volume={0.36} />
-      <Hit at={sec(3.55)} name="swoosh" volume={0.26} />
+      <Hit at={sec(3.52)} name="swoosh" volume={0.24} />
 
-      {/* Act 3 - the rhythm. */}
-      <Hit at={sec(4.8)} name="tick" volume={0.20} />
-      {ticks.map((t, i) => (
-        <Hit key={t} at={t} name="tick" volume={0.17 + i * 0.014} />
+      {/* Act 3 - the card comes apart, then four verifications. The ticks are
+          the rhythm section; they are placed on the same frames the brackets
+          arrive on, which is why they read as the brackets doing something
+          rather than as a loop underneath. */}
+      <Hit at={sec(4.4)} name="swoosh" volume={0.26} />
+      {GROUPS.map((g, i) => (
+        <Hit key={g.id} at={g.visitAt} name="tick" volume={0.2 + i * 0.02} />
       ))}
-      <Hit at={sec(6.5)} name="scan" volume={0.16} />
+      <Hit at={sec(6.62)} name="scan" volume={0.17} />
 
       {/* The wipe into the dark act. */}
       <Hit at={sec(7.42)} name="swoosh" volume={0.40} />
@@ -76,13 +78,13 @@ export function Mix() {
       <Hit at={PAYOFF.land87} name="impact-87" volume={0.52} />
       <Hit at={PAYOFF.land25} name="impact-25" volume={1.0} />
 
-      {/* Act 5 - one soft transition only. */}
-      <Hit at={sec(11.85)} name="swoosh" volume={0.20} />
+      {/* Act 5 - the stroke uncovering the food. One sound. */}
+      <Hit at={sec(11.42)} name="swoosh" volume={0.30} />
 
-      {/* Act 6 - the brackets land, the button, the sting. */}
-      <Hit at={sec(15.45)} name="tap" volume={0.24} />
-      <Hit at={sec(15.75)} name="button" volume={0.30} />
-      <Hit at={sec(16.6)} name="tick" volume={0.18} />
+      {/* Act 6 - the brackets land, the button, the ring. */}
+      <Hit at={sec(14.45)} name="tap" volume={0.26} />
+      <Hit at={sec(15.2)} name="button" volume={0.30} />
+      <Hit at={sec(15.45)} name="tick" volume={0.18} />
     </>
   );
 }

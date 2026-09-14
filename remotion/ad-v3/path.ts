@@ -1,5 +1,6 @@
 import { CURVE, type Key, type RectKey, track, trackRect } from "./motion";
 import { bracketRectForWordmark } from "./brand";
+import { ALL_RECT, GROUPS } from "./elements";
 import { sec } from "./spec";
 
 /**
@@ -17,6 +18,14 @@ import { sec } from "./spec";
  *   opening until they are the frame the food sits in -> come home -> land on
  *   the wordmark.
  */
+
+/** A rect grown by a margin, so brackets sit around a thing rather than on it. */
+const pad = (r: { x: number; y: number; w: number; h: number }, m: number) => ({
+  x: r.x - m,
+  y: r.y - m,
+  w: r.w + m * 2,
+  h: r.h + m * 2,
+});
 
 /** Where the lockup sits in the final composition. */
 export const RESOLVE_WORDMARK = { x: 190, y: 560, width: 700 };
@@ -43,9 +52,20 @@ const RECT: RectKey[] = [
   { f: sec(3.05), v: { x: 232, y: 726, w: 616, h: 322 }, ease: CURVE.snap },
   { f: sec(3.9), v: { x: 296, y: 566, w: 488, h: 256 }, ease: CURVE.inOut },
 
-  // --- Act 3. Becomes a scanner: wide, tall, travelling down the basket.
-  { f: sec(5.0), v: { x: 92, y: 452, w: 896, h: 742 }, ease: CURVE.out },
-  { f: sec(6.9), v: { x: 92, y: 690, w: 896, h: 742 }, ease: CURVE.drift },
+  // --- Act 3. The card comes apart and the brackets check the pieces.
+  //
+  // Four stops, each landing on a rect from elements.ts rather than on a
+  // number typed here, so they frame what they are verifying exactly. The
+  // travel between stops is the act: this used to be one slow drift down a
+  // static list, which is the most inert twenty seconds a film like this can
+  // have.
+  { f: GROUPS[0].visitAt - 12, v: { x: 300, y: 470, w: 480, h: 200 }, ease: CURVE.out },
+  { f: GROUPS[0].visitAt, v: pad(GROUPS[0].rect, 18), ease: CURVE.snap },
+  { f: GROUPS[1].visitAt, v: pad(GROUPS[1].rect, 18), ease: CURVE.inOut },
+  { f: GROUPS[2].visitAt, v: pad(GROUPS[2].rect, 18), ease: CURVE.inOut },
+  { f: GROUPS[3].visitAt, v: pad(GROUPS[3].rect, 18), ease: CURVE.inOut },
+  // Opens over everything while the other app's prices arrive beside ours.
+  { f: sec(6.85), v: ALL_RECT, ease: CURVE.out },
   // Flattens into a bar. This is the wipe that takes the film dark.
   { f: sec(7.45), v: { x: -60, y: 880, w: 1200, h: 132 }, ease: CURVE.snap },
 
@@ -57,11 +77,11 @@ const RECT: RectKey[] = [
 
   // --- Act 5. Keeps opening until it is the frame the food sits in.
   { f: sec(11.9), v: { x: -70, y: 604, w: 1220, h: 1020 }, ease: CURVE.inOut },
-  { f: sec(13.2), v: { x: 86, y: 628, w: 908, h: 912 }, ease: CURVE.drift },
+  { f: sec(13.2), v: { x: -30, y: 520, w: 1140, h: 1180 }, ease: CURVE.drift },
 
   // --- Act 6. Home.
-  { f: sec(14.6), v: { x: 284, y: 992, w: 512, h: 322 }, ease: CURVE.inOut },
-  { f: sec(15.5), v: RESOLVE_RECT, ease: CURVE.overshoot },
+  { f: sec(13.85), v: { x: 250, y: 880, w: 580, h: 380 }, ease: CURVE.inOut },
+  { f: sec(14.45), v: RESOLVE_RECT, ease: CURVE.overshoot },
   { f: sec(18.0), v: RESOLVE_RECT },
 ];
 
@@ -70,10 +90,14 @@ const OPACITY: Key[] = [
   { f: 0, v: 0 },
   { f: sec(0.4), v: 0 },
   { f: sec(0.75), v: 1 },
-  { f: sec(11.9), v: 1 },
-  { f: sec(12.3), v: 0.34, ease: CURVE.inOut },
-  { f: sec(13.3), v: 0.34 },
-  { f: sec(13.9), v: 1, ease: CURVE.out },
+  // Pulled down before the wipe rather than after it. At full strength the
+  // bracket arms are the only thing visible of a frame that has opened past all
+  // four edges, so they read as loose yellow bars competing with the one bar
+  // that is actually doing the revealing.
+  { f: sec(11.4), v: 1 },
+  { f: sec(11.72), v: 0.26, ease: CURVE.inOut },
+  { f: sec(13.3), v: 0.26 },
+  { f: sec(13.6), v: 1, ease: CURVE.out },
   { f: sec(18.0), v: 1 },
 ];
 
@@ -110,7 +134,7 @@ const REACH: Key[] = [
   { f: sec(10.1), v: 0.9 },
   { f: sec(10.4), v: 1.35, ease: CURVE.overshoot },
   { f: sec(13.2), v: 1.35 },
-  { f: sec(15.4), v: 1, ease: CURVE.out },
+  { f: sec(14.4), v: 1, ease: CURVE.out },
   { f: sec(18.0), v: 1 },
 ];
 
