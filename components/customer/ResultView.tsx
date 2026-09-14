@@ -17,7 +17,7 @@ import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { BrandTagline, ScriptBubble, ScriptNote, SkylineFooter, Sparks } from "@/components/customer/Motifs";
 import { Wordmark } from "@/components/customer/Wordmark";
 import { NotificationPrompt } from "@/components/customer/NotificationPrompt";
-import { track } from "@/lib/analytics/track";
+import { track, visitId } from "@/lib/analytics/track";
 import type { PublicResult } from "@/lib/submissions/result";
 
 /**
@@ -332,7 +332,34 @@ function PriceRows({ result }: { result: PublicResult }) {
   );
 }
 
+/**
+ * The outbound link, with this visit's id on it.
+ *
+ * Built in an effect rather than during render because sessionStorage does not
+ * exist on the server, and reading it while rendering would make the two
+ * disagree. Deferred by a tick for the same reason the rest of this codebase
+ * does it - setting state straight from an effect body is the pattern React now
+ * warns about - and until it resolves the button already works: the href falls
+ * back to the plain path, which redirects perfectly well and simply records the
+ * click without a visit attached.
+ */
+function useSwitchHref(path: string | null): string | null {
+  const [href, setHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!path) return;
+    const timer = setTimeout(() => {
+      const id = visitId();
+      setHref(id ? `${path}?v=${encodeURIComponent(id)}` : path);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [path]);
+
+  return href;
+}
+
 function Saving({ result, token }: { result: PublicResult; token: string }) {
+  const switchHref = useSwitchHref(result.switchPath);
   const saving = formatDecimalStringAsCurrency(result.savingAmount);
 
   return (
@@ -401,10 +428,10 @@ function Saving({ result, token }: { result: PublicResult; token: string }) {
         </section>
       ) : null}
 
-      {result.comparisonUrl ? (
+      {result.switchPath ? (
         <div className="mt-5">
           <a
-            href={result.comparisonUrl}
+            href={switchHref ?? result.switchPath}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => track("keeta_opened", token)}

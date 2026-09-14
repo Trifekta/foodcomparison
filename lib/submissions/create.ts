@@ -14,7 +14,11 @@ import {
   cartItemsSchema,
   submissionFieldsSchema,
 } from "@/lib/validation/submission";
-import { generateReferenceNumber, generateResultToken } from "@/lib/utils/reference";
+import {
+  generateReferenceNumber,
+  generateRedirectToken,
+  generateResultToken,
+} from "@/lib/utils/reference";
 import { alertAdminOfNewSubmission } from "@/lib/notifications/admin-alert";
 import { pushToAdmins } from "@/lib/push/send";
 import { normalisePhone } from "@/lib/utils/phone";
@@ -253,6 +257,10 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   // ---- 5. Insert, retrying only on a reference-number collision ------------
   let referenceNumber = "";
   const resultToken = generateResultToken();
+  // Minted here beside the result token rather than when a comparison is
+  // saved, so a submission never exists in a state where the button cannot be
+  // built. It addresses nothing until there is a link to redirect to.
+  const redirectToken = generateRedirectToken();
   let inserted = false;
   let insertError: DbError = null;
 
@@ -266,6 +274,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       // customer is sent straight to this address and we cannot wait to read it
       // back. The default exists so a row can never end up without one.
       result_token: resultToken,
+      redirect_token: redirectToken,
       status: "new",
       // The customer is not asked which app this came from - the screenshot
       // shows it to anyone who looks, and asking costs a question. The admin

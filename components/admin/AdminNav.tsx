@@ -6,6 +6,7 @@ import { Wordmark } from "@/components/customer/Wordmark";
 const LINKS = [
   { href: "/admin", label: "Submissions" },
   { href: "/admin/analytics", label: "Validation" },
+  { href: "/admin/attribution", label: "Attribution" },
   { href: "/admin/areas", label: "Areas" },
 ];
 

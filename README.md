@@ -371,6 +371,17 @@ CRON_SECRET            any long random string. Without it the chaser route
                        order nobody opened.
 ```
 
+One more, and it is not optional at launch even though it has a default:
+
+```
+KEETA_ALLOWED_HOSTS    comma-separated hostnames /go/ may redirect to,
+                       subdomains included. Defaults to "keeta.com". If Keeta
+                       serves the UAE from anything else, every switch is
+                       stopped with an explanation instead of reaching the
+                       restaurant - safe, but not a working button. Check it
+                       against a real link before running ads.
+```
+
 Setting the push keys is not the last step: push is per device, so somebody
 then has to open the dashboard **on the phone that should buzz** and press
 *Enable new request notifications*. On an iPhone that button only exists in a
@@ -912,6 +923,44 @@ colour behind it as it opens — comes from `app/manifest.ts` and
 `app/apple-icon.png`. Without them iOS falls back to a screenshot of the page,
 which is the difference between an app and a bookmark at the exact moment
 somebody decides whether to bother.
+
+---
+
+## Proving somebody switched
+
+"Open on Keeta" is not a link to Keeta. It points at `/go/<token>`, which looks
+up the comparison, checks the destination, writes a row, and forwards - so
+"this customer saw this saving and then switched" is a record rather than an
+inference from a funnel counter.
+
+```
+result page  ->  /go/<redirect_token>?v=<visit>  ->  keeta_clicks row  ->  Keeta
+```
+
+The token is **not** the result token. That one is the whole of the
+authorisation for a customer's prices, and this one is designed to be followed
+off-site, where it lands in another company's referrer header. A leaked `/go/`
+link reveals nothing and grants nothing: the only thing it can do is redirect.
+
+**It is not an open redirect.** `KEETA_ALLOWED_HOSTS` is the allowlist, checked
+at the moment of redirecting rather than only when the link was saved - a row
+already in the database is exactly what a later check exists to catch. Anything
+else, including `https://keeta.com@evil.test/` and `https://keeta.com.evil.test`,
+lands on `/go/unavailable` with an explanation. See `lib/keeta/destination.ts`.
+
+**A click is not an order.** Every row is switch intent and says so:
+`conversion_status` starts at `unknown`, not `clicked`, because nothing has
+looked for an order. `converted_at`, `keeta_order_id`, `order_value` and
+`commission_value` are already columns, so wiring a Keeta referral callback
+later is a route and not a migration.
+
+Nothing may cost the customer their redirect. A failed write, a slow database
+or a missing migration are all logged and forwarded anyway; the only thing that
+stops a redirect is a destination we will not vouch for.
+
+`/admin/attribution` reads it back: total taps, unique switchers, the
+click-through rate against comparisons that had a button, and every click with
+its restaurant, source app, prices, saving, area and click id.
 
 ---
 

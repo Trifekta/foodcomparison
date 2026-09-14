@@ -52,6 +52,7 @@ function row(overrides: Record<string, unknown> = {}) {
     saving_amount: "5.65",
     saving_percentage: "16.31",
     comparison_url: "https://keeta.example/restaurant/123",
+    redirect_token: "b7d1c0a94e3f42a8b1d6e5f0c2a37948",
     created_at: "2026-09-10T10:15:00.000Z",
     ...overrides,
   };
@@ -124,7 +125,7 @@ describe("getPublicResult", () => {
   it("says so plainly when the basket was not cheaper", async () => {
     submission = row({ status: "no_saving", comparison_total: "36.00", saving_amount: "0.00" });
     const result = await getPublicResult(TOKEN);
-    expect(result).toMatchObject({ state: "no_saving", savingAmount: null, comparisonUrl: null });
+    expect(result).toMatchObject({ state: "no_saving", savingAmount: null, switchPath: null });
   });
 
   it("does not offer a button to a link that is not https", async () => {
@@ -132,8 +133,24 @@ describe("getPublicResult", () => {
     // but a customer-facing page is the wrong place to find out.
     for (const bad of ["javascript:alert(1)", "http://keeta.example/x", "not a url", ""]) {
       submission = row({ comparison_url: bad });
-      expect((await getPublicResult(TOKEN))?.comparisonUrl, `for ${bad}`).toBeNull();
+      expect((await getPublicResult(TOKEN))?.switchPath, `for ${bad}`).toBeNull();
     }
+  });
+
+  /**
+   * The restaurant's own link never reaches the browser now. The button points
+   * at our redirect, which is what makes the switch recordable - and it means a
+   * page saved or shared carries no destination anybody can follow blind.
+   */
+  it("points the button at our own redirect, not at the restaurant", async () => {
+    const result = await getPublicResult(TOKEN);
+    expect(result?.switchPath).toBe("/go/b7d1c0a94e3f42a8b1d6e5f0c2a37948");
+    expect(JSON.stringify(result)).not.toContain("keeta.example");
+  });
+
+  it("offers no button when the comparison predates the redirect token", async () => {
+    submission = row({ redirect_token: null });
+    expect((await getPublicResult(TOKEN))?.switchPath).toBeNull();
   });
 
   it("lists the items, so the basket can be rebuilt from the result", async () => {
@@ -162,7 +179,7 @@ describe("getPublicResult", () => {
       unavailableReason: "restaurant_not_listed",
       comparisonTotal: null,
       savingAmount: null,
-      comparisonUrl: null,
+      switchPath: null,
     });
   });
 

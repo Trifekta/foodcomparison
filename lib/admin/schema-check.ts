@@ -45,6 +45,11 @@ const PROBES: MigrationProbe[] = [
     column: "chased_at",
     breaks: "reminders about submissions nobody has opened yet",
   },
+  {
+    file: "0014_keeta_click_attribution.sql",
+    column: "redirect_token",
+    breaks: "the Open on Keeta button, and every click-through it would record",
+  },
 ];
 
 /**
@@ -62,6 +67,12 @@ const OTHER_PROBES: { file: string; table: string; column: string; breaks: strin
     table: "push_subscriptions",
     column: "endpoint",
     breaks: "browser notifications for customers and admins",
+  },
+  {
+    file: "0014_keeta_click_attribution.sql",
+    table: "keeta_clicks",
+    column: "click_ref",
+    breaks: "recording that a customer switched to Keeta, and the Attribution page",
   },
 ];
 
@@ -94,7 +105,8 @@ export async function findMissingMigrations(): Promise<SchemaGap[]> {
       // 0011 adds a column to a table another migration creates, so a missing
       // TABLE there is 0009's problem and must not be reported as 0011's. 0012
       // creates its own table, so for that one a missing table IS the gap.
-      const createsOwnTable = probe.table === "push_subscriptions";
+      const createsOwnTable =
+        probe.table === "push_subscriptions" || probe.table === "keeta_clicks";
       const missing =
         error !== null &&
         (createsOwnTable
@@ -187,6 +199,10 @@ export async function runDiagnostics(): Promise<Check[]> {
 
   await record("Read extractions", () =>
     supabase.from("submission_extractions").select("id").limit(1),
+  );
+
+  await record("Keeta click-throughs (the Attribution page)", () =>
+    supabase.from("keeta_clicks").select("click_ref").limit(1),
   );
 
   return checks;
