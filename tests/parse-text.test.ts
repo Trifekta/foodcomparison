@@ -219,3 +219,46 @@ describe("parseOcrText, edge cases", () => {
     expect(basket.items[1]?.name).toBe("Fries");
   });
 });
+
+/**
+ * Tax is a charge, not a dish.
+ *
+ * There is no financial key for tax - the breakdown kept here is subtotal,
+ * fees, discount and total - so a VAT row has nothing above it to claim it and
+ * falls through to the item rules carrying a name and a price. It was being
+ * listed among the food on every app that itemises it.
+ */
+describe("a tax line", () => {
+  const RECEIPT = [
+    "Al Safadi Restaurant",
+    "Mixed Grill Platter        AED 89.00",
+    "Hummus                     AED 18.00",
+    "Subtotal                   AED 107.00",
+    "Delivery fee               AED 5.00",
+    "VAT 5%                     AED 5.35",
+    "Total                      AED 117.35",
+  ].join("\n");
+
+  it("is not one of the items", () => {
+    const { basket } = parseOcrText(RECEIPT);
+    expect(basket.items.map((item) => item.name)).toEqual(["Mixed Grill Platter", "Hummus"]);
+  });
+
+  it("does not disturb the totals around it", () => {
+    const { basket } = parseOcrText(RECEIPT);
+    expect(basket.subtotal).toBe("107.00");
+    expect(basket.delivery_fee).toBe("5.00");
+    expect(basket.final_total).toBe("117.35");
+  });
+
+  /**
+   * The stems are short enough to sit inside a real name, so the rule is
+   * deliberately narrow: a dish is never dropped for containing these letters.
+   */
+  it("does not take a dish whose name happens to contain the letters", () => {
+    const { basket } = parseOcrText(
+      ["Sultan Grill", "Vatan Special Thali for two people   AED 62.00"].join("\n"),
+    );
+    expect(basket.items.map((item) => item.name)).toEqual(["Vatan Special Thali for two people"]);
+  });
+});
