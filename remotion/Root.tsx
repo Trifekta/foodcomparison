@@ -7,6 +7,8 @@ import { SnipSavorAd } from "./ad/SnipSavorAd";
 import { DURATION_IN_FRAMES, FPS, HEIGHT, WIDTH } from "./ad/spec";
 import { SnipSavorAdV2 } from "./ad-v2/SnipSavorAdV2";
 import * as v2 from "./ad-v2/spec";
+import { SnipSavorAdV3 } from "./ad-v3/SnipSavorAdV3";
+import * as v3 from "./ad-v3/spec";
 
 export function RemotionRoot() {
   return (
@@ -29,6 +31,16 @@ export function RemotionRoot() {
         fps={v2.FPS}
         width={v2.WIDTH}
         height={v2.HEIGHT}
+      />
+
+      {/* V3: the continuous motion-design film. */}
+      <Composition
+        id="SnipSavorAdV3"
+        component={SnipSavorAdV3}
+        durationInFrames={v3.DURATION_IN_FRAMES}
+        fps={v3.FPS}
+        width={v3.WIDTH}
+        height={v3.HEIGHT}
       />
     </>
   );

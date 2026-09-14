@@ -24,7 +24,9 @@
     "ad:still": "remotion still SnipSavorAd out/snipsavor-frame.png",
     "ad:audio": "python3 scripts/build_ad_audio.py",
     "ad2:render": "remotion render SnipSavorAdV2 out/snipsavor-ad-v2.mp4",
-    "ad2:still": "remotion still SnipSavorAdV2 out/snipsavor-v2-frame.png"
+    "ad2:still": "remotion still SnipSavorAdV2 out/snipsavor-v2-frame.png",
+    "ad3:render": "remotion render SnipSavorAdV3 out/snipsavor-ad-v3.mp4",
+    "ad3:still": "remotion still SnipSavorAdV3 out/snipsavor-v3-frame.png"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
