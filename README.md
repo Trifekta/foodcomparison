@@ -342,7 +342,20 @@ NEXT_PUBLIC_APP_URL
 
 **3. Secrets** — Settings → Variables and Secrets, added as **Secret**, not
 plain text. These are read at runtime, and the OpenNext adapter copies Worker
-bindings into `process.env` on each request:
+bindings into `process.env` on each request.
+
+> **Two panels share this name and only one of them is read while the site is
+> running.** Build variables are consumed by `next build` — `NEXT_PUBLIC_` values
+> are baked into the bundle there and fixed for the life of that deployment.
+> Everything below is looked up on every request and must be set on the **Worker
+> itself**, not in the build panel. Putting one in the wrong place fails
+> silently in every direction: the build passes, the deploy passes, the site
+> works, and the one feature that needed it is quietly switched off.
+>
+> `/admin/diagnostics` → **What this Worker can see** answers this directly,
+> one line per name. It reads no values, only whether the name is visible.
+
+
 
 ```
 SUPABASE_SERVICE_ROLE_KEY
