@@ -28,12 +28,45 @@ export const metadata: Metadata = {
   description: PRODUCT_DESCRIPTION,
   applicationName: PRODUCT_NAME,
   robots: { index: true, follow: true },
+
+  /**
+   * What iOS reads when somebody adds this to their Home Screen.
+   *
+   * Only meaningful once installed - nothing here prompts for that, and nothing
+   * should while the product is still being validated. It is the difference
+   * between the installed copy opening as an app and opening as a browser tab
+   * with a bookmark, and it costs two tags now rather than a migration later.
+   *
+   * The status bar is translucent so the page's own cream runs under the clock,
+   * which is the whole point of viewportFit above.
+   */
+  appleWebApp: {
+    capable: true,
+    title: PRODUCT_NAME,
+    statusBarStyle: "default",
+  },
+
+  /** Phone numbers are collected in a field, not linked in prose. */
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
   themeColor: "#fdfaf4",
   width: "device-width",
   initialScale: 1,
+  /**
+   * The line that makes every safe-area rule in this codebase work.
+   *
+   * Without it iOS letterboxes the page inside the notch and home indicator,
+   * and every env(safe-area-inset-*) reads zero - so the padding written to
+   * clear them was doing nothing at all. With it the page reaches the physical
+   * edges, which is what makes a web page stop looking like one, and the
+   * insets become real numbers the layout can respect.
+   *
+   * It is deliberately paired with the padding below rather than shipped alone:
+   * cover without insets is a home indicator sitting on top of a button.
+   */
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -10,6 +10,7 @@ import {
   MAX_RESTAURANT_NAME_LENGTH,
 } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
+import { StepActions } from "./StepActions";
 import { FieldError } from "@/components/ui/FieldError";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote } from "@/components/customer/Motifs";
@@ -371,11 +372,11 @@ export function StepBasket({
         </div>
       </div>
 
-      <div className="mt-5">
+      <StepActions>
         <Button onClick={onContinue} arrow>
           Continue
         </Button>
-      </div>
+      </StepActions>
     </>
   );
 }

@@ -108,7 +108,7 @@ export function ResultView({
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5">
-      <header className="flex items-start justify-between gap-3 pt-5">
+      <header className="flex items-start justify-between gap-3 pt-[max(1.25rem,env(safe-area-inset-top))]">
         <Wordmark size="md" />
         <ScriptNote underline className="text-[0.95rem] text-slate-600">
           Same Food
@@ -429,7 +429,11 @@ function Saving({ result, token }: { result: PublicResult; token: string }) {
       ) : null}
 
       {result.switchPath ? (
-        <div className="mt-5">
+        // The one action this whole product exists to produce, kept within
+        // reach. Sticky rather than fixed for the same reasons as the wizard's
+        // bar - see StepActions - and it comes to rest above the small print
+        // rather than hovering over it.
+        <div className="safe-bottom-tight sticky bottom-0 z-10 -mx-5 mt-5 border-t border-ink-100 bg-canvas/95 px-5 pt-3 backdrop-blur">
           <a
             href={switchHref ?? result.switchPath}
             target="_blank"

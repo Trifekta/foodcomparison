@@ -62,11 +62,11 @@ export function FindOrder() {
     "min-h-14 w-full rounded-2xl border border-ink-200 bg-white px-4 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400";
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5">
-      <header className="flex items-start justify-between gap-3 pt-5">
+    <div className="safe-bottom mx-auto flex min-h-dvh w-full max-w-md flex-col px-5">
+      <header className="flex items-start justify-between gap-3 pt-[max(1.25rem,env(safe-area-inset-top))]">
         <Link
           href="/compare"
-          className="-ml-1.5 inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-900 hover:bg-ink-100"
+          className="-ml-2.5 inline-flex h-11 w-11 items-center justify-center rounded-full text-ink-900 hover:bg-ink-100"
           aria-label="Back"
         >
           <ArrowLeft aria-hidden="true" className="h-5 w-5" strokeWidth={2.5} />
@@ -148,7 +148,10 @@ export function FindOrder() {
 
         <p className="text-center text-[0.85rem] text-slate-500">
           Lost the reference?{" "}
-          <Link href="/compare" className="font-bold text-ink-800 underline underline-offset-2">
+          <Link
+            href="/compare"
+            className="inline-flex min-h-11 items-center px-1.5 font-bold text-ink-800 underline underline-offset-2"
+          >
             Send us the order again
           </Link>
         </p>

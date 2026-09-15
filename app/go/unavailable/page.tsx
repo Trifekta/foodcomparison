@@ -38,7 +38,7 @@ export default async function KeetaUnavailablePage({
   const explanation = REASONS[why ?? ""] ?? REASONS.unknown;
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5">
+    <div className="safe-bottom mx-auto flex min-h-dvh w-full max-w-md flex-col px-5">
       <BrandHeader />
       <main className="flex flex-1 flex-col items-center justify-center text-center">
         <h1 className="text-2xl font-extrabold text-ink-900">
@@ -54,7 +54,7 @@ export default async function KeetaUnavailablePage({
         </Link>
         <Link
           href="/"
-          className="mt-3 text-[0.95rem] font-semibold text-ink-600 underline underline-offset-2"
+          className="mt-3 inline-flex min-h-11 items-center px-3 text-[0.95rem] font-semibold text-ink-600 underline underline-offset-2"
         >
           Back home
         </Link>

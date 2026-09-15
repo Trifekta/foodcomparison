@@ -30,7 +30,7 @@ export default function PrivacyPage() {
   const readsScreenshots = isExtractionConfigured();
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-5">
+    <div className="safe-bottom mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-5">
       <BrandHeader />
 
       <main className="flex-1 pb-10">
@@ -156,7 +156,10 @@ export default function PrivacyPage() {
         </Section>
 
         <p className="mt-10 text-sm">
-          <Link href="/" className="font-semibold text-ink-800 underline underline-offset-2">
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center px-1.5 font-semibold text-ink-800 underline underline-offset-2"
+          >
             Back to {BRAND_NAME}
           </Link>
         </p>

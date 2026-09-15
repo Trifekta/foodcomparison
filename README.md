@@ -955,6 +955,37 @@ somebody decides whether to bother.
 
 ---
 
+## Feeling like an app
+
+The customer flow is one column, `max-w-md`, `min-h-dvh`, no navigation and no
+footer menu - it was built that way. What was missing was the last inch:
+
+`viewportFit: "cover"` in `app/layout.tsx` is the line that makes the rest work.
+Without it iOS letterboxes the page inside the notch and home indicator and
+**every `env(safe-area-inset-*)` reads zero** - so the safe-area padding already
+written in `globals.css` was doing nothing at all. With it the page reaches the
+physical edges, and the insets become real numbers the headers and the sticky
+bars respect.
+
+The primary action of each wizard step, and the "Open on Keeta" button, sit in a
+**sticky** bar (`components/customer/wizard/StepActions.tsx`) - not a fixed one.
+Fixed takes the bar out of the flow so it sits on top of content forever, and
+fixed loses a fight with the iOS keyboard, which shrinks the visual viewport but
+not the layout one. Sticky rides the bottom of the screen while there is more
+below and comes to rest at its own place when the page ends.
+
+`app/manifest.ts` and `app/apple-icon.png` make an installed copy open as an app
+rather than a bookmark. **Nothing prompts anybody to install it** and nothing
+should while the product is being validated: the first click from an advert has
+to be the page, immediately.
+
+Checked with a real browser at 360x800, 390x844, 393x852, 412x915 and 430x932 -
+`npm run build`, serve, then drive Chromium over every customer page looking for
+horizontal overflow and tap targets under 40px. That found twenty-one real
+problems, all of them secondary links between 15px and 37px tall.
+
+---
+
 ## Proving somebody switched
 
 "Open on Keeta" is not a link to Keeta. It points at `/go/<token>`, which looks

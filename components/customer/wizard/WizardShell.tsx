@@ -19,13 +19,13 @@ export function WizardShell({ step, stepLabel, onBack, children }: WizardShellPr
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5">
-      <header className="sticky top-0 z-10 -mx-5 bg-canvas/95 px-5 pb-3 pt-4 backdrop-blur">
+      <header className="sticky top-0 z-10 -mx-5 bg-canvas/95 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur">
         <div className="flex items-center gap-3">
           {onBack ? (
             <button
               type="button"
               onClick={onBack}
-              className="-ml-1.5 inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-900 hover:bg-ink-100"
+              className="-ml-2.5 inline-flex h-11 w-11 items-center justify-center rounded-full text-ink-900 hover:bg-ink-100"
               aria-label="Go back"
             >
               <ArrowLeft aria-hidden="true" className="h-5 w-5" strokeWidth={2.5} />
@@ -33,7 +33,7 @@ export function WizardShell({ step, stepLabel, onBack, children }: WizardShellPr
           ) : (
             <Link
               href="/"
-              className="-ml-1.5 inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-900 hover:bg-ink-100"
+              className="-ml-2.5 inline-flex h-11 w-11 items-center justify-center rounded-full text-ink-900 hover:bg-ink-100"
               aria-label="Back to home"
             >
               <ArrowLeft aria-hidden="true" className="h-5 w-5" strokeWidth={2.5} />
