@@ -4,6 +4,7 @@ import { isValidResultToken } from "@/lib/utils/reference";
 import { checkRateLimit, clientKeyFromHeaders } from "@/lib/utils/rate-limit";
 import { RATE_LIMIT_WINDOW_MS } from "@/lib/constants";
 import { getWebPushConfig } from "@/lib/env";
+import { PUSH_CONFLICT_TARGET } from "@/lib/push/send";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -111,7 +112,7 @@ export async function POST(request: Request) {
         admin_id: null,
         failure_count: 0,
       },
-      { onConflict: "endpoint" },
+      { onConflict: PUSH_CONFLICT_TARGET },
     );
 
     if (error) {

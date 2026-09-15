@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Bell, BellOff, Check } from "lucide-react";
-import { subscribeAdminPush, unsubscribeAdminPush } from "@/lib/admin/actions";
+import {
+  isAdminDeviceRegistered,
+  subscribeAdminPush,
+  unsubscribeAdminPush,
+} from "@/lib/admin/actions";
 import {
   currentPushState,
   currentSubscription,
@@ -33,14 +37,46 @@ export function AdminPushToggle({ publicKey }: { publicKey: string }) {
   // the server and the client disagree, and setting it synchronously in the
   // effect is the pattern React now warns about. One tick later is invisible
   // and correct.
+  //
+  // "On" is a fact about the server, not about this browser. It used to be read
+  // from Notification.permission plus "does a subscription exist", which are
+  // both true for a browser that has only ever subscribed as a CUSTOMER - on
+  // the phone an admin tests the customer flow with, the toggle said
+  // notifications were on while there was no admin row to send to. So the
+  // server is asked, and the button stays offered until it says yes.
   useEffect(() => {
+    let cancelled = false;
+
     const timer = setTimeout(() => {
-      setState(currentPushState());
-      void currentSubscription().then((subscription) => {
-        if (subscription) setEndpoint(subscription.endpoint);
-      });
+      const permission = currentPushState();
+      if (permission === "unsupported" || permission === "denied") {
+        setState(permission);
+        return;
+      }
+
+      void (async () => {
+        const subscription = await currentSubscription();
+        if (cancelled) return;
+
+        if (!subscription) {
+          setState("idle");
+          return;
+        }
+
+        const registered = await isAdminDeviceRegistered(subscription.endpoint).catch(() => false);
+        if (cancelled) return;
+
+        // Permission granted and a subscription present, but not ours: the
+        // right thing to show is the button, so one tap registers it.
+        setEndpoint(registered ? subscription.endpoint : null);
+        setState(registered ? "enabled" : "idle");
+      })();
     }, 0);
-    return () => clearTimeout(timer);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, []);
 
   const onEnable = () => {
