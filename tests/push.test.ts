@@ -322,3 +322,24 @@ describe("a browser can actually open what we send", () => {
     ).rejects.toThrow();
   });
 });
+
+/**
+ * One browser, two roles.
+ *
+ * The admin tests the customer flow on the phone they run the dashboard on, so
+ * one browser holds both an admin registration and a customer one. Keyed on the
+ * endpoint alone, the second overwrote the first: the admin was registered,
+ * then silently was not, and the only symptom was a notification that never
+ * arrived. Nothing errored at any point.
+ *
+ * The constant is asserted rather than the behaviour because the behaviour is a
+ * Postgres unique constraint, and a test that mocked it would prove only that
+ * the mock agreed with itself. What can go wrong in code is the two call sites
+ * drifting apart, which is why they now read the same value.
+ */
+describe("what makes a subscription the same one", () => {
+  it("is the endpoint and the role, never the endpoint alone", async () => {
+    const { PUSH_CONFLICT_TARGET } = await import("@/lib/push/send");
+    expect(PUSH_CONFLICT_TARGET).toBe("endpoint,kind");
+  });
+});

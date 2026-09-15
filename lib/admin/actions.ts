@@ -19,7 +19,7 @@ import {
   sourceAppLabel,
 } from "@/lib/notifications/messages";
 import { alertChannels, sendTestAdminAlert } from "@/lib/notifications/admin-alert";
-import { pushToAdmins, pushToCustomer } from "@/lib/push/send";
+import { PUSH_CONFLICT_TARGET, pushToAdmins, pushToCustomer } from "@/lib/push/send";
 import { getEmailProvider } from "@/lib/notifications/resend";
 import { sanitiseMultiline, sanitiseText } from "@/lib/utils/text";
 import { normalisePhone } from "@/lib/utils/phone";
@@ -939,7 +939,7 @@ export async function subscribeAdminPush(input: {
           submission_id: null,
           failure_count: 0,
         },
-        { onConflict: "endpoint" },
+        { onConflict: PUSH_CONFLICT_TARGET },
       );
 
     if (error) return { ok: false, message: `Could not save the subscription: ${error.message}` };
@@ -947,6 +947,36 @@ export async function subscribeAdminPush(input: {
     revalidatePath("/admin");
     return { ok: true };
   });
+}
+
+/**
+ * Is THIS browser on the list of admin devices?
+ *
+ * Asked of the server, because the browser cannot answer it. Having a push
+ * subscription and being registered as an admin device are different facts, and
+ * the toggle used to infer the second from the first - so a browser that had
+ * only ever subscribed as a customer displayed "New request notifications on"
+ * while pushToAdmins had nobody to send to. A control that says a thing is on
+ * when it is off is worse than no control: it stops anybody looking further.
+ *
+ * Returns a bare boolean about an endpoint the caller already holds, so it adds
+ * nothing they could not already see.
+ */
+export async function isAdminDeviceRegistered(endpoint: string): Promise<boolean> {
+  const { user } = await requireAdmin();
+
+  if (!/^https:\/\/\S+$/.test(endpoint)) return false;
+
+  const supabase = await createServerSupabaseClient();
+  const { data } = await supabase
+    .from("push_subscriptions")
+    .select("id")
+    .eq("endpoint", endpoint)
+    .eq("kind", "admin")
+    .eq("admin_id", user.id)
+    .maybeSingle();
+
+  return data !== null;
 }
 
 /** Stop notifying this browser. Scoped to the signed-in admin by RLS. */
@@ -958,6 +988,7 @@ export async function unsubscribeAdminPush(endpoint: string): Promise<ActionResu
       .from("push_subscriptions")
       .delete()
       .eq("endpoint", endpoint)
+      .eq("kind", "admin")
       .eq("admin_id", user.id);
 
     if (error) return { ok: false, message: `Could not turn them off: ${error.message}` };

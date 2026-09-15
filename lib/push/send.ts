@@ -15,6 +15,17 @@ import { encryptPayload, vapidAuthorization } from "./crypto";
  * line, never an error in front of anybody.
  */
 
+/**
+ * What makes a subscription row the "same" one.
+ *
+ * Endpoint AND role. On endpoint alone, a customer subscription overwrote the
+ * admin registration on the same browser - which is the normal case, since the
+ * admin tests the customer flow on their own phone - and the only symptom was a
+ * notification that never arrived. Named here so the two places that upsert
+ * cannot drift apart again. See migration 0016.
+ */
+export const PUSH_CONFLICT_TARGET = "endpoint,kind";
+
 export interface PushPayload {
   title: string;
   body: string;
