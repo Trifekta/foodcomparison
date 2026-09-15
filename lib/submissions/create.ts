@@ -407,13 +407,28 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   // The area is the only detail carried. It is enough to judge whether this is
   // worth getting up for, and a notification is rendered on a lock screen -
   // so the restaurant, the total and anything about the customer stay out.
-  await pushToAdmins({
+  const pushed = await pushToAdmins({
     title: "New SnipSavor request 🔔",
     body: area.name
       ? `A customer in ${area.name} just submitted a price comparison.`
       : "A customer just submitted a price comparison.",
     url: `/admin/submissions/${submissionId}`,
     tag: `submission-${submissionId}`,
+  });
+
+  // Logged on the way out whether or not it worked.
+  //
+  // Until now a successful send said nothing and a failed one said something
+  // only if the push service complained - so "the order arrived and no phone
+  // buzzed" had no line anywhere to distinguish "nobody was registered" from
+  // "we sent it and the phone did not show it". Those have completely different
+  // fixes, and one line is the whole difference between reading the answer and
+  // guessing at it.
+  console.info("[submissions] told the admins", {
+    reference: referenceNumber,
+    attempted: pushed.attempted,
+    delivered: pushed.delivered,
+    ...(pushed.failures.length > 0 ? { failures: pushed.failures } : {}),
   });
 
   return { ok: true, referenceNumber, resultToken, id: submissionId };
