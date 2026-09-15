@@ -66,24 +66,57 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     (async () => {
       const url = new URL(target, self.location.origin);
-      const windows = await self.clients.matchAll({
-        type: "window",
-        includeUncontrolled: true,
-      });
 
-      // Reuse the tab that is already on this page, then one on this site, and
-      // only open a new one if neither exists. Somebody who left the result
-      // page open should be brought back to it, not given a second copy.
-      const exact = windows.find((client) => client.url === url.href);
-      if (exact) return exact.focus();
+      // Opening a window is the only step here that always works, so nothing is
+      // allowed to end without it having been tried. The reuse paths below are
+      // the nice version - they bring back the window somebody already has open
+      // rather than stacking a second copy - but every one of them can fail
+      // quietly on a platform that does not implement it, and an earlier version
+      // of this handler ended there: focus() resolved, navigate() was not
+      // supported, and the tap did nothing at all.
+      const open = () => self.clients.openWindow(url.href);
 
-      const sameOrigin = windows.find((client) => client.url.startsWith(self.location.origin));
-      if (sameOrigin && "navigate" in sameOrigin) {
-        await sameOrigin.focus();
-        return sameOrigin.navigate(url.href);
+      let windows = [];
+      try {
+        windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      } catch {
+        return open();
       }
 
-      return self.clients.openWindow(url.href);
+      // Already on the exact page: just bring it forward.
+      const exact = windows.find((client) => client.url === url.href);
+      if (exact) {
+        try {
+          await exact.focus();
+          return;
+        } catch {
+          return open();
+        }
+      }
+
+      // Somewhere else on this site: focus it and send it to the right page.
+      // Both halves are attempted separately, because focus() succeeding is no
+      // promise that navigate() will - notably inside an iOS home-screen app,
+      // which is the only place an iPhone can show these at all.
+      const sameOrigin = windows.find((client) => client.url.startsWith(self.location.origin));
+      if (sameOrigin) {
+        try {
+          await sameOrigin.focus();
+        } catch {
+          // Focus is a courtesy. Carry on and try to navigate anyway.
+        }
+
+        if (typeof sameOrigin.navigate === "function") {
+          try {
+            const navigated = await sameOrigin.navigate(url.href);
+            if (navigated) return;
+          } catch {
+            // Not supported here, or refused. Fall through to a new window.
+          }
+        }
+      }
+
+      return open();
     })(),
   );
 });

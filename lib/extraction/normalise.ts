@@ -108,3 +108,31 @@ export function normaliseBasket(basket: StructuredBasket): StructuredBasket {
     uncertain_fields: [...uncertain].slice(0, MAX_UNCERTAIN),
   };
 }
+
+/**
+ * An item's name, cut back to the dish.
+ *
+ * Some apps put the whole build of a combo on the title line rather than
+ * beneath it, so what arrives is "Limo Combo - Meal, Margherita, Margherita,
+ * Pepsi (2.25 litres), Creamy Ranch..." and the useful part is the first three
+ * words. Cut at the first separator that introduces a list, and only when there
+ * is a real name in front of it - a dish genuinely called "Fish & Chips" or
+ * "Chicken, Rice" keeps its name, because the cut needs something worth keeping
+ * on the left of it.
+ *
+ * Length alone is not the test. A long name is fine; a name that turns into an
+ * inventory is not.
+ */
+export function itemTitle(name: string): string {
+  const trimmed = name.trim();
+
+  // Only a list is cut, and a list needs at least two commas after the head -
+  // otherwise "Chicken, Rice" loses half of what it is called.
+  const head = trimmed.split(/\s*[·|]\s*|\s+-\s+/)[0].trim();
+  const parts = head.split(/\s*,\s*/);
+  const candidate = parts.length >= 3 ? parts[0].trim() : head;
+
+  // Never cut down to nothing, and never to something too short to identify an
+  // order: a two-letter head is a misread, not a dish.
+  return candidate.length >= 3 ? candidate : trimmed;
+}

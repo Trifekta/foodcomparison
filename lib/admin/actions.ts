@@ -129,12 +129,23 @@ async function notifyCustomerResultReady(
   resultToken: string,
 ): Promise<void> {
   try {
-    await pushToCustomer(submissionId, {
+    const pushed = await pushToCustomer(submissionId, {
       title: "Your SnipSavor result is ready 🎉",
       body: `We checked your basket on ${COMPARISON_APP}. Tap to see the result.`,
       url: resultPath(resultToken),
       // Replaces rather than stacks, so a correction later does not leave two.
       tag: `result-${submissionId}`,
+    });
+
+    // The same line the new-order alert now writes, for the same reason: zero
+    // attempted means this customer never turned notifications on, which is the
+    // ordinary case and not a fault. Without the count it is indistinguishable
+    // from a send that failed.
+    console.info("[push] told the customer their result is ready", {
+      submissionId,
+      attempted: pushed.attempted,
+      delivered: pushed.delivered,
+      ...(pushed.failures.length > 0 ? { failures: pushed.failures } : {}),
     });
   } catch (error) {
     console.error("[push] could not notify the customer", {

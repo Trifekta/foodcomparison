@@ -348,6 +348,16 @@ function withoutJunkTail(rawLine: string): string {
   return head;
 }
 
+/**
+ * Units that turn a number into a size rather than a sum.
+ *
+ * Deliberately short. Every entry here is a word that cannot plausibly follow a
+ * price on a receipt, which is what makes skipping the number safe - a longer
+ * list of maybes would start eating real prices.
+ */
+const MEASUREMENT_AFTER =
+  /^\s*(?:l|lt|ltr|lit|litre|liter|litres|liters|ml|cl|kg|kgs|g|gm|gr|gram|grams|oz|lb|cm|mm|pc|pcs|piece|pieces|slice|slices|pack|packs)\b/i;
+
 /** Every money-shaped value on a line, in the order they appear. */
 function allPrices(line: string): string[] {
   return line.match(/\d{1,5}\.\d{1,2}/g) ?? [];
@@ -382,6 +392,18 @@ function extractPrice(line: string): { price: string; rest: string } | null {
 
   while ((match = pattern.exec(cleaned)) !== null) {
     if (match[0].trim() === "") continue;
+
+    // A measurement is not a price. "Pepsi (2.25 litres)" sits in the middle of
+    // a combo's description, and 2.25 carries a decimal point, which outranks
+    // everything else here - so a customer was shown a Limo Combo costing AED
+    // 2.25 while the real 119.00 two lines below was never reached.
+    //
+    // Matched on the unit that follows rather than on the brackets, because the
+    // brackets are the packaging of this one example and the unit is the thing
+    // that makes it a quantity. Only units that are unambiguous: "in" and "x"
+    // are left out, because "2.25 in the box" is not a volume and a dish really
+    // can be "Pizza 12 in".
+    if (MEASUREMENT_AFTER.test(cleaned.slice(match.index + match[0].length))) continue;
 
     const hasCurrency = Boolean(match[1] || match[3]);
     const hasDecimal = match[2].includes(".");
@@ -468,6 +490,53 @@ function financialKey(lower: string): FinancialKey | null {
  *
  * Returns the paths it changed, so they can be flagged for a human to check.
  */
+/**
+ * A discount larger than the thing being discounted.
+ *
+ * repairMergedCurrency tries every plausible reading against the receipt's own
+ * arithmetic, and where nothing reconciles it deliberately leaves the figures
+ * exactly as read - a fee nobody could place is better off-screen than invented.
+ * That is right for a number that is merely doubtful. It is wrong for one that
+ * is impossible: a customer was shown "Discount -AED 8,543.00" against a
+ * subtotal of AED 162.00, which is not a value anybody needs to check, and
+ * showing it undermines every other figure on the screen.
+ *
+ * So the bound is the only hard one available. Fees and subtotals can exceed the
+ * total in ordinary ways - a discount is exactly what makes that happen - but a
+ * discount can never exceed what there was to discount.
+ *
+ * The field is cleared, never derived. Subtracting the total from the parts
+ * looks like the receipt's own arithmetic and is not: it silently absorbs every
+ * OTHER reading error into the discount. On the receipt this came from, the
+ * service fee had not been read - so the subtraction gives 38.10 against a real
+ * discount of 43.00, and a plausible wrong number is worse than a missing one,
+ * because nobody checks it. An empty discount leaves the summary visibly not
+ * adding up, which is exactly the right thing for it to look like.
+ */
+function dropImpossibleDiscount(basket: StructuredBasket): string[] {
+  const discount = Number(basket.discount);
+  if (basket.discount === "" || !Number.isFinite(discount) || discount <= 0) return [];
+
+  const value = (money: string) => {
+    const parsed = Number(money);
+    return money !== "" && Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const subtotal = value(basket.subtotal);
+  const delivery = value(basket.delivery_fee) ?? 0;
+  const service = value(basket.service_fee) ?? 0;
+
+  // Without a subtotal there is nothing to bound it against, and a guess would
+  // be worse than the doubtful figure already there.
+  if (subtotal === null) return [];
+
+  const chargeable = subtotal + delivery + service;
+  if (discount <= chargeable) return [];
+
+  basket.discount = "";
+  return ["discount"];
+}
+
 function repairMergedCurrency(
   basket: StructuredBasket,
   lostDecimals: Partial<Record<MoneyField, string>>,
@@ -834,6 +903,7 @@ export function parseOcrText(raw: string): ParseResult {
 
   basket.items = items;
   for (const field of repairMergedCurrency(basket, lostDecimals)) uncertain.add(field);
+  for (const field of dropImpossibleDiscount(basket)) uncertain.add(field);
 
   // Flag what there is evidence against, not everything. Marking every price
   // uncertain is the same as marking none: the customer stops looking.

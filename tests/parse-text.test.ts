@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseOcrText } from "@/lib/extraction/parse-text";
+import { itemTitle } from "@/lib/extraction/normalise";
 
 /**
  * The free parser, tested against text OCR really produced.
@@ -260,5 +261,154 @@ describe("a tax line", () => {
       ["Sultan Grill", "Vatan Special Thali for two people   AED 62.00"].join("\n"),
     );
     expect(basket.items.map((item) => item.name)).toEqual(["Vatan Special Thali for two people"]);
+  });
+});
+
+/**
+ * A discount larger than the thing being discounted.
+ *
+ * Taken from a real Pizza Hut checkout that reached a customer's screen reading
+ * "Discount -AED 8,543.00" against a subtotal of AED 162.00. The repair pass
+ * correctly declined to guess - nothing reconciled - and then left the figure
+ * exactly as read, which is the right call for a doubtful number and the wrong
+ * one for an impossible one. A value like that does not invite checking; it
+ * discredits every other figure beside it.
+ */
+describe("a discount that cannot be right", () => {
+  const RECEIPT = [
+    "Pizza Hut",
+    "Limo Combo                 AED 162.00",
+    "Subtotal                   AED 162.00",
+    "Delivery                   AED 9.50",
+    "Discount                  -AED 8543.00",
+    "Total                      AED 133.40",
+  ].join("\n");
+
+  /**
+   * Cleared, not derived. Subtracting the total from the parts would give 38.10
+   * here and the real discount is 43.00 - the difference being a service fee
+   * this run did not read. A plausible wrong number is worse than a missing one
+   * because nobody checks it, and everything around it survives untouched.
+   */
+  it("is cleared, and the figures around it are left alone", () => {
+    const { basket } = parseOcrText(RECEIPT);
+    expect(basket.discount).toBe("");
+    expect(basket.subtotal).toBe("162.00");
+    expect(basket.delivery_fee).toBe("9.50");
+    expect(basket.final_total).toBe("133.40");
+  });
+
+  it("is flagged, so the gap in the summary is somebody's to fill", () => {
+    const { basket } = parseOcrText(RECEIPT);
+    expect(basket.uncertain_fields).toContain("discount");
+  });
+
+  /**
+   * The bound is only the impossible one. A genuine half-price offer is a large
+   * discount and must survive untouched, or this rule costs more than it saves.
+   */
+  it("leaves an ordinary large discount alone", () => {
+    const { basket } = parseOcrText(
+      [
+        "Pizza Hut",
+        "Subtotal AED 162.00",
+        "Delivery AED 9.50",
+        "Discount -AED 81.00",
+        "Total AED 90.50",
+      ].join("\n"),
+    );
+    expect(basket.discount).toBe("81.00");
+    expect(basket.uncertain_fields).not.toContain("discount");
+  });
+});
+
+/**
+ * A Pizza Hut combo, from the screenshots a customer actually sent.
+ *
+ * Two separate faults met here. The combo's description lists what is inside
+ * it - "Pepsi (2.25 litres)" - and 2.25 carries a decimal point, which outranks
+ * every other signal in the price reader. So the basket showed a Limo Combo
+ * costing AED 2.25, and the real 119.00 two lines below was never reached.
+ */
+describe("a combo whose description contains a measurement", () => {
+  const CART = [
+    "Cart",
+    "Pizza Hut",
+    "Limo Combo",
+    "Meal, Margherita, Margherita,",
+    "Margherita, Limo Combo,",
+    "Pepsi (2.25 litres), Creamy",
+    "Ranch, Fiery Peri Sauce,",
+    "Chipotle BBQ Dip",
+    "Edit",
+    "B 119.00 B 162.00",
+    "You might also like...",
+    "Creamy Ranch Dip",
+    "B 5.00",
+    "Great! You're saving B 43.00",
+  ].join("\n");
+
+  it("prices the combo, not the bottle of Pepsi inside it", () => {
+    const { basket } = parseOcrText(CART);
+    expect(basket.items).toHaveLength(1);
+    expect(basket.items[0].line_total).toBe("119.00");
+  });
+
+  /** The live price, not the struck-through one beside it. */
+  it("takes the discounted price rather than the original", () => {
+    const { basket } = parseOcrText(CART);
+    expect(basket.items[0].line_total).not.toBe("162.00");
+  });
+
+  it("leaves the measurement in the description where it belongs", () => {
+    const { basket } = parseOcrText(CART);
+    expect(basket.items[0].modifiers.join(" ")).toContain("2.25 litres");
+  });
+
+  it("does not take the upsell carousel for part of the order", () => {
+    const { basket } = parseOcrText(CART);
+    expect(basket.items.map((item) => item.name)).toEqual(["Limo Combo"]);
+  });
+
+  /**
+   * The same order's payment summary, which reconciles exactly:
+   * 162.00 - 43.00 + 9.50 + 4.90 = 133.40.
+   */
+  it("reads every line of the payment summary", () => {
+    const { basket } = parseOcrText(
+      [
+        "Payment summary",
+        "Subtotal B 162.00",
+        "Discount - B 43.00",
+        "Delivery fee B 9.50",
+        "Service fee B 4.90",
+        "Total amount B 133.40",
+      ].join("\n"),
+    );
+
+    expect(basket.subtotal).toBe("162.00");
+    expect(basket.discount).toBe("43.00");
+    expect(basket.delivery_fee).toBe("9.50");
+    expect(basket.service_fee).toBe("4.90");
+    expect(basket.final_total).toBe("133.40");
+  });
+});
+
+describe("cutting an item name back to the dish", () => {
+  it("keeps the head of a combo that lists its contents", () => {
+    expect(itemTitle("Limo Combo · Meal, Margherita, Margherita, Pepsi (2.25 litres)")).toBe(
+      "Limo Combo",
+    );
+  });
+
+  /** A real name with one comma in it is a name, not a list. */
+  it("leaves an ordinary name alone", () => {
+    expect(itemTitle("Chicken, Rice")).toBe("Chicken, Rice");
+    expect(itemTitle("Fish & Chips")).toBe("Fish & Chips");
+    expect(itemTitle("Zinger Burger Meal Large")).toBe("Zinger Burger Meal Large");
+  });
+
+  it("never cuts down to something too short to recognise", () => {
+    expect(itemTitle("XL, Margherita, Pepperoni, Olives")).toBe("XL, Margherita, Pepperoni, Olives");
   });
 });
