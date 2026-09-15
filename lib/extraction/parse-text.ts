@@ -604,6 +604,25 @@ function repairMergedCurrency(
  * with a line through it. The strike-through does not survive OCR, so position
  * is no guide, but the discount always is: an offer never raises the price.
  */
+/**
+ * Whether a value read off a line is actually money.
+ *
+ * A price on these apps carries fils or a currency mark: "119.00", "AED 45".
+ * A bare integer alone on a line is almost never a price - it is a quantity
+ * stepper, a badge, a rating, or a fragment of the image column beside the
+ * description. One of those, a lone "5", was taken as the price of a Limo
+ * Combo; and because an item with a price is an item whose row has ended, the
+ * gap after it closed the row and the rest of the description became a second
+ * item that then caught the real 119.00.
+ *
+ * So the bar is evidence, not position. A whole-dirham price does exist, but it
+ * arrives with its currency beside it, and a number with neither mark nor fils
+ * has not earned the right to become somebody's basket.
+ */
+function looksLikeMoney(line: string, price: string): boolean {
+  return price.includes(".") || /AED|aed|د\.?إ|dhs?|dirhams?/i.test(line);
+}
+
 function cheapestOf(line: string, fallback: string): string {
   const prices = allPrices(line);
   if (prices.length < 2) return fallback;
@@ -843,7 +862,13 @@ export function parseOcrText(raw: string): ParseResult {
     // Quantity steppers and stray glyphs: too few letters to be a name.
     if (letterCount(line) < 3) {
       // Unless it is nothing but a price, which belongs to the item above.
-      if (priced && pending && pending.line_total === "" && letterCount(priced.rest) < 3) {
+      if (
+        priced &&
+        pending &&
+        pending.line_total === "" &&
+        letterCount(priced.rest) < 3 &&
+        looksLikeMoney(line, priced.price)
+      ) {
         pending.line_total = cheapestOf(line, priced.price);
       }
       continue;
@@ -879,7 +904,9 @@ export function parseOcrText(raw: string): ParseResult {
 
     // ---- a price on its own line: it belongs to the item above -------------
     if (priced && letterCount(priced.rest) < 3) {
-      if (pending && pending.line_total === "") pending.line_total = cheapestOf(line, priced.price);
+      if (pending && pending.line_total === "" && looksLikeMoney(line, priced.price)) {
+        pending.line_total = cheapestOf(line, priced.price);
+      }
       continue;
     }
 
