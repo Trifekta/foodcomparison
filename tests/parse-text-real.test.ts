@@ -639,3 +639,65 @@ describe("a Pizza Hut cart, as OCR actually reads it", () => {
     expect(parseOcrText(CART).basket.restaurant_name).toBe("Pizza Hut");
   });
 });
+
+/**
+ * The same cart, read by a different phone.
+ *
+ * OCR is not deterministic across devices: the same screenshot on another
+ * handset put a lone "5" among the description lines - a fragment of the image
+ * column beside them - and ran "Chipotle BBQ Dip" into "Cor" from whatever sat
+ * to its right.
+ *
+ * That "5" became the Limo Combo's price. And because an item WITH a price is
+ * an item whose row has ended, the next gap closed it, the rest of the
+ * description opened a second item, and that one caught the real 119.00. Two
+ * items, both wrong, from one stray digit.
+ *
+ * A price carries fils or a currency mark. A bare integer alone on a line is a
+ * quantity stepper, a badge, or noise, and has not earned the right to become
+ * somebody's basket.
+ */
+describe("the same cart, with the image column leaking a stray digit", () => {
+  const CART = [
+    "10:51",
+    "Cart",
+    "<     Pizza Hut",
+    "",
+    "Limo Combo",
+    "",
+    "Meal, Margherita, Margherita,                    QR)",
+    "",
+    "Margherita, Limo Combo,                  TORE",
+    "",
+    "5",
+    "",
+    "Pepsi (2.25 litres), Creamy",
+    "",
+    "Ranch, Fiery Peri Sauce,                 og 1 +",
+    "",
+    "Chipotle BBQ Dip Cor",
+    "",
+    "2 Edit",
+    "",
+    "£119.00 816200",
+    "",
+    "You might also like...",
+  ].join("\n");
+
+  it("is still one item at the right price", () => {
+    const { basket } = parseOcrText(CART);
+    expect(basket.items).toHaveLength(1);
+    expect(basket.items[0].name).toBe("Limo Combo");
+    expect(basket.items[0].line_total).toBe("119.00");
+  });
+
+  /**
+   * The bar is evidence, not position: a whole-dirham price does exist, and it
+   * arrives with its currency beside it.
+   */
+  it("still takes a whole-dirham price when the currency says so", () => {
+    // The restaurant claims the first line, so the dish needs one above it.
+    const { basket } = parseOcrText(["Al Safadi", "Shawarma Plate", "AED 45"].join("\n"));
+    expect(basket.items[0].line_total).toBe("45");
+  });
+});
