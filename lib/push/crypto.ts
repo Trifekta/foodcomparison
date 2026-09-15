@@ -122,7 +122,14 @@ export async function vapidAuthorization(
   return `vapid t=${signingInput}.${toBase64Url(signature)}, k=${publicKey}`;
 }
 
-/** HKDF as RFC 8291 uses it: SHA-256, a salt, and a one-byte-counter info. */
+/**
+ * HKDF, both halves of it.
+ *
+ * crypto.subtle.deriveBits with HKDF runs Extract AND Expand, and Expand
+ * appends the 0x01 counter byte to the info itself. Callers pass the info up to
+ * and including its null terminator and nothing more; adding the counter by
+ * hand derives a different key, which is a failure with no error attached to it.
+ */
 async function hkdf(
   salt: Uint8Array,
   ikm: Uint8Array,
@@ -190,16 +197,23 @@ export async function encryptPayload(
   );
   const ikm = await hkdf(auth, sharedSecret, keyInfo, 32);
 
+  // The info strings end at their null terminator. RFC 8188 writes them as
+  // "Content-Encoding: aes128gcm" || 0x00, and the 0x01 counter that follows
+  // belongs to HKDF-Expand - which crypto.subtle.deriveBits performs itself.
+  // Appending it here as well produced a key and a nonce that no browser could
+  // reproduce, so every push was accepted by the push service, delivered, and
+  // silently failed to decrypt on arrival. Nothing reported an error at any
+  // point: not the service, not the worker, not us.
   const contentEncryptionKey = await hkdf(
     salt,
     ikm,
-    concat(encoder.encode("Content-Encoding: aes128gcm"), new Uint8Array([0, 1])),
+    concat(encoder.encode("Content-Encoding: aes128gcm"), new Uint8Array([0])),
     16,
   );
   const nonce = await hkdf(
     salt,
     ikm,
-    concat(encoder.encode("Content-Encoding: nonce"), new Uint8Array([0, 1])),
+    concat(encoder.encode("Content-Encoding: nonce"), new Uint8Array([0])),
     12,
   );
 

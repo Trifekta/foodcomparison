@@ -155,173 +155,18 @@ describe("the encrypted body (RFC 8291)", () => {
  * read what we send, which is the one thing that cannot be checked by looking
  * at lengths.
  */
-describe("a browser can actually open what we send", () => {
-  const decoder = new TextDecoder();
-  const encoder = new TextEncoder();
-
-  function concat(...parts: Uint8Array[]): Uint8Array {
-    const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-    let offset = 0;
-    for (const part of parts) {
-      out.set(part, offset);
-      offset += part.length;
-    }
-    return out;
-  }
-
-  async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, length: number) {
-    const key = await crypto.subtle.importKey("raw", ikm as BufferSource, "HKDF", false, [
-      "deriveBits",
-    ]);
-    return new Uint8Array(
-      await crypto.subtle.deriveBits(
-        { name: "HKDF", hash: "SHA-256", salt: salt as BufferSource, info: info as BufferSource },
-        key,
-        length * 8,
-      ),
-    );
-  }
-
-  it("decrypts back to exactly the payload that went in", async () => {
-    // The browser's own subscription keys, private half kept this time.
-    const pair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, [
-      "deriveBits",
-    ]);
-    const clientPublic = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
-    const authSecret = crypto.getRandomValues(new Uint8Array(16));
-
-    const payload = JSON.stringify({
-      title: "Your SnipSavor result is ready 🎉",
-      body: "We checked your basket on Keeta. Tap to see the result.",
-      url: "/r/0123456789abcdef0123456789abcdef",
-    });
-
-    const { body } = await encryptPayload(
-      payload,
-      toBase64Url(clientPublic),
-      toBase64Url(authSecret),
-    );
-
-    // Unpack the header the way a browser does.
-    const salt = body.slice(0, 16);
-    const keyLength = body[20];
-    const serverPublic = body.slice(21, 21 + keyLength);
-    const ciphertext = body.slice(21 + keyLength);
-
-    const serverKey = await crypto.subtle.importKey(
-      "raw",
-      serverPublic as BufferSource,
-      { name: "ECDH", namedCurve: "P-256" },
-      false,
-      [],
-    );
-    const shared = new Uint8Array(
-      await crypto.subtle.deriveBits({ name: "ECDH", public: serverKey }, pair.privateKey, 256),
-    );
-
-    const ikm = await hkdf(
-      authSecret,
-      shared,
-      concat(encoder.encode("WebPush: info"), new Uint8Array([0]), clientPublic, serverPublic),
-      32,
-    );
-    const contentKey = await hkdf(
-      salt,
-      ikm,
-      concat(encoder.encode("Content-Encoding: aes128gcm"), new Uint8Array([0, 1])),
-      16,
-    );
-    const nonce = await hkdf(
-      salt,
-      ikm,
-      concat(encoder.encode("Content-Encoding: nonce"), new Uint8Array([0, 1])),
-      12,
-    );
-
-    const aesKey = await crypto.subtle.importKey(
-      "raw",
-      contentKey as BufferSource,
-      { name: "AES-GCM" },
-      false,
-      ["decrypt"],
-    );
-    const plaintext = new Uint8Array(
-      await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: nonce as BufferSource },
-        aesKey,
-        ciphertext as BufferSource,
-      ),
-    );
-
-    // The trailing byte is the 0x02 record delimiter, not part of the message.
-    expect(plaintext[plaintext.length - 1]).toBe(2);
-    expect(decoder.decode(plaintext.slice(0, -1))).toBe(payload);
-  });
-
-  it("cannot be opened with the wrong subscription keys", async () => {
-    const mine = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, [
-      "deriveBits",
-    ]);
-    const theirs = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, [
-      "deriveBits",
-    ]);
-    const theirPublic = new Uint8Array(await crypto.subtle.exportKey("raw", theirs.publicKey));
-    const authSecret = crypto.getRandomValues(new Uint8Array(16));
-
-    const { body } = await encryptPayload(
-      "secret",
-      toBase64Url(theirPublic),
-      toBase64Url(authSecret),
-    );
-
-    // Same unpacking, but with the wrong private key: the shared secret differs,
-    // so the derived key differs, and AES-GCM refuses rather than returning junk.
-    const serverPublic = body.slice(21, 21 + body[20]);
-    const serverKey = await crypto.subtle.importKey(
-      "raw",
-      serverPublic as BufferSource,
-      { name: "ECDH", namedCurve: "P-256" },
-      false,
-      [],
-    );
-    const shared = new Uint8Array(
-      await crypto.subtle.deriveBits({ name: "ECDH", public: serverKey }, mine.privateKey, 256),
-    );
-    const ikm = await hkdf(
-      authSecret,
-      shared,
-      concat(encoder.encode("WebPush: info"), new Uint8Array([0]), theirPublic, serverPublic),
-      32,
-    );
-    const contentKey = await hkdf(
-      body.slice(0, 16),
-      ikm,
-      concat(encoder.encode("Content-Encoding: aes128gcm"), new Uint8Array([0, 1])),
-      16,
-    );
-    const nonce = await hkdf(
-      body.slice(0, 16),
-      ikm,
-      concat(encoder.encode("Content-Encoding: nonce"), new Uint8Array([0, 1])),
-      12,
-    );
-    const aesKey = await crypto.subtle.importKey(
-      "raw",
-      contentKey as BufferSource,
-      { name: "AES-GCM" },
-      false,
-      ["decrypt"],
-    );
-
-    await expect(
-      crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: nonce as BufferSource },
-        aesKey,
-        body.slice(21 + body[20]) as BufferSource,
-      ),
-    ).rejects.toThrow();
-  });
-});
+/**
+ * There was a hand-rolled decryption test here, and it is gone on purpose.
+ *
+ * It unpacked the header and re-derived the keys - using the same wrong info
+ * strings the implementation used. So it passed, every time, against a
+ * ciphertext no browser could open. It was not a test of the spec; it was a
+ * mirror, and a mirror always agrees.
+ *
+ * The replacement is below and decrypts with http_ece, which shares no code
+ * with ours. That is the only version of this test worth having: the whole
+ * value is in the second opinion.
+ */
 
 /**
  * One browser, two roles.
@@ -341,5 +186,86 @@ describe("what makes a subscription the same one", () => {
   it("is the endpoint and the role, never the endpoint alone", async () => {
     const { PUSH_CONFLICT_TARGET } = await import("@/lib/push/send");
     expect(PUSH_CONFLICT_TARGET).toBe("endpoint,kind");
+  });
+});
+
+/**
+ * The test that was missing, and the reason this file passed while every push
+ * silently failed.
+ *
+ * Everything above checks the SHAPE of the encrypted body - the header layout,
+ * the lengths, that the salt changes. All of it passed against an
+ * implementation whose content key and nonce no browser on earth could
+ * reproduce, because shape is not correctness and a test that encrypts with our
+ * code and inspects it with our assumptions is a closed loop agreeing with
+ * itself.
+ *
+ * So this decrypts, with http_ece - the library the real clients agree with,
+ * and which shares no code with ours. If the two ever disagree about a spec
+ * again, this fails instead of a customer's phone staying quiet.
+ */
+describe("what the browser actually receives", () => {
+  it("decrypts to exactly what was sent, using an implementation that is not ours", async () => {
+    const [{ default: ece }, nodeCrypto] = await Promise.all([
+      import("http_ece"),
+      import("node:crypto"),
+    ]);
+
+    // A browser's subscription keypair, made the way a real one is.
+    const subscriber = nodeCrypto.createECDH("prime256v1");
+    subscriber.generateKeys();
+    const authSecret = nodeCrypto.randomBytes(16);
+
+    const payload = JSON.stringify({
+      title: "New SnipSavor request 🔔",
+      body: "A customer in Dubai Marina just submitted a price comparison.",
+      url: "/admin",
+    });
+
+    const { body } = await encryptPayload(
+      payload,
+      subscriber.getPublicKey().toString("base64url"),
+      authSecret.toString("base64url"),
+    );
+
+    const decrypted = ece.decrypt(Buffer.from(body), {
+      version: "aes128gcm",
+      privateKey: subscriber,
+      authSecret,
+    });
+
+    expect(decrypted.toString()).toBe(payload);
+  });
+
+  /**
+   * The specific mistake, named so it cannot come back quietly: the HKDF info
+   * strings end at their null terminator. crypto.subtle.deriveBits runs
+   * HKDF-Expand itself and appends the 0x01 counter, so adding it by hand
+   * derives a key the browser cannot reproduce - and nothing anywhere reports an
+   * error. The push service accepts the message, delivers it, and the service
+   * worker fails to open it in silence.
+   */
+  it("still decrypts a payload long enough to span the padding boundary", async () => {
+    const [{ default: ece }, nodeCrypto] = await Promise.all([
+      import("http_ece"),
+      import("node:crypto"),
+    ]);
+
+    const subscriber = nodeCrypto.createECDH("prime256v1");
+    subscriber.generateKeys();
+    const authSecret = nodeCrypto.randomBytes(16);
+    const payload = "x".repeat(2000);
+
+    const { body } = await encryptPayload(
+      payload,
+      subscriber.getPublicKey().toString("base64url"),
+      authSecret.toString("base64url"),
+    );
+
+    expect(
+      ece
+        .decrypt(Buffer.from(body), { version: "aes128gcm", privateKey: subscriber, authSecret })
+        .toString(),
+    ).toBe(payload);
   });
 });
