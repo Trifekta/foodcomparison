@@ -379,9 +379,10 @@ ADMIN_ALERT_EMAIL      email alerts instead of, or as well as, Telegram.
 WEB_PUSH_PUBLIC_KEY    browser push. Generate a pair with `npm run push:keys`
 WEB_PUSH_PRIVATE_KEY   or `npx web-push generate-vapid-keys`. Both must be set
 WEB_PUSH_SUBJECT       or the Enable button never appears on the dashboard.
-CRON_SECRET            any long random string. Without it the chaser route
-                       refuses every caller, so nothing reminds you about an
-                       order nobody opened.
+CRON_SECRET            any long random string you invent - it is a password
+                       between the scheduler and the app, not something a
+                       service issues. The Cron Trigger in wrangler.jsonc runs
+                       every 5 minutes and does nothing until this is set.
 ```
 
 One more, and it is not optional at launch even though it has a default:
@@ -398,9 +399,19 @@ then has to open the dashboard **on the phone that should buzz** and press
 *Enable new request notifications*. On an iPhone that button only exists in a
 copy added to the Home Screen - iOS does not offer push to a Safari tab at all.
 
-Point a scheduler at `https://your-domain/api/cron/chase-submissions` every few
-minutes, sending `CRON_SECRET` as an `X-Cron-Secret` header or a bearer token.
-A Cloudflare Worker Cron Trigger, an uptime monitor or cron-job.org all work.
+**The schedule is already configured.** `wrangler.jsonc` carries a Cron Trigger
+every five minutes, and `worker/index.ts` wraps the Worker OpenNext generates to
+add the `scheduled` export Cloudflare calls. Nothing outside Cloudflare has to
+know the route exists, and there is no account anywhere else to keep alive.
+
+Set `CRON_SECRET` on the Worker and it starts running. Without it the handler
+logs `[cron] CRON_SECRET is not set` and returns — the route refuses every
+caller, internal ones included, because one rule about who may run the chaser is
+easier to be sure of than one rule with an exception.
+
+The route stays open to an outside scheduler too (`X-Cron-Secret` header or a
+bearer token), so an uptime monitor or cron-job.org still works if you ever want
+the schedule to live somewhere Cloudflare cannot see.
 
 You can also set them from the CLI:
 
