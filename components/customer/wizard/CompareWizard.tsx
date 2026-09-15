@@ -16,6 +16,7 @@ import { rememberLastOrder } from "@/lib/utils/last-order";
 import { track } from "@/lib/analytics/track";
 import { attributionFormFields, currentAttribution } from "@/lib/analytics/attribution";
 import { compressForUpload } from "@/lib/images/compress";
+import { itemTitle } from "@/lib/extraction/normalise";
 import type { FunnelEvent } from "@/lib/analytics/funnel";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
@@ -201,18 +202,29 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
         setItems((current) => {
           if (current.length > 0 || basket.items.length === 0) return current;
           applied = true;
-          return basket.items.map((item, index) => ({
-            key: crypto.randomUUID(),
-            name: [item.name, ...item.modifiers].join(" · ").slice(0, 120),
-            quantity: item.quantity,
-            linePrice: item.line_total || null,
-            priceUncertain: flagged.has(`items[${index}].line_total`) && item.line_total !== "",
-            proposed: {
-              name: [item.name, ...item.modifiers].join(" · ").slice(0, 120),
+          return basket.items.map((item, index) => {
+            // The title, not the title plus its whole description.
+            //
+            // A combo's modifier list runs to nine items - "Meal, Margherita,
+            // Margherita, Margherita, Limo Combo, Pepsi (2.25 litres)..." - and
+            // joined onto the name it filled the row, got cut off mid-word, and
+            // left the customer confirming a basket they could not read. They
+            // are being asked "is this your order", and "Limo Combo" answers
+            // that; the rest is what is inside it, which they already know.
+            //
+            // Nothing is lost: the screenshot itself goes to the admin, who
+            // rebuilds the basket from the picture rather than from this list.
+            const name = itemTitle(item.name);
+
+            return {
+              key: crypto.randomUUID(),
+              name,
               quantity: item.quantity,
               linePrice: item.line_total || null,
-            },
-          }));
+              priceUncertain: flagged.has(`items[${index}].line_total`) && item.line_total !== "",
+              proposed: { name, quantity: item.quantity, linePrice: item.line_total || null },
+            };
+          });
         });
 
         setStatus(slot, applied ? "applied" : "empty");

@@ -348,6 +348,16 @@ function withoutJunkTail(rawLine: string): string {
   return head;
 }
 
+/**
+ * Units that turn a number into a size rather than a sum.
+ *
+ * Deliberately short. Every entry here is a word that cannot plausibly follow a
+ * price on a receipt, which is what makes skipping the number safe - a longer
+ * list of maybes would start eating real prices.
+ */
+const MEASUREMENT_AFTER =
+  /^\s*(?:l|lt|ltr|lit|litre|liter|litres|liters|ml|cl|kg|kgs|g|gm|gr|gram|grams|oz|lb|cm|mm|pc|pcs|piece|pieces|slice|slices|pack|packs)\b/i;
+
 /** Every money-shaped value on a line, in the order they appear. */
 function allPrices(line: string): string[] {
   return line.match(/\d{1,5}\.\d{1,2}/g) ?? [];
@@ -382,6 +392,18 @@ function extractPrice(line: string): { price: string; rest: string } | null {
 
   while ((match = pattern.exec(cleaned)) !== null) {
     if (match[0].trim() === "") continue;
+
+    // A measurement is not a price. "Pepsi (2.25 litres)" sits in the middle of
+    // a combo's description, and 2.25 carries a decimal point, which outranks
+    // everything else here - so a customer was shown a Limo Combo costing AED
+    // 2.25 while the real 119.00 two lines below was never reached.
+    //
+    // Matched on the unit that follows rather than on the brackets, because the
+    // brackets are the packaging of this one example and the unit is the thing
+    // that makes it a quantity. Only units that are unambiguous: "in" and "x"
+    // are left out, because "2.25 in the box" is not a volume and a dish really
+    // can be "Pizza 12 in".
+    if (MEASUREMENT_AFTER.test(cleaned.slice(match.index + match[0].length))) continue;
 
     const hasCurrency = Boolean(match[1] || match[3]);
     const hasDecimal = match[2].includes(".");
@@ -483,11 +505,13 @@ function financialKey(lower: string): FinancialKey | null {
  * total in ordinary ways - a discount is exactly what makes that happen - but a
  * discount can never exceed what there was to discount.
  *
- * Where the rest of the summary is present, the same arithmetic that rejects the
- * reading also supplies the right one, and that is not a guess: it is the
- * receipt's own subtraction. Where it does not, the field is cleared rather than
- * filled with something invented. Either way it is flagged, because a number
- * this route produced is one a human should look at.
+ * The field is cleared, never derived. Subtracting the total from the parts
+ * looks like the receipt's own arithmetic and is not: it silently absorbs every
+ * OTHER reading error into the discount. On the receipt this came from, the
+ * service fee had not been read - so the subtraction gives 38.10 against a real
+ * discount of 43.00, and a plausible wrong number is worse than a missing one,
+ * because nobody checks it. An empty discount leaves the summary visibly not
+ * adding up, which is exactly the right thing for it to look like.
  */
 function dropImpossibleDiscount(basket: StructuredBasket): string[] {
   const discount = Number(basket.discount);
@@ -509,12 +533,7 @@ function dropImpossibleDiscount(basket: StructuredBasket): string[] {
   const chargeable = subtotal + delivery + service;
   if (discount <= chargeable) return [];
 
-  const total = value(basket.final_total);
-  const derived = total !== null ? chargeable - total : null;
-
-  basket.discount =
-    derived !== null && derived > 0 && derived <= chargeable ? derived.toFixed(2) : "";
-
+  basket.discount = "";
   return ["discount"];
 }
 
