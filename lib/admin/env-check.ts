@@ -91,7 +91,7 @@ export function checkEnvironment(): EnvCheck[] {
       when: "runtime",
       present: has(process.env.CRON_SECRET),
       required: false,
-      what: "chasing orders nobody opened",
+      what: "chasing orders nobody opened - the 5-minute Cron Trigger does nothing without it",
     },
     {
       name: "TELEGRAM_BOT_TOKEN",

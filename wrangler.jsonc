@@ -5,7 +5,10 @@
   // deploys to the project name, so a mismatch here is rejected at deploy time.
   "name": "foodcomparison",
 
-  "main": ".open-next/worker.js",
+  // Our own entry, which wraps the one OpenNext generates. The wrapper exists
+  // only to add a `scheduled` export for the cron trigger below; every other
+  // export is passed straight through. See worker/index.ts.
+  "main": "worker/index.ts",
   "compatibility_date": "2026-09-08",
 
   // nodejs_compat: Next.js and supabase-js need Node built-ins.
@@ -20,6 +23,15 @@
 
   "observability": {
     "enabled": true
+  },
+
+  // "Is anything still waiting?", asked by Cloudflare rather than by a
+  // third-party scheduler. Every five minutes, against a promise of five: a
+  // submission is chased once it has been unanswered for ten, so this is
+  // frequent enough that the reminder is never much later than that and rare
+  // enough to be free.
+  "triggers": {
+    "crons": ["*/5 * * * *"]
   }
 
   // Deliberately no WORKER_SELF_REFERENCE service binding. OpenNext only needs
