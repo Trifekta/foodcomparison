@@ -88,18 +88,57 @@ export interface SchemaGap {
   detail: string;
 }
 
+/**
+ * Remembered for a few minutes, per isolate.
+ *
+ * This runs on every dashboard load to detect something that changes only when
+ * a person runs a migration by hand - which is roughly never, and never without
+ * that person knowing. Asking the database eight times a page for an answer
+ * that was the same five seconds ago is most of what made the dashboard feel
+ * slow. A stale "everything is fine" costs one page view; a stale "0014 is
+ * missing" costs the same and names a file that is already run.
+ */
+let cached: { at: number; gaps: SchemaGap[] } | null = null;
+const CACHE_MS = 5 * 60_000;
+
+/** Cleared by the tests, and by anything that has reason to think it changed. */
+export function forgetSchemaCheck(): void {
+  cached = null;
+}
+
 export async function findMissingMigrations(): Promise<SchemaGap[]> {
+  if (cached && Date.now() - cached.at < CACHE_MS) return cached.gaps;
+
+  const gaps = await probeForGaps();
+  cached = { at: Date.now(), gaps };
+  return gaps;
+}
+
+async function probeForGaps(): Promise<SchemaGap[]> {
   const supabase = await createServerSupabaseClient();
 
-  const results = await Promise.all(
-    PROBES.map(async (probe) => {
-      const { error } = await supabase.from("submissions").select(probe.column).limit(1);
-      // Only a missing column counts. A permissions or network failure is a
-      // different problem and must not be reported as a missing migration.
-      const missing = error !== null && /column|does not exist|schema cache/i.test(error.message);
-      return missing ? { file: probe.file, breaks: probe.breaks, detail: error.message } : null;
-    }),
-  );
+  // One query naming every column first. They are all on `submissions`, so a
+  // database that is up to date answers the whole question in a single round
+  // trip - which is the case on every load but the one after a deploy. Only
+  // when that fails is it worth asking column by column to find out which.
+  const { error: combined } = await supabase
+    .from("submissions")
+    .select(PROBES.map((probe) => probe.column).join(", "))
+    .limit(1);
+
+  const results = combined
+    ? await Promise.all(
+        PROBES.map(async (probe) => {
+          const { error } = await supabase.from("submissions").select(probe.column).limit(1);
+          // Only a missing column counts. A permissions or network failure is
+          // a different problem and must not be reported as a missing
+          // migration.
+          const missing =
+            error !== null && /column|does not exist|schema cache/i.test(error.message);
+          return missing ? { file: probe.file, breaks: probe.breaks, detail: error.message } : null;
+        }),
+      )
+    : [];
 
   const others = await Promise.all(
     OTHER_PROBES.map(async (probe) => {
