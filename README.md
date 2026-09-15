@@ -355,6 +355,13 @@ bindings into `process.env` on each request.
 > `/admin/diagnostics` → **What this Worker can see** answers this directly,
 > one line per name. It reads no values, only whether the name is visible.
 
+> **Set runtime values as Secret, not as Variable.** Wrangler treats its config
+> file as the source of truth and deletes plain-text variables it does not find
+> there, so `wrangler deploy` — which runs on every merge — silently wiped every
+> dashboard Variable. Secrets were never touched. `keep_vars: true` in
+> `wrangler.jsonc` now stops the deletion, but Secret is still the right type for
+> a private key.
+
 
 
 ```

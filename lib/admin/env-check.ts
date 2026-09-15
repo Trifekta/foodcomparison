@@ -129,7 +129,7 @@ export function environmentNextStep(checks: EnvCheck[]): string | null {
     (check) => check.when === "runtime" && check.required && !check.present,
   );
   if (missingRuntime.length > 0) {
-    return `${missingRuntime.map((check) => check.name).join(", ")} cannot be read at request time. These belong in the Worker's own Variables and Secrets, not in Build variables - the two panels have the same name and only one of them is read while the site is running.`;
+    return `${missingRuntime.map((check) => check.name).join(", ")} cannot be read at request time. Two things do this. They may be in Build variables rather than the Worker's own Variables and Secrets - the two panels share a name and only one is read while the site runs. Or they were set as plain Variables and a deploy deleted them: wrangler treats its config file as the source of truth and removes dashboard variables it does not find there, which is why "set as Secret" is not just advice about secrecy.`;
   }
 
   const missingBuild = checks.filter(
