@@ -371,6 +371,15 @@ CRON_SECRET            any long random string. Without it the chaser route
                        order nobody opened.
 ```
 
+One more, and it is not optional at launch even though it has a default:
+
+```
+KEETA_ALLOWED_HOSTS    EXACT hostnames /go/ may redirect to, comma-separated.
+                       Not domains: "mykeeta.com" would not allow
+                       url-eu.mykeeta.com. Defaults to the three Keeta serves
+                       the UAE from, so most deployments need not set it.
+```
+
 Setting the push keys is not the last step: push is per device, so somebody
 then has to open the dashboard **on the phone that should buzz** and press
 *Enable new request notifications*. On an iPhone that button only exists in a
@@ -912,6 +921,74 @@ colour behind it as it opens — comes from `app/manifest.ts` and
 `app/apple-icon.png`. Without them iOS falls back to a screenshot of the page,
 which is the difference between an app and a bookmark at the exact moment
 somebody decides whether to bother.
+
+---
+
+## Proving somebody switched
+
+"Open on Keeta" is not a link to Keeta. It points at `/go/<token>`, which looks
+up the comparison, checks the destination, writes a row, and forwards - so
+"this customer saw this saving and then switched" is a record rather than an
+inference from a funnel counter.
+
+```
+result page  ->  /go/<redirect_token>?v=<visit>  ->  keeta_clicks row  ->  Keeta
+```
+
+The token is **not** the result token. That one is the whole of the
+authorisation for a customer's prices, and this one is designed to be followed
+off-site, where it lands in another company's referrer header. A leaked `/go/`
+link reveals nothing and grants nothing: the only thing it can do is redirect.
+
+**It is not an open redirect.** `KEETA_ALLOWED_HOSTS` is the allowlist, and it
+holds **exact hostnames, not domains** — allowing `*.mykeeta.com` would be a far
+larger promise than the three addresses that actually serve restaurants here:
+
+| Host | What it is |
+| --- | --- |
+| `url-eu.mykeeta.com` | what the Keeta app puts on the clipboard — the one an admin pastes |
+| `m-eu.mykeeta.com` | where those links land, carrying `region=AE` |
+| `fooddelivery1-eu.mykeeta.com` | likewise |
+
+`keeta.com` and `keeta-global.com` are deliberately absent: the first is not
+what the UAE app produces and the second is the corporate site. The `sailorc://`
+app deep link is refused too — a scheme we do not control is not something to
+hand a browser, and the https share link launches the app by itself.
+
+It is checked **twice**. The admin form refuses to save a link the redirect
+would refuse to follow, so a bad paste is caught while it is still on somebody's
+clipboard; the redirect checks again, because a row can be written by something
+other than that form and an allowlist that changes after a link was saved is
+exactly what the later check is for. Anything else — including
+`https://url-eu.mykeeta.com@evil.test/` and `https://url-eu.mykeeta.com.evil.test`
+— lands on `/go/unavailable`. See `lib/keeta/destination.ts`.
+
+**Where the customer came from travels with them.** Campaign parameters exist on
+the first URL of a visit and nowhere else, so they are captured on arrival
+(`lib/analytics/attribution.ts`), stored on the submission, and inherited by the
+click. First touch wins, and the referrer is reduced to its origin — "which
+site" is ours to know, "which page" is not. The `/go/` URL is never read for
+them: it would be several navigations too late, and anybody could reassign a
+click to any campaign by typing one.
+
+```
+Instagram ad 2  ->  landing  ->  screenshot sent  ->  result  ->  switched
+utm_campaign=validation_week1, utm_content=ad2_new_user, fbclid=…
+```
+
+**A click is not an order.** Every row is switch intent and says so:
+`conversion_status` starts at `unknown`, not `clicked`, because nothing has
+looked for an order. `converted_at`, `keeta_order_id`, `order_value` and
+`commission_value` are already columns, so wiring a Keeta referral callback
+later is a route and not a migration.
+
+Nothing may cost the customer their redirect. A failed write, a slow database
+or a missing migration are all logged and forwarded anyway; the only thing that
+stops a redirect is a destination we will not vouch for.
+
+`/admin/attribution` reads it back: total taps, unique switchers, the
+click-through rate against comparisons that had a button, and every click with
+its restaurant, source app, prices, saving, area and click id.
 
 ---
 

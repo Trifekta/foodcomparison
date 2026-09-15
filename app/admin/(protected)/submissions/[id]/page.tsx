@@ -25,6 +25,7 @@ import { formatDecimalStringAsCurrency, formatMinorAsCurrency } from "@/lib/calc
 import { formatDubaiDateTime } from "@/lib/utils/text";
 import { LEGACY_OTHER_APP } from "@/lib/constants";
 import { resultPath } from "@/lib/utils/reference";
+import { allowedKeetaHosts } from "@/lib/keeta/destination";
 import { maskEmail } from "@/lib/utils/phone";
 import { statusLabel } from "@/lib/utils/status";
 import type { SubmissionItemSource } from "@/types/database";
@@ -305,6 +306,7 @@ export default async function SubmissionDetailPage({
             comparisonApp={submission.comparison_app}
             currentTotal={submission.current_total}
             areaName={submission.areas?.name ?? "Dubai"}
+            allowedKeetaHosts={allowedKeetaHosts()}
             initial={{
               sourceApp: submission.source_app,
               comparisonUrl: submission.comparison_url ?? "",

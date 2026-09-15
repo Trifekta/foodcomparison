@@ -14,7 +14,11 @@ import {
   cartItemsSchema,
   submissionFieldsSchema,
 } from "@/lib/validation/submission";
-import { generateReferenceNumber, generateResultToken } from "@/lib/utils/reference";
+import {
+  generateReferenceNumber,
+  generateRedirectToken,
+  generateResultToken,
+} from "@/lib/utils/reference";
 import { alertAdminOfNewSubmission } from "@/lib/notifications/admin-alert";
 import { pushToAdmins } from "@/lib/push/send";
 import { normalisePhone } from "@/lib/utils/phone";
@@ -106,6 +110,35 @@ function parseItems(raw: FormDataEntryValue | null): ParsedItems {
   return { ok: true, value };
 }
 
+/** Longer than any sane campaign name, short enough that no column is at risk. */
+const MAX_ATTRIBUTION_LENGTH = 160;
+
+/**
+ * The campaign labels the browser captured on arrival.
+ *
+ * Every field optional and every absence a null, because most visits have none
+ * of this and a submission must never depend on it. Column names rather than
+ * form names, so what is read here is what lands in the row.
+ */
+function readAttribution(formData: FormData): Record<string, string | null> {
+  const read = (field: string): string | null => {
+    const value = formData.get(field);
+    if (typeof value !== "string") return null;
+    return sanitiseText(value, MAX_ATTRIBUTION_LENGTH) || null;
+  };
+
+  return {
+    utm_source: read("utmSource"),
+    utm_medium: read("utmMedium"),
+    utm_campaign: read("utmCampaign"),
+    utm_content: read("utmContent"),
+    utm_term: read("utmTerm"),
+    click_id: read("clickId"),
+    landing_path: read("landingPath"),
+    landing_referrer: read("landingReferrer"),
+  };
+}
+
 export async function createSubmission(formData: FormData): Promise<CreateSubmissionResult> {
   // ---- 1. Fields ----------------------------------------------------------
   const parsed = submissionFieldsSchema.safeParse({
@@ -133,6 +166,12 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   // The optional item list arrives as one JSON entry. Bad JSON is rejected
   // rather than ignored: it can only come from a tampered or broken client, and
   // silently dropping a basket the customer thinks they sent would be worse.
+  // Where they came from, captured in the browser when they first arrived. Not
+  // validated beyond length and trimming: these are labels we chose for our own
+  // adverts, they are worth nothing to anybody forging them, and a campaign name
+  // that fails validation would cost a real submission to protect a report.
+  const attribution = readAttribution(formData);
+
   const items = parseItems(formData.get("items"));
   if (!items.ok) {
     return { ok: false, status: 400, error: items.error, field: "items" };
@@ -253,6 +292,10 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   // ---- 5. Insert, retrying only on a reference-number collision ------------
   let referenceNumber = "";
   const resultToken = generateResultToken();
+  // Minted here beside the result token rather than when a comparison is
+  // saved, so a submission never exists in a state where the button cannot be
+  // built. It addresses nothing until there is a link to redirect to.
+  const redirectToken = generateRedirectToken();
   let inserted = false;
   let insertError: DbError = null;
 
@@ -266,6 +309,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       // customer is sent straight to this address and we cannot wait to read it
       // back. The default exists so a row can never end up without one.
       result_token: resultToken,
+      redirect_token: redirectToken,
       status: "new",
       // The customer is not asked which app this came from - the screenshot
       // shows it to anyone who looks, and asking costs a question. The admin
@@ -282,6 +326,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       email,
       marketing_consent: fields.marketingConsent,
       restaurant_name: sanitiseText(fields.restaurantName, MAX_RESTAURANT_NAME_LENGTH),
+      ...attribution,
     });
 
     if (!error) {

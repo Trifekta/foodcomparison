@@ -93,3 +93,27 @@ export function isValidResultToken(value: string): boolean {
 export function resultPath(token: string): string {
   return `/r/${token}`;
 }
+
+/**
+ * The token in the outbound /go/ link.
+ *
+ * Same shape and same entropy as a result token, and deliberately a different
+ * value. The result token is the whole of the authorisation for a customer's
+ * prices; this one is designed to be followed off-site, where it lands in
+ * another company's referrer header. Reusing one for both would mean every
+ * switch handed Keeta the key to the result page.
+ */
+export function generateRedirectToken(): string {
+  return generateResultToken();
+}
+
+export const REDIRECT_TOKEN_PATTERN = RESULT_TOKEN_PATTERN;
+
+export function isValidRedirectToken(value: string): boolean {
+  return REDIRECT_TOKEN_PATTERN.test(value);
+}
+
+/** Where the "Open on Keeta" button points. Relative, so any host works. */
+export function keetaRedirectPath(token: string): string {
+  return `/go/${token}`;
+}

@@ -14,6 +14,7 @@ import {
 } from "@/lib/validation/submission";
 import { rememberLastOrder } from "@/lib/utils/last-order";
 import { track } from "@/lib/analytics/track";
+import { attributionFormFields, currentAttribution } from "@/lib/analytics/attribution";
 import type { FunnelEvent } from "@/lib/analytics/funnel";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
@@ -295,6 +296,14 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       if (files.checkout) body.append("checkoutImage", files.checkout);
       for (const [key, value] of Object.entries(parsed.data)) {
         body.append(key, typeof value === "boolean" ? String(value) : value);
+      }
+
+      // Where this customer came from, captured when they arrived and carried
+      // here so it can be stored on the submission. Everything downstream - the
+      // result, the switch to Keeta - inherits it from the row rather than
+      // trying to read a query string that stopped existing several screens ago.
+      for (const [key, value] of Object.entries(attributionFormFields(currentAttribution()))) {
+        body.append(key, value);
       }
 
       // Sent as one JSON entry, and re-parsed and re-validated on the server.

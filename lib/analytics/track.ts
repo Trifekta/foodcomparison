@@ -18,7 +18,17 @@ import type { FunnelEvent } from "./funnel";
 
 const KEY = "snipsavor.visit";
 
-function visitId(): string | null {
+/**
+ * The id for this visit, made on first use.
+ *
+ * Exported as well as used here, because the outbound Keeta link carries it in
+ * its query string: the click is recorded server-side, where sessionStorage is
+ * not readable, and without it the report can count taps but not the people
+ * making them. It is the same value the funnel already uses, so "visits that
+ * reached the result" and "visits that switched" are the same kind of number.
+ */
+
+export function visitId(): string | null {
   try {
     const existing = sessionStorage.getItem(KEY);
     if (existing) return existing;

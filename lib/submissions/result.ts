@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   isValidReferenceNumber,
   isValidResultToken,
+  keetaRedirectPath,
   normaliseReference,
   resultPath,
 } from "@/lib/utils/reference";
@@ -52,8 +53,15 @@ export interface PublicResult {
   comparisonTotal: string | null;
   savingAmount: string | null;
   savingPercentage: number | null;
-  /** The restaurant's page on the comparison app, when an admin has linked it. */
-  comparisonUrl: string | null;
+  /**
+   * Where the "Open on Keeta" button points.
+   *
+   * Our own /go/ path, not the restaurant's link. The customer's switch goes
+   * through us so it can be recorded as evidence, and the destination is
+   * checked against the approved domains at the moment of the redirect. The
+   * Keeta link itself never reaches the browser.
+   */
+  switchPath: string | null;
   items: Array<{ name: string; quantity: number; linePrice: string | null }>;
   createdAt: string;
 }
@@ -89,7 +97,7 @@ export async function getPublicResult(token: string): Promise<PublicResult | nul
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, reference_number, status, restaurant_name, current_total, comparison_app, comparison_total, saving_amount, saving_percentage, comparison_url, unavailable_reason, created_at",
+      "id, reference_number, status, restaurant_name, current_total, comparison_app, comparison_total, saving_amount, saving_percentage, comparison_url, redirect_token, unavailable_reason, created_at",
     )
     .eq("result_token", token)
     .maybeSingle();
@@ -136,7 +144,10 @@ export async function getPublicResult(token: string): Promise<PublicResult | nul
     savingAmount:
       saving && saving.hasSaving ? formatMinorToDecimalString(saving.savingMinor) : null,
     savingPercentage: saving && saving.hasSaving ? Math.round(saving.savingPercentage) : null,
-    comparisonUrl: state === "saving" ? sanitiseLink(row.comparison_url) : null,
+    switchPath:
+      state === "saving" && sanitiseLink(row.comparison_url) && row.redirect_token
+        ? keetaRedirectPath(row.redirect_token)
+        : null,
     items,
     createdAt: row.created_at,
   };
