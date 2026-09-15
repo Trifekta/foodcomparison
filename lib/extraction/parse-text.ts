@@ -468,6 +468,56 @@ function financialKey(lower: string): FinancialKey | null {
  *
  * Returns the paths it changed, so they can be flagged for a human to check.
  */
+/**
+ * A discount larger than the thing being discounted.
+ *
+ * repairMergedCurrency tries every plausible reading against the receipt's own
+ * arithmetic, and where nothing reconciles it deliberately leaves the figures
+ * exactly as read - a fee nobody could place is better off-screen than invented.
+ * That is right for a number that is merely doubtful. It is wrong for one that
+ * is impossible: a customer was shown "Discount -AED 8,543.00" against a
+ * subtotal of AED 162.00, which is not a value anybody needs to check, and
+ * showing it undermines every other figure on the screen.
+ *
+ * So the bound is the only hard one available. Fees and subtotals can exceed the
+ * total in ordinary ways - a discount is exactly what makes that happen - but a
+ * discount can never exceed what there was to discount.
+ *
+ * Where the rest of the summary is present, the same arithmetic that rejects the
+ * reading also supplies the right one, and that is not a guess: it is the
+ * receipt's own subtraction. Where it does not, the field is cleared rather than
+ * filled with something invented. Either way it is flagged, because a number
+ * this route produced is one a human should look at.
+ */
+function dropImpossibleDiscount(basket: StructuredBasket): string[] {
+  const discount = Number(basket.discount);
+  if (basket.discount === "" || !Number.isFinite(discount) || discount <= 0) return [];
+
+  const value = (money: string) => {
+    const parsed = Number(money);
+    return money !== "" && Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const subtotal = value(basket.subtotal);
+  const delivery = value(basket.delivery_fee) ?? 0;
+  const service = value(basket.service_fee) ?? 0;
+
+  // Without a subtotal there is nothing to bound it against, and a guess would
+  // be worse than the doubtful figure already there.
+  if (subtotal === null) return [];
+
+  const chargeable = subtotal + delivery + service;
+  if (discount <= chargeable) return [];
+
+  const total = value(basket.final_total);
+  const derived = total !== null ? chargeable - total : null;
+
+  basket.discount =
+    derived !== null && derived > 0 && derived <= chargeable ? derived.toFixed(2) : "";
+
+  return ["discount"];
+}
+
 function repairMergedCurrency(
   basket: StructuredBasket,
   lostDecimals: Partial<Record<MoneyField, string>>,
@@ -834,6 +884,7 @@ export function parseOcrText(raw: string): ParseResult {
 
   basket.items = items;
   for (const field of repairMergedCurrency(basket, lostDecimals)) uncertain.add(field);
+  for (const field of dropImpossibleDiscount(basket)) uncertain.add(field);
 
   // Flag what there is evidence against, not everything. Marking every price
   // uncertain is the same as marking none: the customer stops looking.

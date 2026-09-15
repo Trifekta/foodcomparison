@@ -15,6 +15,7 @@ import {
 import { rememberLastOrder } from "@/lib/utils/last-order";
 import { track } from "@/lib/analytics/track";
 import { attributionFormFields, currentAttribution } from "@/lib/analytics/attribution";
+import { compressForUpload } from "@/lib/images/compress";
 import type { FunnelEvent } from "@/lib/analytics/funnel";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
@@ -291,9 +292,19 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     setSubmitError(null);
 
     try {
+      // Shrunk before sending. The screenshots are almost all of the payload -
+      // everything else is a few small fields - and on mobile data the upload is
+      // the whole of the wait somebody feels after pressing the button. Both are
+      // done together, and either falling back to the original costs nothing but
+      // the saving.
+      const [cartImage, checkoutImage] = await Promise.all([
+        compressForUpload(files.cart),
+        files.checkout ? compressForUpload(files.checkout) : Promise.resolve(null),
+      ]);
+
       const body = new FormData();
-      body.append("cartImage", files.cart);
-      if (files.checkout) body.append("checkoutImage", files.checkout);
+      body.append("cartImage", cartImage);
+      if (checkoutImage) body.append("checkoutImage", checkoutImage);
       for (const [key, value] of Object.entries(parsed.data)) {
         body.append(key, typeof value === "boolean" ? String(value) : value);
       }

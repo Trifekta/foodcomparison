@@ -262,3 +262,65 @@ describe("a tax line", () => {
     expect(basket.items.map((item) => item.name)).toEqual(["Vatan Special Thali for two people"]);
   });
 });
+
+/**
+ * A discount larger than the thing being discounted.
+ *
+ * Taken from a real Pizza Hut checkout that reached a customer's screen reading
+ * "Discount -AED 8,543.00" against a subtotal of AED 162.00. The repair pass
+ * correctly declined to guess - nothing reconciled - and then left the figure
+ * exactly as read, which is the right call for a doubtful number and the wrong
+ * one for an impossible one. A value like that does not invite checking; it
+ * discredits every other figure beside it.
+ */
+describe("a discount that cannot be right", () => {
+  const RECEIPT = [
+    "Pizza Hut",
+    "Limo Combo                 AED 162.00",
+    "Subtotal                   AED 162.00",
+    "Delivery                   AED 9.50",
+    "Discount                  -AED 8543.00",
+    "Total                      AED 133.40",
+  ].join("\n");
+
+  /**
+   * Not a guess - the receipt's own subtraction. 162.00 + 9.50 - 133.40.
+   */
+  it("is replaced by what the rest of the receipt says it must be", () => {
+    const { basket } = parseOcrText(RECEIPT);
+    expect(basket.discount).toBe("38.10");
+    expect(basket.subtotal).toBe("162.00");
+    expect(basket.final_total).toBe("133.40");
+  });
+
+  it("is flagged, because a number we worked out is one to look at", () => {
+    const { basket } = parseOcrText(RECEIPT);
+    expect(basket.uncertain_fields).toContain("discount");
+  });
+
+  it("is cleared rather than invented when there is no total to derive it from", () => {
+    const { basket } = parseOcrText(
+      ["Pizza Hut", "Subtotal AED 162.00", "Discount -AED 8543.00"].join("\n"),
+    );
+    expect(basket.discount).toBe("");
+    expect(basket.uncertain_fields).toContain("discount");
+  });
+
+  /**
+   * The bound is only the impossible one. A genuine half-price offer is a large
+   * discount and must survive untouched, or this rule costs more than it saves.
+   */
+  it("leaves an ordinary large discount alone", () => {
+    const { basket } = parseOcrText(
+      [
+        "Pizza Hut",
+        "Subtotal AED 162.00",
+        "Delivery AED 9.50",
+        "Discount -AED 81.00",
+        "Total AED 90.50",
+      ].join("\n"),
+    );
+    expect(basket.discount).toBe("81.00");
+    expect(basket.uncertain_fields).not.toContain("discount");
+  });
+});
