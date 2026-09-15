@@ -725,9 +725,20 @@ export function parseOcrText(raw: string): ParseResult {
     // The phone's own clock and battery, only ever the first line.
     if (index === 0 && looksLikeStatusBar(original)) continue;
 
-    // A gap ends whatever row we were assembling.
+    // A gap ends a row - but only one that is finished.
+    //
+    // A row is finished when it has its price. Tesseract puts a blank line
+    // wherever the layout leaves vertical space, and this app leaves space
+    // between every line of a combo's description, so treating each one as the
+    // end of a row shredded a single item into one per line: "Limo Combo" with
+    // no price, then a row made of its own ingredients, then another - and the
+    // 119.00 at the bottom landed on whichever fragment happened to be last.
+    //
+    // Waiting for the price is the right rule rather than a lenient one. An
+    // item's row genuinely does end at its price; the whitespace above it is
+    // layout, and reading it as structure is reading the wrong thing.
     if (original === "") {
-      flush();
+      if (pending === null || pending.line_total !== "") flush();
       afterGap = true;
       continue;
     }

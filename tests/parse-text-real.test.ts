@@ -561,3 +561,81 @@ describe("Deliveroo checkout", () => {
     expect(basket.items).toEqual([]);
   });
 });
+
+/**
+ * Pizza Hut, verbatim from the customer's own cart screenshot.
+ *
+ * Produced by running this project's OCR over the image they sent, so the noise
+ * is the real noise: the image column arriving as "QR)" and "TORE" welded onto
+ * the ends of description lines, the currency glyph read as "£" or "8", the
+ * struck-through original price arriving as "816200" with its decimal point
+ * gone - and, decisively, a blank line between every single line of the combo's
+ * description.
+ *
+ * Those blank lines were the bug. A gap ended the row being assembled, so one
+ * item became three: "Limo Combo" with no price, a row made from its own
+ * ingredients, and a third that happened to catch the 119.00 at the bottom. The
+ * customer was asked to confirm a basket containing two things they had never
+ * ordered.
+ */
+describe("a Pizza Hut cart, as OCR actually reads it", () => {
+  const CART = [
+    "10:51 ®                      Ni Zl ail CEE)",
+    "Cart",
+    "<     Pizza Hut",
+    "",
+    "Limo Combo",
+    "",
+    "Meal, Margherita, Margherita,                    QR)",
+    "",
+    "Margherita, Limo Combo,                  TORE",
+    "",
+    "Pepsi (2.25 litres), Creamy                   £",
+    "",
+    "Ranch, Fiery Peri Sauce,                 og 1 +",
+    "",
+    "Chipotle BBQ Dip",
+    "",
+    "2 Edit",
+    "",
+    "£119.00 816200",
+    "",
+    "You might also like...",
+    "",
+    "10 @",
+    "Creamy Ranch Fiery Peri Dip Chipotle BBQ Potat",
+    "Dip                  5 5.00              Dip                  B 16.",
+    "8 5.00                                   8 5.00",
+    "+",
+    "Great! You're saving B 43.00                   %0",
+    "Add items                 Checkout",
+  ].join("\n");
+
+  it("is one item, not three", () => {
+    const { basket } = parseOcrText(CART);
+    expect(basket.items).toHaveLength(1);
+    expect(basket.items[0].name).toBe("Limo Combo");
+  });
+
+  /** The live price. "816200" beside it is the struck-through 162.00. */
+  it("prices it at what is actually being charged", () => {
+    const { basket } = parseOcrText(CART);
+    expect(basket.items[0].line_total).toBe("119.00");
+  });
+
+  /**
+   * Three dips at 5.00 and a side at 16 sit in the carousel below. None of them
+   * were ordered, and a basket that quietly contains them is worse than one
+   * that contains nothing.
+   */
+  it("takes nothing from the upsell carousel", () => {
+    const { basket } = parseOcrText(CART);
+    const names = basket.items.map((item) => item.name).join(" ");
+    expect(names).not.toContain("Dip");
+    expect(names).not.toContain("Ranch");
+  });
+
+  it("keeps the restaurant", () => {
+    expect(parseOcrText(CART).basket.restaurant_name).toBe("Pizza Hut");
+  });
+});
