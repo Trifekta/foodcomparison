@@ -374,12 +374,10 @@ CRON_SECRET            any long random string. Without it the chaser route
 One more, and it is not optional at launch even though it has a default:
 
 ```
-KEETA_ALLOWED_HOSTS    comma-separated hostnames /go/ may redirect to,
-                       subdomains included. Defaults to "keeta.com". If Keeta
-                       serves the UAE from anything else, every switch is
-                       stopped with an explanation instead of reaching the
-                       restaurant - safe, but not a working button. Check it
-                       against a real link before running ads.
+KEETA_ALLOWED_HOSTS    EXACT hostnames /go/ may redirect to, comma-separated.
+                       Not domains: "mykeeta.com" would not allow
+                       url-eu.mykeeta.com. Defaults to the three Keeta serves
+                       the UAE from, so most deployments need not set it.
 ```
 
 Setting the push keys is not the last step: push is per device, so somebody
@@ -942,11 +940,41 @@ authorisation for a customer's prices, and this one is designed to be followed
 off-site, where it lands in another company's referrer header. A leaked `/go/`
 link reveals nothing and grants nothing: the only thing it can do is redirect.
 
-**It is not an open redirect.** `KEETA_ALLOWED_HOSTS` is the allowlist, checked
-at the moment of redirecting rather than only when the link was saved - a row
-already in the database is exactly what a later check exists to catch. Anything
-else, including `https://keeta.com@evil.test/` and `https://keeta.com.evil.test`,
-lands on `/go/unavailable` with an explanation. See `lib/keeta/destination.ts`.
+**It is not an open redirect.** `KEETA_ALLOWED_HOSTS` is the allowlist, and it
+holds **exact hostnames, not domains** — allowing `*.mykeeta.com` would be a far
+larger promise than the three addresses that actually serve restaurants here:
+
+| Host | What it is |
+| --- | --- |
+| `url-eu.mykeeta.com` | what the Keeta app puts on the clipboard — the one an admin pastes |
+| `m-eu.mykeeta.com` | where those links land, carrying `region=AE` |
+| `fooddelivery1-eu.mykeeta.com` | likewise |
+
+`keeta.com` and `keeta-global.com` are deliberately absent: the first is not
+what the UAE app produces and the second is the corporate site. The `sailorc://`
+app deep link is refused too — a scheme we do not control is not something to
+hand a browser, and the https share link launches the app by itself.
+
+It is checked **twice**. The admin form refuses to save a link the redirect
+would refuse to follow, so a bad paste is caught while it is still on somebody's
+clipboard; the redirect checks again, because a row can be written by something
+other than that form and an allowlist that changes after a link was saved is
+exactly what the later check is for. Anything else — including
+`https://url-eu.mykeeta.com@evil.test/` and `https://url-eu.mykeeta.com.evil.test`
+— lands on `/go/unavailable`. See `lib/keeta/destination.ts`.
+
+**Where the customer came from travels with them.** Campaign parameters exist on
+the first URL of a visit and nowhere else, so they are captured on arrival
+(`lib/analytics/attribution.ts`), stored on the submission, and inherited by the
+click. First touch wins, and the referrer is reduced to its origin — "which
+site" is ours to know, "which page" is not. The `/go/` URL is never read for
+them: it would be several navigations too late, and anybody could reassign a
+click to any campaign by typing one.
+
+```
+Instagram ad 2  ->  landing  ->  screenshot sent  ->  result  ->  switched
+utm_campaign=validation_week1, utm_content=ad2_new_user, fbclid=…
+```
 
 **A click is not an order.** Every row is switch intent and says so:
 `conversion_status` starts at `unknown`, not `clicked`, because nothing has

@@ -50,6 +50,11 @@ const PROBES: MigrationProbe[] = [
     column: "redirect_token",
     breaks: "the Open on Keeta button, and every click-through it would record",
   },
+  {
+    file: "0015_submission_attribution.sql",
+    column: "utm_campaign",
+    breaks: "recording which advert a customer came from, all the way to the Keeta switch",
+  },
 ];
 
 /**

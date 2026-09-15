@@ -7,6 +7,7 @@ import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
 import { LastOrderBanner } from "@/components/customer/LastOrderBanner";
 import { track } from "@/lib/analytics/track";
+import { captureAttribution } from "@/lib/analytics/attribution";
 import { RESULT_PROMISE } from "@/lib/constants";
 
 interface StepUploadProps {
@@ -50,6 +51,11 @@ export function StepUpload({
   // The top of the funnel. Recorded once when this screen first appears, which
   // is the only moment that means "somebody arrived".
   useEffect(() => {
+    // An advert can point straight here rather than at the landing page, and if
+    // it does, this screen is the only one that ever sees the campaign
+    // parameters. Captured before the count, and a no-op when the landing page
+    // already did it - first touch wins.
+    captureAttribution();
     track("wizard_started");
   }, []);
 

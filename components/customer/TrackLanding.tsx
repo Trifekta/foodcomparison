@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { track } from "@/lib/analytics/track";
+import { captureAttribution } from "@/lib/analytics/attribution";
 
 /**
  * Records that somebody arrived.
@@ -17,6 +18,9 @@ import { track } from "@/lib/analytics/track";
  */
 export function TrackLanding() {
   useEffect(() => {
+    // Before the count, because the campaign parameters are on this URL and
+    // this is the only screen that will ever see them.
+    captureAttribution();
     track("landing_viewed");
   }, []);
 

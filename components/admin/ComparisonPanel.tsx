@@ -10,12 +10,24 @@ import { calculateSaving } from "@/lib/calculations/saving";
 import { MoneyParseError, parseAmountToMinor } from "@/lib/calculations/money";
 import { PriceVerdict } from "@/components/admin/PriceVerdict";
 import { comparisonTotalSchema } from "@/lib/validation/admin";
+import {
+  checkKeetaDestinationAgainst,
+  describeRefusalForAdmin,
+} from "@/lib/keeta/destination";
 
 interface ComparisonPanelProps {
   submissionId: string;
   comparisonApp: string;
   currentTotal: string;
   areaName: string;
+  /**
+   * The hostnames /go/ will redirect to, handed down from the server.
+   *
+   * The allowlist lives in an environment variable the browser cannot read, so
+   * the page is given it rather than the check being duplicated with a guess.
+   * The same function runs on both sides against the same list.
+   */
+  allowedKeetaHosts: string[];
   initial: {
     /** What the order came from, as stored. "Unknown" until someone looks. */
     sourceApp: string;
@@ -39,6 +51,7 @@ export function ComparisonPanel({
   comparisonApp,
   currentTotal,
   areaName,
+  allowedKeetaHosts,
   initial,
 }: ComparisonPanelProps) {
   // Which ending this submission is getting. "priced" is the ordinary one; the
@@ -88,13 +101,20 @@ export function ComparisonPanel({
     }
   }, [comparisonTotal, currentMinor]);
 
-  // A link that will not become a button is worth saying so before saving,
-  // not discovering when the customer's result has no button on it.
+  // A link that will not become a button is worth saying so while the admin
+  // still has it on their clipboard. The alternative is a customer finding out:
+  // they tap, the redirect refuses a destination it will not vouch for, and
+  // they land on an apology instead of a restaurant.
+  //
+  // Exactly the check the server runs, against exactly the list the server
+  // uses. The save is refused there too - this is the earlier of two layers,
+  // not a replacement for the one that matters.
   const trimmedUrl = comparisonUrl.trim();
+  const urlCheck = trimmedUrl === "" ? null : checkKeetaDestinationAgainst(trimmedUrl, allowedKeetaHosts);
   const urlError =
-    trimmedUrl === "" || /^https:\/\/\S+$/i.test(trimmedUrl)
-      ? undefined
-      : "Paste the full https:// link from the app.";
+    urlCheck && !urlCheck.ok
+      ? describeRefusalForAdmin(urlCheck.reason, allowedKeetaHosts)
+      : undefined;
 
   const validation = comparisonTotalSchema.safeParse(comparisonTotal);
   const inputError =
@@ -241,7 +261,18 @@ export function ComparisonPanel({
             placeholder={`https://…  — share link from the ${comparisonApp} app`}
             aria-invalid={urlError ? true : undefined}
           />
-          {urlError ? <p className="mt-1.5 text-sm text-rose-700">{urlError}</p> : null}
+          {urlError ? (
+            <p className="mt-1.5 text-sm text-rose-700">{urlError}</p>
+          ) : urlCheck?.ok ? (
+            // Said out loud rather than left to the absence of an error. The
+            // admin is pasting something they cannot verify by looking at it,
+            // and "nothing is complaining" is not the same reassurance as "yes,
+            // that one works".
+            <p className="mt-1.5 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
+              <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
+              Valid {comparisonApp} UAE link
+            </p>
+          ) : null}
         </div>
 
         <div>

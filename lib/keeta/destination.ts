@@ -17,14 +17,27 @@ import { COMPARISON_APP } from "@/lib/constants";
  */
 
 /**
- * Keeta's own domains.
+ * The hostnames Keeta actually serves the UAE from.
  *
- * Kept here as the default and overridable by environment, because a delivery
- * company adding a regional domain must not need a deploy - and because the
- * value that matters is whatever Keeta is actually using in the UAE the day a
- * customer taps, which this file cannot know for certain.
+ * Checked against real share links rather than assumed from the brand name,
+ * which is how the first version of this list came to say "keeta.com" and would
+ * have refused every genuine link:
+ *
+ *  - url-eu.mykeeta.com is what the Keeta app puts on the clipboard. It is the
+ *    one an admin pastes, so it is the one that matters.
+ *  - m-eu and fooddelivery1-eu are where those links land, carrying region=AE.
+ *    Allowed so that a resolved link works too, since an admin who followed the
+ *    link before copying has pasted something equally genuine.
+ *
+ * keeta.com itself is deliberately absent: it is not what the UAE app produces,
+ * and keeta-global.com is the corporate site rather than anywhere a customer
+ * orders food. A link to either is far more likely to be a mistake than a shop.
  */
-const DEFAULT_KEETA_HOSTS = ["keeta.com"] as const;
+const DEFAULT_KEETA_HOSTS = [
+  "url-eu.mykeeta.com",
+  "m-eu.mykeeta.com",
+  "fooddelivery1-eu.mykeeta.com",
+] as const;
 
 /**
  * Hosts we will redirect to, lowercased and without a leading dot.
@@ -58,12 +71,24 @@ export type DestinationCheck =
 /**
  * Whether this is a Keeta address we are willing to send a customer to.
  *
- * Subdomains count - `ae.keeta.com` is Keeta - and a host that merely ends in
- * the same letters does not: `notkeeta.com` and `keeta.com.evil.test` are both
- * refused, which is the whole reason this compares against a dot boundary
- * rather than calling endsWith on the bare name.
+ * The comparison is on the whole hostname, so nothing that merely contains or
+ * ends in the right letters gets through: notmykeeta.com, mykeeta.com.evil.test
+ * and evil.test/url-eu.mykeeta.com are all refused.
  */
-export function checkKeetaDestination(value: string | null | undefined): DestinationCheck {
+/**
+ * The check itself, against a list handed in.
+ *
+ * Split out so the admin form can run exactly this logic in the browser while
+ * the redirect runs it on the server: the allowlist lives in an environment
+ * variable the browser cannot read, so the page is given the hosts as a prop
+ * and the rule stays in one place. Two copies of a security check are two
+ * chances for them to disagree, and the one that disagrees is the one nobody
+ * tested.
+ */
+export function checkKeetaDestinationAgainst(
+  value: string | null | undefined,
+  hosts: readonly string[],
+): DestinationCheck {
   const raw = (value ?? "").trim();
   if (!raw) return { ok: false, reason: "missing" };
 
@@ -82,21 +107,54 @@ export function checkKeetaDestination(value: string | null | undefined): Destina
   // as a link to Keeta. Nothing legitimate here carries credentials.
   if (url.username || url.password) return { ok: false, reason: "has_credentials" };
 
+  // Exact hostnames, deliberately. Matching subdomains too would turn
+  // "mykeeta.com" in this list into *.mykeeta.com, and a company's entire
+  // domain tree is a much larger promise than "these three addresses serve
+  // restaurants in Dubai" - one forgotten staging or user-content subdomain and
+  // the allowlist is decoration. Another host means another entry.
   const host = url.hostname.toLowerCase();
-  const allowed = allowedKeetaHosts().some(
-    (candidate) => host === candidate || host.endsWith(`.${candidate}`),
-  );
-
-  if (!allowed) return { ok: false, reason: "host_not_allowed" };
+  if (!hosts.includes(host)) {
+    return { ok: false, reason: "host_not_allowed" };
+  }
 
   // Normalised through the URL parser, so what is stored and what is sent are
   // the same string and neither is whatever was in the paste buffer.
   return { ok: true, url: url.toString(), host };
 }
 
-/** For the admin form, which should warn before a customer ever meets the link. */
+/** The same check, against whatever this deployment allows. Server-side. */
+export function checkKeetaDestination(value: string | null | undefined): DestinationCheck {
+  return checkKeetaDestinationAgainst(value, allowedKeetaHosts());
+}
+
+/** For the admin form, which should refuse before a customer ever meets the link. */
 export function isApprovedKeetaUrl(value: string | null | undefined): boolean {
   return checkKeetaDestination(value).ok;
+}
+
+/**
+ * Said in the admin's terms, at the moment of pasting.
+ *
+ * Names the hosts rather than saying "invalid", because the admin is holding a
+ * link they believe is right and the useful information is which addresses this
+ * deployment will accept.
+ */
+export function describeRefusalForAdmin(
+  reason: DestinationRefusal,
+  hosts: readonly string[],
+): string {
+  switch (reason) {
+    case "missing":
+      return "Paste the restaurant's link from the app.";
+    case "unparseable":
+      return "That is not a link. Copy it again from the app's share option.";
+    case "not_https":
+      return "That link is not https. Copy the share link rather than typing an address.";
+    case "has_credentials":
+      return "That link carries a username or password, which no real share link does.";
+    case "host_not_allowed":
+      return `Not a ${COMPARISON_APP} link. Accepted: ${hosts.join(", ")}.`;
+  }
 }
 
 /** Said in the admin's terms, for a log line and the fallback page. */

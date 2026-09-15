@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { MAX_RESTAURANT_NAME_LENGTH, MAX_TOTAL_AED } from "@/lib/constants";
 import { isNormalisablePhone } from "@/lib/utils/phone";
+import {
+  allowedKeetaHosts,
+  checkKeetaDestination,
+  describeRefusalForAdmin,
+} from "@/lib/keeta/destination";
 
 /** Validation for the admin comparison workflow. */
 
@@ -45,7 +50,30 @@ export const comparisonInputSchema = z.object({
     .refine(
       (value) => /^https:\/\/\S+$/i.test(value),
       "Paste the full https:// link from the app.",
-    ),
+    )
+    /**
+     * And it has to be a link to the app we are comparing against.
+     *
+     * The same allowlist the /go/ redirect enforces, applied at the moment of
+     * saving. Without it the mistake is discovered by a customer: they tap the
+     * button, the redirect refuses a destination it will not vouch for, and
+     * they land on an apology instead of a restaurant. Catching it while the
+     * admin still has the link on their clipboard costs nothing; catching it
+     * later costs the one conversion the whole product exists to produce.
+     *
+     * The redirect still checks again. This is the earlier of two layers, not
+     * a replacement for the one that matters - a row can be written by
+     * something other than this form, and an allowlist that changes after a
+     * link was saved is exactly what the later check is for.
+     */
+    .superRefine((value, ctx) => {
+      const outcome = checkKeetaDestination(value);
+      if (outcome.ok) return;
+      ctx.addIssue({
+        code: "custom",
+        message: describeRefusalForAdmin(outcome.reason, allowedKeetaHosts()),
+      });
+    }),
   restaurantFound: z.string().trim().max(160).optional(),
   comparisonLocationNote: z.string().trim().max(160).optional(),
   adminNotes: z.string().trim().max(2000).optional(),

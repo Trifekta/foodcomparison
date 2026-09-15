@@ -36,6 +36,9 @@ export interface KeetaClickInput {
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
+  utmContent: string | null;
+  utmTerm: string | null;
+  /** The ad platform's click id the visit arrived with: fbclid, gclid, ttclid. */
   campaignId: string | null;
 }
 
@@ -118,7 +121,9 @@ export async function recordKeetaClick(input: KeetaClickInput): Promise<Recorded
         utm_source: cap(input.utmSource, 120),
         utm_medium: cap(input.utmMedium, 120),
         utm_campaign: cap(input.utmCampaign, 160),
-        campaign_id: cap(input.campaignId, 120),
+        utm_content: cap(input.utmContent, 160),
+        utm_term: cap(input.utmTerm, 160),
+        campaign_id: cap(input.campaignId, 200),
         // Not 'clicked'. That would say we looked for an order and found none;
         // nothing has looked, and saying so is the difference between a click
         // and a sale.

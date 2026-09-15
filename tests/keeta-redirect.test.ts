@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * the only case where it must not.
  */
 
-process.env.KEETA_ALLOWED_HOSTS = "keeta.com";
+process.env.KEETA_ALLOWED_HOSTS = "url-eu.mykeeta.com";
 
 const TOKEN = "0123456789abcdef0123456789abcdef";
 const SUBMISSION_ID = "11111111-1111-4111-8111-111111111111";
@@ -57,8 +57,14 @@ function comparison(overrides: Record<string, unknown> = {}) {
     current_total: "74.00",
     comparison_total: "58.00",
     saving_percentage: "21.62",
-    comparison_url: "https://keeta.com/restaurant/9911",
+    comparison_url: "https://url-eu.mykeeta.com/share/9911",
     areas: { name: "Dubai Marina" },
+    utm_source: "instagram",
+    utm_medium: "paid_social",
+    utm_campaign: "validation_week1",
+    utm_content: "ad2_new_user",
+    utm_term: null,
+    click_id: "IwAR0abc",
     ...overrides,
   };
 }
@@ -83,7 +89,7 @@ describe("a valid switch", () => {
     const response = await tap();
 
     expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("https://keeta.com/restaurant/9911");
+    expect(response.headers.get("location")).toBe("https://url-eu.mykeeta.com/share/9911");
     // A 301 would be cached by the browser, and every customer would count once
     // however many times they actually switched.
     expect(response.headers.get("cache-control")).toBe("no-store");
@@ -105,7 +111,7 @@ describe("a valid switch", () => {
       saving_amount: "16.00",
       saving_percentage: 22,
       keeta_cheaper: true,
-      destination_url: "https://keeta.com/restaurant/9911",
+      destination_url: "https://url-eu.mykeeta.com/share/9911",
       // A click is not an order, and nothing has looked for one.
       conversion_status: "unknown",
     });
@@ -120,14 +126,47 @@ describe("a valid switch", () => {
     });
   });
 
-  it("carries campaign values when the link has them", async () => {
-    await tap(TOKEN, "?utm_source=meta&utm_medium=cpc&utm_campaign=dxb-nov&campaign_id=1234");
+  /**
+   * The chain the whole feature exists for: Instagram ad 2 -> landing ->
+   * submission -> result -> switch. The campaign was captured when the customer
+   * first arrived and stored on the submission; the click inherits it.
+   */
+  it("inherits the campaign from the submission", async () => {
+    await tap();
     expect(inserted[0]).toMatchObject({
-      utm_source: "meta",
-      utm_medium: "cpc",
-      utm_campaign: "dxb-nov",
-      campaign_id: "1234",
+      utm_source: "instagram",
+      utm_medium: "paid_social",
+      utm_campaign: "validation_week1",
+      utm_content: "ad2_new_user",
+      campaign_id: "IwAR0abc",
     });
+  });
+
+  /**
+   * Reading them off this URL would mean anybody could reassign a click to any
+   * campaign by typing one, and would also be wrong: by the time somebody
+   * reaches this redirect the advert's query string is several navigations gone.
+   */
+  it("ignores campaign values typed into the redirect URL", async () => {
+    await tap(TOKEN, "?utm_source=forged&utm_campaign=someone-elses&campaign_id=999");
+    expect(inserted[0]).toMatchObject({
+      utm_source: "instagram",
+      utm_campaign: "validation_week1",
+      campaign_id: "IwAR0abc",
+    });
+  });
+
+  it("stores nothing when the submission carried no campaign", async () => {
+    submission = comparison({
+      utm_source: null,
+      utm_medium: null,
+      utm_campaign: null,
+      utm_content: null,
+      utm_term: null,
+      click_id: null,
+    });
+    await tap(TOKEN, "?utm_source=forged");
+    expect(inserted[0]).toMatchObject({ utm_source: null, campaign_id: null });
   });
 
   /**
@@ -182,9 +221,9 @@ describe("when something is wrong", () => {
   it("cannot be used as an open redirect by anybody who can reach it", async () => {
     for (const hostile of [
       "https://evil.test/",
-      "http://keeta.com/x",
-      "https://keeta.com.evil.test/x",
-      "https://keeta.com@evil.test/",
+      "http://url-eu.mykeeta.com/x",
+      "https://url-eu.mykeeta.com.evil.test/x",
+      "https://url-eu.mykeeta.com@evil.test/",
       "javascript:alert(1)",
     ]) {
       submission = comparison({ comparison_url: hostile });
@@ -223,13 +262,13 @@ describe("when something is wrong", () => {
     insertError = { message: 'relation "keeta_clicks" does not exist' };
     const response = await tap();
     expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("https://keeta.com/restaurant/9911");
+    expect(response.headers.get("location")).toBe("https://url-eu.mykeeta.com/share/9911");
   });
 
   it("still redirects when the database throws outright", async () => {
     insertThrows = true;
     const response = await tap();
     expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("https://keeta.com/restaurant/9911");
+    expect(response.headers.get("location")).toBe("https://url-eu.mykeeta.com/share/9911");
   });
 });

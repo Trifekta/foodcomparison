@@ -44,6 +44,12 @@ interface ComparisonRow {
   saving_percentage: string | null;
   comparison_url: string | null;
   areas: { name: string } | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+  click_id: string | null;
 }
 
 /** Where somebody lands when there is nothing safe to send them to. */
@@ -73,7 +79,7 @@ export async function GET(
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, restaurant_name, source_app, source_app_other, area_id, current_total, comparison_total, saving_percentage, comparison_url, areas(name)",
+      "id, restaurant_name, source_app, source_app_other, area_id, current_total, comparison_total, saving_percentage, comparison_url, utm_source, utm_medium, utm_campaign, utm_content, utm_term, click_id, areas(name)",
     )
     .eq("redirect_token", token)
     .maybeSingle();
@@ -131,13 +137,18 @@ export async function GET(
     keetaCheaper: saving ? saving.hasSaving : null,
     userAgent: request.headers.get("user-agent"),
     referrer: request.headers.get("referer"),
-    // Carried on the link when a campaign put them there. Nothing populates
-    // these today - see the note in the README - and the columns are read
-    // rather than invented so that the day something does, this is already done.
-    utmSource: url.searchParams.get("utm_source"),
-    utmMedium: url.searchParams.get("utm_medium"),
-    utmCampaign: url.searchParams.get("utm_campaign"),
-    campaignId: url.searchParams.get("campaign_id") ?? url.searchParams.get("gclid"),
+    // Inherited from the submission, never read off this URL. The campaign
+    // parameters existed on the first page of the visit and were captured
+    // there; by the time somebody reaches this redirect they are several
+    // navigations past the advert that paid for them. Reading the query string
+    // here would also mean anybody could reassign a click to any campaign by
+    // typing one - the row is the only honest source.
+    utmSource: row.utm_source,
+    utmMedium: row.utm_medium,
+    utmCampaign: row.utm_campaign,
+    utmContent: row.utm_content,
+    utmTerm: row.utm_term,
+    campaignId: row.click_id,
   });
 
   // Raced rather than simply awaited. An ordinary insert wins this comfortably;
