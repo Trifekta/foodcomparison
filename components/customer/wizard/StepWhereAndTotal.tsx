@@ -20,8 +20,8 @@ interface StepWhereAndTotalProps {
   readTotal: string | null;
   /** Whether that total came off the checkout screen rather than the cart. */
   totalFromCheckout: boolean;
-  /** The field already holds the number read off their checkout screen. */
-  prefilledFromCheckout: boolean;
+  /** The field already holds the number read off one of their screenshots. */
+  prefilledFromScreenshot: boolean;
   onAreaChange: (areaId: string) => void;
   onCurrentTotalChange: (value: string) => void;
   onUseReadTotal: () => void;
@@ -47,16 +47,18 @@ export function StepWhereAndTotal({
   hasCheckoutScreenshot,
   readTotal,
   totalFromCheckout,
-  prefilledFromCheckout,
+  prefilledFromScreenshot,
   onAreaChange,
   onCurrentTotalChange,
   onUseReadTotal,
   onContinue,
 }: StepWhereAndTotalProps) {
-  // Offered, never filled in for them - unless it came off the checkout screen,
-  // which states the final total plainly and is the one figure the engine reads
-  // reliably. Everything else is a hint with a button, because the baseline for
-  // the saving we quote back is not a number to guess at on their behalf.
+  // Offered, never filled in for them - unless a screenshot printed a final
+  // total, which is the one figure the engine reads reliably and which the
+  // extraction prompt is forbidden to derive, so a value means it was really on
+  // the screen. Anything short of that stays a hint with a button, because the
+  // baseline for the saving we quote back is not a number to guess at on their
+  // behalf.
   const showHint = readTotal !== null && readTotal !== "" && readTotal !== currentTotal;
 
   return (
@@ -130,11 +132,12 @@ export function StepWhereAndTotal({
             />
           </div>
 
-          {prefilledFromCheckout ? (
+          {prefilledFromScreenshot ? (
             <p className="mt-3 flex items-start gap-2 rounded-2xl bg-chip-green-bg px-3.5 py-3 text-sm leading-snug text-chip-green-fg">
               <ScanLine aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                Taken from your checkout screenshot. Change it if it doesn&apos;t match.
+                Taken from your {totalFromCheckout ? "checkout screenshot" : "screenshot"}. Change it
+                if it doesn&apos;t match.
               </span>
             </p>
           ) : null}
@@ -164,7 +167,7 @@ export function StepWhereAndTotal({
           <p className="mt-3 flex items-start gap-2 rounded-2xl bg-flame-50 p-3.5 text-sm leading-relaxed text-ink-600">
             <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-flame-500" />
             <span>
-              {prefilledFromCheckout
+              {prefilledFromScreenshot
                 ? "This is the number we compare against, so it's worth a glance before you continue."
                 : hasCheckoutScreenshot
                   ? "We'll cross-check this against the checkout screenshot you added."

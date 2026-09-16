@@ -77,6 +77,15 @@ export interface SubmissionRow {
   saving_percentage: string | null;
   cart_image_path: string;
   checkout_image_path: string | null;
+  /**
+   * A screenshot showed a printed final total beside its fees or discount.
+   *
+   * Not "they sent two files". Talabat, noon and Keeta print the payment
+   * summary on the cart page, so one screenshot there settles the bill; on
+   * Deliveroo it takes two. What is recorded is what was read, not how many
+   * files arrived.
+   */
+  totals_confirmed: boolean;
   contact_type: ContactType;
   whatsapp_number: string | null;
   email: string | null;

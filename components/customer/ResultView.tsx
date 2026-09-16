@@ -470,7 +470,7 @@ function Saving({ result, token }: { result: PublicResult; token: string }) {
 }
 
 /**
- * Shown when the checkout screen never arrived.
+ * Shown when no screenshot ever showed the fees.
  *
  * The same sentence the message carries, from the same constant, because a
  * caveat worded two ways is a caveat nobody trusts. Silent when they sent it -
@@ -480,7 +480,7 @@ function Saving({ result, token }: { result: PublicResult; token: string }) {
  * they made, and the tone should not suggest otherwise.
  */
 function UnverifiedTotalNote({ result }: { result: PublicResult }) {
-  if (result.checkoutScreenshotProvided) return null;
+  if (result.totalsConfirmed) return null;
 
   return (
     <p className="mt-4 rounded-2xl bg-chip-amber-bg p-3.5 text-[0.85rem] leading-relaxed text-ink-700">

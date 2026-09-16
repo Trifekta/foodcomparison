@@ -170,6 +170,16 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   // that fails validation would cost a real submission to protect a report.
   const attribution = readAttribution(formData);
 
+  // Whether a screenshot printed a final total beside its fees, and the number
+  // being compared against is still that one. Kept out of the field schema for
+  // the same reason the item list is: it is not a thing the customer answered,
+  // it is a thing the browser observed while reading their screenshot.
+  //
+  // Asserted by the browser and stored as stated, like the per-row source
+  // labels. It grants nothing - the only thing a forged value can do is remove
+  // a cautionary sentence from the forger's own result page.
+  const totalsConfirmed = formData.get("totalsConfirmed") === "true";
+
   const items = parseItems(formData.get("items"));
   if (!items.ok) {
     return { ok: false, status: 400, error: items.error, field: "items" };
@@ -316,6 +326,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       comparison_app: COMPARISON_APP,
       cart_image_path: cartPath,
       checkout_image_path: checkoutPath,
+      totals_confirmed: totalsConfirmed,
       contact_type: "whatsapp",
       whatsapp_number: whatsappNumber,
       email: null,

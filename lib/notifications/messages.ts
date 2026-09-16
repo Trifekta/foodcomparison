@@ -47,7 +47,7 @@ export function sourceAppLabel(source: {
  * nobody trusts.
  */
 export const UNVERIFIED_TOTAL_NOTE =
-  "We compared against the total you entered. Without your checkout screenshot we couldn't confirm the fees and discounts, so your actual saving may differ.";
+  "We compared against the total you entered. We couldn't see the fees and discounts on your screenshot, so your actual saving may differ.";
 
 export interface ResultMessageInput {
   sourceAppLabel: string;
@@ -57,11 +57,12 @@ export interface ResultMessageInput {
   /** Absolute link to the customer's own result page, when we can build one. */
   resultUrl?: string | null;
   /**
-   * Whether a checkout screenshot was sent. Required rather than defaulted: a
+   * Whether a screenshot showed the bill settled - a printed final total beside
+   * its fees - rather than just the food. Required rather than defaulted: a
    * caller that forgets it would quietly drop a caveat off a real customer's
    * message, and that is not a decision to make by omission.
    */
-  checkoutScreenshotProvided: boolean;
+  totalsConfirmed: boolean;
 }
 
 export interface GeneratedResult {
@@ -136,7 +137,7 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
         formatMinorAsCurrency(saving.savingMinor),
         "",
         `That's about ${Math.round(saving.savingPercentage)}% less.`,
-        ...(input.checkoutScreenshotProvided ? [] : ["", UNVERIFIED_TOTAL_NOTE]),
+        ...(input.totalsConfirmed ? [] : ["", UNVERIFIED_TOTAL_NOTE]),
         ...(input.resultUrl ? ["", "See it and open the restaurant:", input.resultUrl] : []),
         "",
         "Prices and promotions can change, so please confirm the final amount in the delivery app before ordering.",
@@ -153,7 +154,7 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
         formatMinorAsCurrency(comparisonMinor),
         "",
         "Your current option appears better right now.",
-        ...(input.checkoutScreenshotProvided ? [] : ["", UNVERIFIED_TOTAL_NOTE]),
+        ...(input.totalsConfirmed ? [] : ["", UNVERIFIED_TOTAL_NOTE]),
         "",
         "We'll keep working to help you catch the orders where switching actually makes sense.",
         "",

@@ -159,7 +159,7 @@ async function loadSubmission(id: string) {
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, status, source_app, source_app_other, current_total, comparison_total, comparison_app, contact_type, whatsapp_number, email, reference_number, restaurant_name, result_message, result_token, checkout_image_path",
+      "id, status, source_app, source_app_other, current_total, comparison_total, comparison_app, contact_type, whatsapp_number, email, reference_number, restaurant_name, result_message, result_token, totals_confirmed",
     )
     .eq("id", id)
     .maybeSingle<
@@ -179,7 +179,7 @@ async function loadSubmission(id: string) {
         | "email"
         | "reference_number"
         | "result_message"
-        | "checkout_image_path"
+        | "totals_confirmed"
       >
     >();
 
@@ -271,12 +271,14 @@ export async function saveComparison(formData: FormData): Promise<ActionResult> 
       comparisonTotal,
       comparisonAppLabel: submission.comparison_app,
       resultUrl: absoluteUrl(resultPath(submission.result_token)),
-      // The column is the record of what they sent, so a customer who skipped
-      // the checkout screen is told the comparison could not be checked for
-      // fees - on the saving and the no-saving message alike. A total typed
-      // without fees makes the alternative look worse than it is, so the
-      // caveat matters at least as much when we tell somebody to stay put.
-      checkoutScreenshotProvided: Boolean(submission.checkout_image_path),
+      // The column is the record of what their screenshots showed, so a
+      // customer whose screens never carried the fees is told the comparison
+      // could not be checked for them - on the saving and the no-saving message
+      // alike. A total typed without fees makes the alternative look worse than
+      // it is, so the caveat matters at least as much when we tell somebody to
+      // stay put. It is not a count of files: one Talabat cart screenshot
+      // settles the bill, and two Deliveroo screens are what it takes there.
+      totalsConfirmed: submission.totals_confirmed,
     });
 
     const supabase = await createServerSupabaseClient();
