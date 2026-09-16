@@ -29,6 +29,7 @@ import { allowedKeetaHosts } from "@/lib/keeta/destination";
 import { maskEmail } from "@/lib/utils/phone";
 import { statusLabel } from "@/lib/utils/status";
 import type { SubmissionItemSource } from "@/types/database";
+import { toPublicArea } from "@/lib/areas";
 
 export const metadata: Metadata = {
   title: "Submission",
@@ -132,7 +133,7 @@ export default async function SubmissionDetailPage({
       <div className="flex flex-wrap items-center gap-2">
         <EditSubmissionPanel
           submission={submission}
-          areas={areas.map((area) => ({ id: area.id, name: area.name }))}
+          areas={areas.map(toPublicArea)}
         />
         <SubmissionRowActions
           submissionId={submission.id}
@@ -305,7 +306,7 @@ export default async function SubmissionDetailPage({
             submissionId={submission.id}
             comparisonApp={submission.comparison_app}
             currentTotal={submission.current_total}
-            areaName={submission.areas?.name ?? "Dubai"}
+            areaName={submission.areas?.name ?? "Unknown area"}
             allowedKeetaHosts={allowedKeetaHosts()}
             initial={{
               sourceApp: submission.source_app,

@@ -15,7 +15,7 @@ export default async function AdminAreasPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-bold text-ink-900">Dubai areas</h1>
+        <h1 className="text-xl font-bold text-ink-900">Delivery areas</h1>
         <p className="mt-1 text-sm text-ink-500">
           These drive the customer dropdown. Test-location fields are internal and never shown to
           customers.

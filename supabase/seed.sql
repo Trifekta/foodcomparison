@@ -1,4 +1,9 @@
--- Seed data: supported Dubai areas.
+-- Seed data: Dubai areas.
+--
+-- The rest of the UAE is seeded by migration 0017, which uses the same shape
+-- and the same conflict rule. Dubai stays here, and stays first: its sort_order
+-- runs 10-470 and every other group starts at 1000, so the city the ads point
+-- at is the top of the customer's list.
 --
 -- Safe to re-run: existing areas are left untouched (name is unique per city).
 -- Areas are data, not code - add, rename or deactivate them from /admin/areas.

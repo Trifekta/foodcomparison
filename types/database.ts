@@ -55,6 +55,10 @@ export interface AreaRow {
 export interface PublicArea {
   id: string;
   name: string;
+  /** The heading this area is listed under, e.g. "Sharjah" or "Al Ain". */
+  city: string;
+  /** The emirate it legally belongs to. Differs from city only for Al Ain. */
+  emirate: string;
 }
 
 export interface SubmissionRow {

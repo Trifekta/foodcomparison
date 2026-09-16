@@ -31,7 +31,7 @@ The MVP exists to answer four questions:
 - [1. Create the Supabase project](#1-create-the-supabase-project)
 - [2. Run the migrations](#2-run-the-migrations)
 - [3. Create the storage bucket](#3-create-the-storage-bucket)
-- [4. Seed the Dubai areas](#4-seed-the-dubai-areas)
+- [4. Seed the delivery areas](#4-seed-the-delivery-areas)
 - [5. Create the first admin](#5-create-the-first-admin)
 - [6. Environment variables](#6-environment-variables)
 - [7. Run locally](#7-run-locally)
@@ -212,13 +212,20 @@ after ten minutes.
 
 ---
 
-## 4. Seed the Dubai areas
+## 4. Seed the delivery areas
 
-Run `supabase/seed.sql` in the SQL editor. It inserts the launch list of 47 Dubai
-areas and is safe to re-run.
+Run `supabase/seed.sql` in the SQL editor for the 48 Dubai areas, then migration
+`0017_uae_areas.sql` for the other 148 across the remaining emirates. Both are
+safe to re-run.
+
+The picker groups by `city` and Dubai sorts first, because that is where the ads
+run. Everywhere else is listed so that a customer who hears about this from a
+friend has somewhere to put themselves — being listed is not a promise of
+coverage, and a basket that cannot be priced already has an honest answer.
 
 Areas are data, not code — once the app is running you add, rename, reorder and
-deactivate them at **/admin/areas** with no deploy.
+deactivate them at **/admin/areas** with no deploy, and the city you pick there
+decides both the heading a customer sees and the emirate the funnel reports by.
 
 **Optional (development only):** `supabase/seed_dev_submissions.sql` adds three
 example submissions so the dashboard is not empty. Contact details in it are
@@ -304,7 +311,7 @@ Routes:
 | `/admin` | Admin | Dashboard: cards, filters, submissions table |
 | `/admin/submissions/[id]` | Admin | The comparison workflow |
 | `/admin/analytics` | Admin | Validation metrics |
-| `/admin/areas` | Admin | Manage Dubai areas |
+| `/admin/areas` | Admin | Manage delivery areas |
 
 ---
 

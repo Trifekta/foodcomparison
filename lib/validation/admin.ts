@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_RESTAURANT_NAME_LENGTH, MAX_TOTAL_AED } from "@/lib/constants";
+import { LAUNCH_CITY, MAX_RESTAURANT_NAME_LENGTH, MAX_TOTAL_AED } from "@/lib/constants";
 import { isNormalisablePhone } from "@/lib/utils/phone";
 import {
   allowedKeetaHosts,
@@ -98,6 +98,13 @@ export type UnavailableInput = z.infer<typeof unavailableInputSchema>;
 
 export const areaInputSchema = z.object({
   name: z.string().trim().min(2, "Area name is too short").max(80),
+  /**
+   * The heading this area is listed under. The form offers the known regions as
+   * a select, so this is the net beneath that rather than the gate: a string is
+   * accepted so areas stay data, and a place this codebase has not heard of can
+   * be added without a deploy. The emirate is derived from it, never posted.
+   */
+  city: z.string().trim().min(2, "Pick a city or emirate").max(60).default(LAUNCH_CITY),
   active: z.boolean().default(true),
   sortOrder: z.number().int().min(0).max(9999).default(100),
   testLocationLabel: z.string().trim().max(120).optional(),

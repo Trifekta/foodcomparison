@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { MapPin, X } from "lucide-react";
 import type { PublicArea } from "@/types/database";
+import { type AreaGroup, filterAreas, groupAreasByCity } from "@/lib/area-groups";
 import { FieldError } from "@/components/ui/FieldError";
 import { cn } from "@/lib/utils/cn";
 
@@ -18,11 +19,16 @@ interface AreaComboboxProps {
 }
 
 /**
- * Type-ahead for Dubai areas.
+ * Type-ahead for UAE areas.
  *
  * Options come from the database, never a hard-coded list in this file.
  * Implemented as an ARIA combobox with keyboard support rather than a native
  * <select> so a customer can type "mar" and land on Dubai Marina in one tap.
+ *
+ * Grouped under the city, because the list now covers every emirate and two
+ * hundred ungrouped names is not something anybody scrolls. The heading is also
+ * the only thing distinguishing the Al Nahda in Sharjah from the one in Dubai,
+ * so it is shown even when a search has narrowed the list to one group.
  */
 export function AreaCombobox({
   areas,
@@ -47,11 +53,8 @@ export function AreaCombobox({
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return areas;
-    return areas.filter((area) => area.name.toLowerCase().includes(needle));
-  }, [areas, query]);
+  const filtered = useMemo(() => filterAreas(areas, query), [areas, query]);
+  const groups = useMemo(() => groupAreasByCity(filtered), [filtered]);
 
   useEffect(() => {
     if (!open) return;
@@ -62,12 +65,17 @@ export function AreaCombobox({
     return () => document.removeEventListener("pointerdown", onDocumentPointerDown);
   }, [open]);
 
-  const commit = (area: PublicArea) => {
-    onChange(area.id);
-    setQuery("");
-    setOpen(false);
-    inputRef.current?.blur();
-  };
+  const commit = useCallback(
+    (area: PublicArea) => {
+      onChange(area.id);
+      setQuery("");
+      setOpen(false);
+      // Blurring closes the phone keyboard, which is otherwise still covering
+      // half the screen after the area has been chosen.
+      inputRef.current?.blur();
+    },
+    [onChange],
+  );
 
   const clear = () => {
     onChange("");
@@ -135,7 +143,7 @@ export function AreaCombobox({
           }
           aria-describedby={cn(hint ? hintId : "", error ? errorId : "").trim() || undefined}
           aria-invalid={error ? true : undefined}
-          placeholder="Start typing your area"
+          placeholder="Start typing your area or emirate"
           value={open ? query : selected?.name ?? ""}
           onFocus={() => {
             setOpen(true);
@@ -173,31 +181,21 @@ export function AreaCombobox({
         >
           {filtered.length === 0 ? (
             <li className="px-4 py-3 text-sm text-ink-500">
-              No matching area. We only cover Dubai right now.
+              No area by that name. Try the emirate instead, or the nearest
+              neighbourhood to you.
             </li>
           ) : (
-            filtered.map((area, index) => {
-              const isSelected = area.id === value;
-              return (
-                <li key={area.id} id={`${listId}-${area.id}`} role="option" aria-selected={isSelected}>
-                  <button
-                    type="button"
-                    tabIndex={-1}
-                    onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => commit(area)}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    className={cn(
-                      "flex min-h-12 w-full items-center gap-3 px-4 text-left text-base",
-                      index === activeIndex ? "bg-ink-50" : "bg-white",
-                      isSelected ? "font-bold text-ink-900" : "font-medium text-ink-700",
-                    )}
-                  >
-                    <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-400" />
-                    <span>{area.name}</span>
-                  </button>
-                </li>
-              );
-            })
+            groups.map((group) => (
+              <AreaOptionGroup
+                key={group.city}
+                group={group}
+                listId={listId}
+                selectedId={value}
+                activeIndex={activeIndex}
+                onHover={setActiveIndex}
+                onSelect={commit}
+              />
+            ))
           )}
         </ul>
       ) : null}
@@ -210,5 +208,73 @@ export function AreaCombobox({
 
       <FieldError id={errorId} message={error} />
     </div>
+  );
+}
+
+/**
+ * One heading and the areas under it.
+ *
+ * Its own component rather than a nested map, because `commit` reads a ref to
+ * close the phone keyboard, and a ref-reading function referenced two closures
+ * deep is something the React compiler cannot prove is only ever called from an
+ * event handler. Passing it across a component boundary as a plain prop settles
+ * that, and the listbox reads better for it.
+ */
+function AreaOptionGroup({
+  group,
+  listId,
+  selectedId,
+  activeIndex,
+  onHover,
+  onSelect,
+}: {
+  group: AreaGroup;
+  listId: string;
+  selectedId: string;
+  activeIndex: number;
+  onHover: (index: number) => void;
+  onSelect: (area: PublicArea) => void;
+}) {
+  const headingId = `${listId}-group-${group.city.replace(/\s+/g, "-").toLowerCase()}`;
+
+  return (
+    <li role="presentation">
+      <p
+        id={headingId}
+        className="sticky top-0 bg-white px-4 pb-1 pt-2 text-xs font-bold uppercase tracking-wide text-ink-400"
+      >
+        {group.city}
+        {group.emirate === group.city ? null : (
+          <span className="font-semibold normal-case tracking-normal text-ink-300">
+            {" "}
+            · {group.emirate}
+          </span>
+        )}
+      </p>
+      <ul role="group" aria-labelledby={headingId}>
+        {group.options.map(({ area, index }) => {
+          const isSelected = area.id === selectedId;
+          return (
+            <li key={area.id} id={`${listId}-${area.id}`} role="option" aria-selected={isSelected}>
+              <button
+                type="button"
+                tabIndex={-1}
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => onSelect(area)}
+                onMouseEnter={() => onHover(index)}
+                className={cn(
+                  "flex min-h-12 w-full items-center gap-3 px-4 text-left text-base",
+                  index === activeIndex ? "bg-ink-50" : "bg-white",
+                  isSelected ? "font-bold text-ink-900" : "font-medium text-ink-700",
+                )}
+              >
+                <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-400" />
+                <span>{area.name}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </li>
   );
 }

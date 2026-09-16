@@ -44,7 +44,7 @@ export default function PrivacyPage() {
           <ul className="list-disc space-y-1.5 pl-5">
             <li>your cart screenshot</li>
             <li>your checkout screenshot, if you choose to add one</li>
-            <li>the Dubai area you selected</li>
+            <li>the delivery area you selected</li>
             <li>the order total you typed in</li>
             <li>your WhatsApp number or email address</li>
           </ul>

@@ -246,7 +246,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     return { ok: false, status: 500, error: GENERIC_FAILURE };
   }
   if (!area?.active) {
-    return { ok: false, status: 400, error: "Please select your Dubai area.", field: "areaId" };
+    return { ok: false, status: 400, error: "Please select your delivery area.", field: "areaId" };
   }
 
   // ---- 4. Upload first, using an id we mint ourselves ---------------------

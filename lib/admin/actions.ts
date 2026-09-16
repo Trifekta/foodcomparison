@@ -25,6 +25,8 @@ import { sanitiseMultiline, sanitiseText } from "@/lib/utils/text";
 import { normalisePhone } from "@/lib/utils/phone";
 import {
   COMPARISON_APP,
+  emirateForCity,
+  LAUNCH_CITY,
   MAX_RESTAURANT_NAME_LENGTH,
   STORAGE_BUCKET,
   UNKNOWN_SOURCE_APP,
@@ -595,6 +597,7 @@ export async function createArea(formData: FormData): Promise<ActionResult> {
 
   const parsed = areaInputSchema.safeParse({
     name: String(formData.get("name") ?? ""),
+    city: String(formData.get("city") ?? LAUNCH_CITY),
     active: formData.get("active") === "on" || formData.get("active") === "true",
     sortOrder: Number(formData.get("sortOrder") ?? 100),
     testLocationLabel: String(formData.get("testLocationLabel") ?? ""),
@@ -608,6 +611,10 @@ export async function createArea(formData: FormData): Promise<ActionResult> {
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.from("areas").insert({
     name: parsed.data.name,
+    city: parsed.data.city,
+    // Derived, never posted: the two must agree, and a form is not the place to
+    // find out that they do not.
+    emirate: emirateForCity(parsed.data.city),
     active: parsed.data.active,
     sort_order: parsed.data.sortOrder,
     test_location_label: sanitiseText(parsed.data.testLocationLabel, 120),
@@ -617,7 +624,9 @@ export async function createArea(formData: FormData): Promise<ActionResult> {
   if (error) {
     return {
       ok: false,
-      message: error.code === "23505" ? "That area already exists." : "Could not add the area.",
+      message: error.code === "23505"
+          ? "That area already exists in that city."
+          : "Could not add the area.",
     };
   }
 
@@ -634,6 +643,7 @@ export async function updateArea(formData: FormData): Promise<ActionResult> {
 
   const parsed = areaInputSchema.safeParse({
     name: String(formData.get("name") ?? ""),
+    city: String(formData.get("city") ?? LAUNCH_CITY),
     active: formData.get("active") === "on" || formData.get("active") === "true",
     sortOrder: Number(formData.get("sortOrder") ?? 100),
     testLocationLabel: String(formData.get("testLocationLabel") ?? ""),
@@ -649,6 +659,8 @@ export async function updateArea(formData: FormData): Promise<ActionResult> {
     .from("areas")
     .update({
       name: parsed.data.name,
+      city: parsed.data.city,
+      emirate: emirateForCity(parsed.data.city),
       active: parsed.data.active,
       sort_order: parsed.data.sortOrder,
       test_location_label: sanitiseText(parsed.data.testLocationLabel, 120),
@@ -659,7 +671,9 @@ export async function updateArea(formData: FormData): Promise<ActionResult> {
   if (error) {
     return {
       ok: false,
-      message: error.code === "23505" ? "Another area already has that name." : "Could not save.",
+      message: error.code === "23505"
+          ? "Another area in that city already has that name."
+          : "Could not save.",
     };
   }
 
