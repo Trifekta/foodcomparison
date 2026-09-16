@@ -44,7 +44,10 @@ export function LastOrderBanner() {
     return (
       <p className="mt-3 text-center text-[0.85rem] text-slate-500">
         Sent us an order already?{" "}
-        <Link href="/find" className="font-bold text-ink-800 underline underline-offset-2">
+        <Link
+          href="/find"
+          className="inline-flex min-h-11 items-center px-1.5 font-bold text-ink-800 underline underline-offset-2"
+        >
           Find it with your reference
         </Link>
       </p>

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
+import { StepActions } from "./StepActions";
 import { ImageUpload } from "@/components/forms/ImageUpload";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
@@ -134,7 +135,7 @@ export function StepUpload({
         />
       </div>
 
-      <div className="mt-5">
+      <StepActions>
         <Button onClick={onContinue} disabled={!cartFile} arrow>
           Continue
         </Button>
@@ -143,7 +144,7 @@ export function StepUpload({
             Add your cart screenshot to continue.
           </p>
         ) : null}
-      </div>
+      </StepActions>
     </>
   );
 }

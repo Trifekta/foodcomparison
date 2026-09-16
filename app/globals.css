@@ -81,6 +81,25 @@
     color: var(--color-ink-900);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+
+    /* Nothing may scroll sideways. A single element a few pixels too wide turns
+       every vertical swipe into a fight with the page, which is the clearest
+       possible signal that something is a website. clip rather than hidden,
+       because hidden on body silently makes position:sticky stop working. */
+    overflow-x: clip;
+
+    /* The horizontal rubber-band only ever competes with the browser's own
+       back-swipe. Vertical bounce is left alone: it is how a phone tells you
+       that you have reached the end, and taking it away feels broken rather
+       than native. */
+    overscroll-behavior-x: none;
+  }
+
+  /* The grey flash on every tap is the tell of a web page. Buttons here all
+     have their own pressed and focus states, so nothing is lost with it gone -
+     and :focus-visible below still draws a real outline for keyboards. */
+  :where(a, button, [role="button"], label, summary) {
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* Headlines are tight and heavy, matching the product's visual identity. */
@@ -127,6 +146,27 @@
   -webkit-box-decoration-break: clone;
 }
 
+/**
+ * Room for the hardware.
+ *
+ * viewportFit: "cover" in app/layout.tsx lets the page reach the physical edges
+ * of the screen, which is what stops it looking like a document in a frame -
+ * and hands the layout the job of not putting anything under the notch or the
+ * home indicator. These are that job, in one place.
+ *
+ * max() rather than the raw inset, because a phone without a notch reports zero
+ * and a button flush against the bottom edge of the glass is uncomfortable to
+ * press on any device.
+ */
 @utility safe-bottom {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+@utility safe-top {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+
+/** For a sticky bar, where the bar's own padding is already part of the design. */
+@utility safe-bottom-tight {
+  padding-bottom: max(0.875rem, env(safe-area-inset-bottom));
 }

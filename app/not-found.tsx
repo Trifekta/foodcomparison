@@ -3,7 +3,7 @@ import { BrandHeader } from "@/components/customer/BrandHeader";
 
 export default function NotFound() {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5">
+    <div className="safe-bottom mx-auto flex min-h-dvh w-full max-w-md flex-col px-5">
       <BrandHeader />
       <main className="flex flex-1 flex-col items-center justify-center text-center">
         <h1 className="text-2xl font-extrabold text-ink-900">Page not found</h1>

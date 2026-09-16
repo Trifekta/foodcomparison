@@ -4,6 +4,7 @@ import { Info, MapPin, ScanLine } from "lucide-react";
 import type { PublicArea } from "@/types/database";
 import { CURRENCY } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
+import { StepActions } from "./StepActions";
 import { AmountInput } from "@/components/forms/AmountInput";
 import { AreaCombobox } from "@/components/forms/AreaCombobox";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
@@ -149,11 +150,11 @@ export function StepWhereAndTotal({
         </div>
       </div>
 
-      <div className="mt-5">
+      <StepActions>
         <Button onClick={onContinue} arrow>
           Continue
         </Button>
-      </div>
+      </StepActions>
     </>
   );
 }

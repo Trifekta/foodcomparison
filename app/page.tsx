@@ -36,12 +36,12 @@ const STEPS = [
 
 export default function LandingPage() {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5">
+    <div className="safe-bottom mx-auto flex min-h-dvh w-full max-w-md flex-col px-5">
       {/* Renders nothing. It is here so the advert click is counted before the
           customer decides whether to start. */}
       <TrackLanding />
 
-      <header className="flex items-start justify-between gap-3 pt-5">
+      <header className="flex items-start justify-between gap-3 pt-[max(1.25rem,env(safe-area-inset-top))]">
         <Wordmark size="md" />
         <ScriptNote underline className="text-[0.95rem] text-slate-600">
           Same Food
@@ -135,7 +135,7 @@ export default function LandingPage() {
             <p className="mt-2 text-xs">
               <Link
                 href="/privacy"
-                className="text-slate-500 underline underline-offset-2 hover:text-ink-800"
+                className="inline-flex min-h-11 items-center px-2 text-slate-500 underline underline-offset-2 hover:text-ink-800"
               >
                 Privacy
               </Link>
