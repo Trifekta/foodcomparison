@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { structureImage, structureOcrText } from "@/lib/extraction/structure";
 import type { StructuringClient } from "@/lib/extraction/structure";
 import { emptyBasket, type StructuredBasket } from "@/lib/extraction/schema";
@@ -162,5 +162,41 @@ describe("structureImage", () => {
       visionCall.parse.mock.calls[0][0].system,
     );
     expect(ocrCall.parse.mock.calls[0][0].system).toContain("OCR");
+  });
+});
+
+/**
+ * EXTRACTION_MODEL is the one knob meant to be turned from the Cloudflare
+ * dashboard, by somebody looking at a bill, without a deploy. It is only that
+ * if changing it cannot break the request.
+ */
+describe("the effort setting follows the model", () => {
+  const optionsFor = async (model: string) => {
+    process.env.EXTRACTION_MODEL = model;
+    const { client, parse } = fakeClient(basket());
+    await structureOcrText(OCR, client);
+    return parse.mock.calls[0][0].output_config as { effort?: string; format?: unknown };
+  };
+
+  afterEach(() => {
+    delete process.env.EXTRACTION_MODEL;
+  });
+
+  it("sends effort to a model that accepts it", async () => {
+    expect((await optionsFor("claude-opus-5")).effort).toBe("low");
+    expect((await optionsFor("claude-sonnet-5")).effort).toBe("low");
+  });
+
+  it("omits it for Haiku, which rejects it outright", async () => {
+    // A 400 on every screenshot would be a silent, total failure of the cheapest
+    // option - exactly the one somebody reaches for to cut a bill.
+    const options = await optionsFor("claude-haiku-4-5");
+    expect(options.effort).toBeUndefined();
+    expect(options.format).toBeDefined();
+  });
+
+  it("omits it for a model it has never heard of", async () => {
+    // Costing slightly more is recoverable. 400ing is not.
+    expect((await optionsFor("some-future-model")).effort).toBeUndefined();
   });
 });

@@ -372,8 +372,20 @@ SUPABASE_SERVICE_ROLE_KEY
 ANTHROPIC_API_KEY   (optional - reads the cart screenshot)
 ```
 
-`EXTRACTION_MODEL` is a plain build/runtime variable, not a secret - set it only
-if you want something other than the default.
+`EXTRACTION_MODEL` is a plain runtime variable, not a secret. It defaults to
+`claude-opus-5`, and it is the knob to turn when the bill is the problem: two
+screenshots go to the model per submission, and the cost is dominated by the
+image tokens, so the per-million input rate is very nearly the whole story.
+
+| Model | Input $/MTok | Relative cost | Notes |
+|---|---|---|---|
+| `claude-opus-5` (default) | $5 | 1x | |
+| `claude-sonnet-5` | $2 | ~0.4x | drop-in |
+| `claude-haiku-4-5` | $1 | ~0.2x | no `effort` setting; the code omits it |
+
+Changing it needs no deploy - it is read on every request. Measure before and
+after with `npm run extract:eval`: a cheaper read that the customer has to
+correct is not cheaper.
 
 **Nothing tells you a customer is waiting until one of these is set too.** A
 Worker with only the list above deploys, serves and takes orders perfectly, and
