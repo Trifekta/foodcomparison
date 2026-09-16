@@ -17,7 +17,12 @@ describe("buildResultMessage", () => {
     });
 
     expect(result.hasSaving).toBe(true);
-    expect(result.message).toContain("Good news — we found a cheaper option for your order.");
+    // The first line names us: this lands on WhatsApp from a number the
+    // customer has never seen, and the preview is the first line and nothing
+    // else.
+    expect(result.message.split("\n")[0]).toBe(
+      "SnipSavor — good news, we found a cheaper option for your order.",
+    );
     expect(result.message).toContain("Talabat — AED 82.00");
     expect(result.message).toContain("Keeta — AED 63.00");
     expect(result.message).toContain("AED 19.00");
@@ -44,7 +49,9 @@ describe("buildResultMessage", () => {
 
     expect(result.hasSaving).toBe(false);
     expect(result.savingMinor).toBe(0);
-    expect(result.message).toContain("we couldn't find a better price this time");
+    expect(result.message.split("\n")[0]).toBe(
+      "SnipSavor — we checked your order, but couldn't find a better price this time.",
+    );
     expect(result.message).toContain("Your current option appears better right now.");
     expect(result.message).not.toContain("You could save");
     expect(result.message).not.toContain("-");
