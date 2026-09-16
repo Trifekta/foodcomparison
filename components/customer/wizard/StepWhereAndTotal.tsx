@@ -102,6 +102,14 @@ export function StepWhereAndTotal({
             value={areaId}
             onChange={onAreaChange}
             error={errors.areaId}
+            /* Said out loud because people answer the question they think was
+               asked. Somebody at work ordering dinner home reads "your area"
+               as where they are standing, and the wrong area is not a slightly
+               wrong delivery fee - it can put the restaurant outside Keeta's
+               range, which comes back as "not available" and sends them back
+               to the app they came from. A false no is the worst answer this
+               product can give, and one line prevents most of them. */
+            hint="Where the food is going — not where you are right now."
           />
         </div>
 
