@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Caveat, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { PRODUCT_NAME, PRODUCT_DESCRIPTION } from "@/lib/constants";
+import { socialCard } from "@/lib/metadata";
+import { absoluteUrl } from "@/lib/env";
 
 // Self-hosted at build time by next/font, so there is no runtime request to
 // Google and no layout shift.
@@ -20,6 +22,9 @@ const caveat = Caveat({
   display: "swap",
 });
 
+const appOrigin = absoluteUrl("/");
+const metadataBaseUrl = appOrigin ? new URL(appOrigin) : undefined;
+
 export const metadata: Metadata = {
   title: {
     default: `${PRODUCT_NAME} — check if your food order is cheaper elsewhere`,
@@ -28,6 +33,29 @@ export const metadata: Metadata = {
   description: PRODUCT_DESCRIPTION,
   applicationName: PRODUCT_NAME,
   robots: { index: true, follow: true },
+
+  /**
+   * What a relative URL in any metadata below resolves against.
+   *
+   * Undefined rather than a fallback when NEXT_PUBLIC_APP_URL is unset: Next
+   * would otherwise quietly resolve against localhost, and every page in the
+   * build would advertise an address only this machine can reach.
+   */
+  metadataBase: metadataBaseUrl,
+
+  /**
+   * The default link preview, inherited by every page that does not set its own.
+   *
+   * It is what somebody sees when the landing page is pasted into a chat, which
+   * during validation is how most of the first customers arrive.
+   */
+  ...socialCard({
+    title: `${PRODUCT_NAME} — is your food order cheaper elsewhere?`,
+    description: PRODUCT_DESCRIPTION,
+    image: "/og/default.png",
+    imageAlt: `${PRODUCT_NAME} — send your cart screenshot and we check the same order on another delivery app in Dubai.`,
+    path: "/",
+  }),
 
   /**
    * What iOS reads when somebody adds this to their Home Screen.
