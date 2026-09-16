@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  UNVERIFIED_TOTAL_NOTE,
   buildMailtoLink,
   buildResultMessage,
   buildResultSubject,
@@ -14,6 +15,7 @@ describe("buildResultMessage", () => {
       sourceAppLabel: "Talabat",
       currentTotal: "82.00",
       comparisonTotal: "63.00",
+      checkoutScreenshotProvided: true,
     });
 
     expect(result.hasSaving).toBe(true);
@@ -36,6 +38,7 @@ describe("buildResultMessage", () => {
       sourceAppLabel: "Talabat",
       currentTotal: "82.00",
       comparisonTotal: "63.00",
+      checkoutScreenshotProvided: true,
     });
     expect(message.toLowerCase()).not.toContain("guarantee");
   });
@@ -45,6 +48,7 @@ describe("buildResultMessage", () => {
       sourceAppLabel: "Talabat",
       currentTotal: "65.00",
       comparisonTotal: "66.50",
+      checkoutScreenshotProvided: true,
     });
 
     expect(result.hasSaving).toBe(false);
@@ -63,6 +67,7 @@ describe("buildResultMessage", () => {
         sourceAppLabel: "Deliveroo",
         currentTotal: "50.00",
         comparisonTotal: "50.00",
+        checkoutScreenshotProvided: true,
       }).hasSaving,
     ).toBe(false);
   });
@@ -72,6 +77,7 @@ describe("buildResultMessage", () => {
       sourceAppLabel: "Talabat",
       currentTotal: "50.00",
       comparisonTotal: "54.00",
+      checkoutScreenshotProvided: true,
     });
     expect(result.hasSaving).toBe(false);
     expect(result.message).toContain("Keeta checked:");
@@ -83,6 +89,7 @@ describe("buildResultMessage", () => {
       sourceAppLabel: "Smiles",
       currentTotal: "40.00",
       comparisonTotal: "35.00",
+      checkoutScreenshotProvided: true,
     });
     expect(message).toContain("Smiles — AED 40.00");
   });
@@ -102,6 +109,7 @@ describe("delivery links", () => {
       sourceAppLabel: "Talabat",
       currentTotal: "82.00",
       comparisonTotal: "63.00",
+      checkoutScreenshotProvided: true,
     });
     const link = buildWhatsAppLink("+971501234567", message);
     expect(decodeURIComponent(link.split("?text=")[1])).toBe(message);
@@ -146,12 +154,14 @@ describe("the result link in a message", () => {
     sourceAppLabel: "Talabat",
     currentTotal: "34.65",
     comparisonTotal: "29.00",
+    checkoutScreenshotProvided: true,
   };
 
   it("sends the customer back to their own result page", () => {
     const { message } = buildResultMessage({
       ...base,
       resultUrl: "https://snipsavor.example/r/0123456789abcdef0123456789abcdef",
+      checkoutScreenshotProvided: true,
     });
     expect(message).toContain("https://snipsavor.example/r/0123456789abcdef0123456789abcdef");
   });
@@ -195,5 +205,56 @@ describe("buildUnavailableMessage", () => {
       resultUrl: "https://snipsavor.example/r/0123456789abcdef0123456789abcdef",
     });
     expect(message).toContain("/r/0123456789abcdef0123456789abcdef");
+  });
+});
+
+/**
+ * The caveat when the checkout screen never arrived.
+ *
+ * It is deliberately about verification rather than arithmetic. The baseline is
+ * whatever the customer typed into the total field, and plenty of people type
+ * their real final total straight off their own screen - so a message claiming
+ * we "compared the item subtotal" would be a confident statement about their
+ * order that happens to be untrue, which is worse than no warning at all.
+ */
+describe("a comparison with no checkout screenshot", () => {
+  const base = {
+    sourceAppLabel: "Talabat",
+    currentTotal: "133.40",
+    comparisonTotal: "120.00",
+  };
+
+  it("says nothing extra when they sent one", () => {
+    const { message } = buildResultMessage({ ...base, checkoutScreenshotProvided: true });
+    expect(message).not.toContain(UNVERIFIED_TOTAL_NOTE);
+  });
+
+  it("warns on the saving message when they did not", () => {
+    const { message } = buildResultMessage({ ...base, checkoutScreenshotProvided: false });
+    expect(message).toContain(UNVERIFIED_TOTAL_NOTE);
+    // Still the message it was: the caveat is added, not substituted.
+    expect(message).toContain("You could save");
+  });
+
+  it("warns on the no-saving message too", () => {
+    // A total typed without fees makes the alternative look worse than it is,
+    // so telling somebody to stay put is exactly when this matters.
+    const { message } = buildResultMessage({
+      ...base,
+      comparisonTotal: "150.00",
+      checkoutScreenshotProvided: false,
+    });
+    expect(message).toContain(UNVERIFIED_TOTAL_NOTE);
+    expect(message).toContain("Your current option appears better right now.");
+  });
+
+  it("does not claim we compared a subtotal, because we did not", () => {
+    expect(UNVERIFIED_TOTAL_NOTE).not.toMatch(/subtotal/i);
+    expect(UNVERIFIED_TOTAL_NOTE).toContain("the total you entered");
+  });
+
+  it("keeps the sign-off last, so the caveat does not end the message", () => {
+    const { message } = buildResultMessage({ ...base, checkoutScreenshotProvided: false });
+    expect(message.trimEnd().endsWith("— SnipSavor")).toBe(true);
   });
 });
