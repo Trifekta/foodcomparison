@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { MAX_IMAGE_BYTES, RATE_LIMIT_MAX_EXTRACTIONS, RATE_LIMIT_WINDOW_MS } from "@/lib/constants";
-import { isExtractionConfigured } from "@/lib/env";
+import { getExtractionModel, isExtractionConfigured } from "@/lib/env";
 import { structureImage } from "@/lib/extraction/structure";
 import { checkRateLimit, clientKeyFromHeaders } from "@/lib/utils/rate-limit";
 import { validateImageFile } from "@/lib/validation/image";
@@ -77,8 +77,23 @@ export async function POST(request: Request) {
   const outcome = await structureImage(image);
 
   if (!outcome.ok) {
-    // The reason is deliberately not passed on. A customer can do nothing with
-    // "the model returned invalid JSON", and the browser falls back either way.
+    // Logged, because the browser falls back and the customer sees a working
+    // form either way - so a model that is refusing every request looks exactly
+    // like one that is working, and the only place the difference shows up is
+    // here. EXTRACTION_MODEL is meant to be changed from the dashboard; a typo
+    // in it would otherwise be a silent, permanent downgrade.
+    //
+    // The model and the reason, and nothing else. Not the screenshot, not a
+    // basket, not an address - this line goes to a log that is not the place
+    // for any of them.
+    console.error("[extract] the model could not read a screenshot", {
+      model: getExtractionModel(),
+      reason: outcome.reason,
+      detail: outcome.detail ?? null,
+    });
+
+    // The reason is deliberately not passed on to the customer. They can do
+    // nothing with "the response did not match the schema".
     const status = outcome.reason === "not_configured" ? 503 : 502;
     return NextResponse.json({ error: "The screenshot could not be read." }, { status });
   }

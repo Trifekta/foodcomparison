@@ -42,6 +42,29 @@ function createClient(apiKey: string): StructuringClient {
   return new Anthropic({ apiKey, timeout: EXTRACTION_TIMEOUT_MS, maxRetries: 1 }).messages;
 }
 
+/**
+ * Whether this model takes an effort setting.
+ *
+ * Not every family does - Haiku 4.5 and the 4.5 Sonnets reject `effort` with a
+ * 400 rather than ignoring it, so sending it unconditionally would turn a change
+ * of EXTRACTION_MODEL into a broken extraction with no clue why. That matters
+ * because this is the one knob meant to be turned from the dashboard, without a
+ * deploy, by somebody looking at a bill.
+ *
+ * Listed the safe way round: families known to accept it opt in, and anything
+ * unrecognised goes without. A model that silently costs a little more is a
+ * worse outcome than a saving; a model that 400s on every screenshot is a worse
+ * outcome than either.
+ */
+function supportsEffort(model: string): boolean {
+  return (
+    model.startsWith("claude-opus-") ||
+    model.startsWith("claude-fable-") ||
+    model.startsWith("claude-mythos-") ||
+    model.startsWith("claude-sonnet-5")
+  );
+}
+
 interface CallOptions {
   system: string;
   content: Anthropic.MessageParam["content"];
@@ -61,10 +84,15 @@ async function callModel({ system, content, client }: CallOptions) {
       model,
       max_tokens: 8192,
       system,
-      // Reading a receipt is not a reasoning problem, and an admin is waiting.
-      // Thinking stays on: turning it off on this model family costs more in
-      // reliability than the low effort setting saves in latency.
-      output_config: { effort: "low", format: zodOutputFormat(structuredBasketSchema) },
+      // Reading a receipt is not a reasoning problem, and somebody is waiting.
+      // Thinking stays on where it exists: turning it off costs more in
+      // reliability than the low effort setting saves in latency. Where the
+      // model has no effort setting at all, the field is omitted rather than
+      // sent and rejected - see supportsEffort.
+      output_config: {
+        ...(supportsEffort(model) ? { effort: "low" as const } : {}),
+        format: zodOutputFormat(structuredBasketSchema),
+      },
       messages: [{ role: "user", content }],
     });
 
