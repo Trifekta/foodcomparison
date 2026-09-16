@@ -1084,6 +1084,28 @@ its restaurant, source app, prices, saving, area and click id.
 
 ---
 
+## Sending the result as SnipSavor, not as a person
+
+The result goes out over WhatsApp by hand: the admin opens a prefilled `wa.me`
+link from the submission page and sends it. Which WhatsApp account that is
+decides whether the customer hears from a brand or from a stranger.
+
+**Use the free WhatsApp Business app on a second number.** It is an ordinary app,
+not the API: the profile carries the SnipSavor name, logo and website, and it can
+message anybody - the 24-hour window and the pre-approved templates are rules of
+the WhatsApp Business *Platform*, which is a different product.
+
+Nothing in this codebase changes for it. `wa.me` opens whichever WhatsApp the
+device is signed into, so linking WhatsApp Business Web in the same browser as
+the dashboard is the whole setup.
+
+The message names SnipSavor in its first line for the same reason. It arrives
+from a number the customer has never seen and the preview on their lock screen
+is that line and nothing else - "we found a cheaper option" from an unknown
+number reads like a scam.
+
+---
+
 ## The five-minute promise
 
 `RESULT_PROMISE_MINUTES` in `lib/constants.ts` is the single place the wait is

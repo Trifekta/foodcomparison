@@ -87,9 +87,17 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
   const currentLine = `${input.sourceAppLabel} — ${formatMinorAsCurrency(currentMinor)}`;
   const comparisonLine = `${comparisonApp} — ${formatMinorAsCurrency(comparisonMinor)}`;
 
+  // The first line names us, because of where this message lands.
+  //
+  // It arrives on WhatsApp from a number the customer has never seen, and the
+  // preview on their lock screen is the first line and nothing else. "Good news
+  // - we found a cheaper option" from an unknown number reads like the opening
+  // of a scam; the same sentence with SnipSavor in front of it reads like the
+  // thing they asked for ten minutes ago. The sign-off stays, which is how a
+  // business message is shaped either way.
   const message = saving.hasSaving
     ? [
-        "Good news — we found a cheaper option for your order.",
+        `${BRAND_NAME} — good news, we found a cheaper option for your order.`,
         "",
         "Your current total:",
         currentLine,
@@ -108,7 +116,7 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
         `— ${BRAND_NAME}`,
       ].join("\n")
     : [
-        "We checked your order, but we couldn't find a better price this time.",
+        `${BRAND_NAME} — we checked your order, but couldn't find a better price this time.`,
         "",
         "Your current total:",
         currentLine,
