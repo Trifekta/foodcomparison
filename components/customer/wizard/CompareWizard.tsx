@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm, useWatch, type PathValue } from "react-hook-form";
 import type { z } from "zod";
 import type { PublicArea } from "@/types/database";
+import type { StructuredBasket } from "@/lib/extraction/schema";
 import {
   ERROR_MESSAGES,
   basketStepSchema,
@@ -51,6 +52,52 @@ const STEP_REVIEW = 4;
  * and once more over the whole submission before it is sent. The server
  * re-validates everything regardless - nothing here is trusted.
  */
+/**
+ * Reading one screenshot, by whichever route can actually read it.
+ *
+ * The model first. It sees the picture, so it gets the things Tesseract cannot:
+ * a struck-through price beside the real one, a discount line, a currency glyph
+ * welded to a digit. On the one real payment summary measured here, the browser
+ * read the 2.70 service fee as 52.70 and lost a 16.20 discount; the model reads
+ * the same screen correctly.
+ *
+ * Then the browser, for everything that stops the first one working - no key
+ * configured, the rate limit reached, the network gone, the API having a bad
+ * minute. That path is the one this app shipped with and it is still here in
+ * full, so a customer never sees a dead form because a third party is down.
+ *
+ * Null means neither could make anything of it, which is the same outcome the
+ * wizard has always had for an unreadable screenshot: the confirm step opens
+ * empty and the customer types what they see.
+ */
+async function readBasket(file: File): Promise<StructuredBasket | null> {
+  try {
+    const body = new FormData();
+    body.append("image", file);
+
+    const response = await fetch("/api/extract", { method: "POST", body });
+
+    if (response.ok) {
+      const payload = (await response.json()) as { basket?: StructuredBasket };
+      if (payload.basket) return payload.basket;
+    }
+  } catch {
+    // Offline, blocked, or the request died in flight. Fall through and read it
+    // here instead - a failed model call must never cost somebody their upload.
+  }
+
+  const [{ readImageInBrowser }, { parseOcrText }] = await Promise.all([
+    import("@/lib/ocr/browser"),
+    import("@/lib/extraction/parse-text"),
+  ]);
+
+  const ocr = await readImageInBrowser(file);
+  if (!ocr.ok) return null;
+
+  const { basket, empty } = parseOcrText(ocr.text);
+  return empty ? null : basket;
+}
+
 export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   const router = useRouter();
 
@@ -187,22 +234,10 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
 
     void (async () => {
       try {
-        const [{ readImageInBrowser }, { parseOcrText }] = await Promise.all([
-          import("@/lib/ocr/browser"),
-          import("@/lib/extraction/parse-text"),
-        ]);
-
-        const ocr = await readImageInBrowser(file);
-        if (!stillCurrent()) return;
-        if (!ocr.ok) {
-          setStatus(slot, "empty");
-          return;
-        }
-
-        const { basket, empty } = parseOcrText(ocr.text);
+        const basket = await readBasket(file);
         if (!stillCurrent()) return;
 
-        if (empty) {
+        if (!basket) {
           setStatus(slot, "empty");
           return;
         }
