@@ -20,6 +20,7 @@ let outcome: unknown = null;
 
 vi.mock("@/lib/env", () => ({
   isExtractionConfigured: () => configured,
+  getExtractionModel: () => "claude-haiku-4-5",
 }));
 
 vi.mock("@/lib/extraction/structure", () => ({
@@ -129,5 +130,40 @@ describe("POST /api/extract", () => {
     const response = await POST(imageRequest());
     expect(response.status).toBe(502);
     expect(JSON.stringify(await response.json())).not.toContain("JSON");
+  });
+
+  it("logs the model and the reason, so a bad EXTRACTION_MODEL is findable", async () => {
+    // The browser falls back, so a model refusing every request looks exactly
+    // like one that works. This log line is the only place the difference shows.
+    const logged: unknown[][] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((...args) => {
+      logged.push(args);
+    });
+
+    outcome = { ok: false, reason: "failed", detail: "model: unknown model" };
+    await POST(imageRequest());
+    spy.mockRestore();
+
+    const line = JSON.stringify(logged);
+    expect(line).toContain("claude-haiku-4-5");
+    expect(line).toContain("unknown model");
+  });
+
+  it("keeps the customer out of the log", async () => {
+    const logged: unknown[][] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((...args) => {
+      logged.push(args);
+    });
+
+    outcome = { ok: false, reason: "failed", detail: "boom" };
+    await POST(imageRequest());
+    spy.mockRestore();
+
+    // No screenshot, no basket, no filename. A log is not the place for any of
+    // it, and this one runs on every failed customer upload.
+    const line = JSON.stringify(logged);
+    expect(line).not.toContain("cart.png");
+    expect(line).not.toContain("basket");
+    expect(line).not.toContain("image");
   });
 });
