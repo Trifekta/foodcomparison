@@ -266,10 +266,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-# Optional — leave blank and the dashboard falls back to "Copy email message"
-RESEND_API_KEY=
-EMAIL_FROM=SnipSavor <results@yourdomain.com>
-
 # Optional — leave blank and the confirm step starts empty instead of pre-filled
 ANTHROPIC_API_KEY=
 EXTRACTION_MODEL=
@@ -374,8 +370,6 @@ bindings into `process.env` on each request.
 ```
 SUPABASE_SERVICE_ROLE_KEY
 ANTHROPIC_API_KEY   (optional - reads the cart screenshot)
-RESEND_API_KEY      (optional)
-EMAIL_FROM          (optional)
 ```
 
 `EXTRACTION_MODEL` is a plain build/runtime variable, not a secret - set it only
@@ -388,8 +382,6 @@ notifies nobody - `/admin/diagnostics` is where that shows up:
 ```
 TELEGRAM_BOT_TOKEN     free, instant, two minutes - see .env.example for the
 TELEGRAM_CHAT_ID       @BotFather steps. The quickest way to be told anything.
-ADMIN_ALERT_EMAIL      email alerts instead of, or as well as, Telegram.
-                       Needs RESEND_API_KEY.
 WEB_PUSH_PUBLIC_KEY    browser push. Generate a pair with `npm run push:keys`
 WEB_PUSH_PRIVATE_KEY   or `npx web-push generate-vapid-keys`. Both must be set
 WEB_PUSH_SUBJECT       or the Enable button never appears on the dashboard.

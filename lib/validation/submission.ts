@@ -29,7 +29,6 @@ export const ERROR_MESSAGES = {
   totalTooHigh: `Enter an amount under AED ${MAX_TOTAL_AED.toLocaleString("en-AE")}.`,
   contactMissing: "Please tell us where to send your result.",
   invalidPhone: "Enter a valid mobile number.",
-  invalidEmail: "Enter a valid email address.",
   /**
    * Three ways a submission can fail without any field being wrong, worded
    * differently on purpose.
@@ -62,6 +61,20 @@ export const amountSchema = z
   .refine((value) => Number(value) >= MIN_TOTAL_AED, ERROR_MESSAGES.invalidTotal)
   .refine((value) => Number(value) <= MAX_TOTAL_AED, ERROR_MESSAGES.totalTooHigh);
 
+/**
+ * WhatsApp only.
+ *
+ * Email was offered behind a small "Prefer email?" link and is gone: the result
+ * is a short message with a link in it, sent within minutes, to somebody who is
+ * deciding what to eat right now. That is a WhatsApp message. Sending it by
+ * email meant a second channel to build, a Resend key to keep alive and a
+ * different template to keep in step with the first, for a delivery people
+ * would read an hour late.
+ *
+ * The enum keeps both values because the column and its rows do - a submission
+ * taken by email before this is still a real request, and still has to be
+ * findable by the person who made it. Nothing new is ever written with it.
+ */
 export const contactTypeSchema = z.enum(["whatsapp", "email"]);
 
 /** The fields both the wizard and the API route validate. */
@@ -73,10 +86,8 @@ const baseFields = {
     .max(MAX_RESTAURANT_NAME_LENGTH, ERROR_MESSAGES.restaurantTooLong),
   areaId: z.uuid({ message: ERROR_MESSAGES.areaMissing }),
   currentTotal: amountSchema,
-  contactType: contactTypeSchema,
   dialCode: z.string(),
   whatsappNumber: z.string(),
-  email: z.string(),
   marketingConsent: z.boolean(),
 };
 
@@ -84,42 +95,30 @@ type BaseValues = {
   restaurantName: string;
   areaId: string;
   currentTotal: string;
-  contactType: "whatsapp" | "email";
   dialCode: string;
   whatsappNumber: string;
-  email: string;
   marketingConsent: boolean;
 };
 
-type ContactValues = Pick<
-  BaseValues,
-  "contactType" | "dialCode" | "whatsappNumber" | "email"
->;
+type ContactValues = Pick<BaseValues, "dialCode" | "whatsappNumber">;
 
-/** Exactly one contact method must be valid, for the channel the customer chose. */
+/** A reachable WhatsApp number, which is now the only way a result goes out. */
 function checkContactRules(value: ContactValues, ctx: z.RefinementCtx): void {
-  if (value.contactType === "whatsapp") {
-    if (!value.whatsappNumber.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["whatsappNumber"],
-        message: ERROR_MESSAGES.contactMissing,
-      });
-    } else if (!isNormalisablePhone(value.dialCode, value.whatsappNumber)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["whatsappNumber"],
-        message: ERROR_MESSAGES.invalidPhone,
-      });
-    }
+  if (!value.whatsappNumber.trim()) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["whatsappNumber"],
+      message: ERROR_MESSAGES.contactMissing,
+    });
+    return;
   }
 
-  if (value.contactType === "email") {
-    if (!value.email.trim()) {
-      ctx.addIssue({ code: "custom", path: ["email"], message: ERROR_MESSAGES.contactMissing });
-    } else if (!z.email().safeParse(value.email.trim()).success) {
-      ctx.addIssue({ code: "custom", path: ["email"], message: ERROR_MESSAGES.invalidEmail });
-    }
+  if (!isNormalisablePhone(value.dialCode, value.whatsappNumber)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["whatsappNumber"],
+      message: ERROR_MESSAGES.invalidPhone,
+    });
   }
 }
 
@@ -150,10 +149,8 @@ export const whereStepSchema = z.object({
 
 export const contactStepSchema = z
   .object({
-    contactType: baseFields.contactType,
     dialCode: baseFields.dialCode,
     whatsappNumber: baseFields.whatsappNumber,
-    email: baseFields.email,
   })
   .superRefine(checkContactRules);
 

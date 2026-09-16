@@ -17,10 +17,8 @@ function baseSubmission(overrides: Record<string, unknown> = {}) {
     restaurantName: "Al Safadi",
     areaId: VALID_AREA_ID,
     currentTotal: "82.00",
-    contactType: "whatsapp",
     dialCode: "+971",
     whatsappNumber: "501234567",
-    email: "",
     marketingConsent: false,
     ...overrides,
   };
@@ -84,42 +82,28 @@ describe("contact validation", () => {
   it("accepts a UAE mobile in any of the usual formats", () => {
     for (const number of ["501234567", "050 123 4567", "+971 50 123 4567", "00971501234567"]) {
       const result = contactStepSchema.safeParse({
-        contactType: "whatsapp",
-        dialCode: "+971",
+          dialCode: "+971",
         whatsappNumber: number,
-        email: "",
-      });
+        });
       expect(result.success, `expected ${number} to be accepted`).toBe(true);
     }
   });
 
-  it("requires only one contact method - email alone is fine", () => {
+  it("has no email channel to fall back to", () => {
+    // Email was removed; a number is the only way a result goes out, so a
+    // submission carrying an address and no number is not a submission.
     const result = contactStepSchema.safeParse({
-      contactType: "email",
       dialCode: "+971",
       whatsappNumber: "",
       email: "customer@example.com",
     });
-    expect(result.success).toBe(true);
-  });
-
-  it("rejects an invalid email when email is the chosen channel", () => {
-    const result = contactStepSchema.safeParse({
-      contactType: "email",
-      dialCode: "+971",
-      whatsappNumber: "",
-      email: "not-an-email",
-    });
     expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.issues[0].message).toBe(ERROR_MESSAGES.invalidEmail);
   });
 
   it("tells the customer where to send the result when nothing is given", () => {
     const result = contactStepSchema.safeParse({
-      contactType: "whatsapp",
       dialCode: "+971",
       whatsappNumber: "",
-      email: "",
     });
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.issues[0].message).toBe(ERROR_MESSAGES.contactMissing);

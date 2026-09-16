@@ -67,10 +67,8 @@ export const WIZARD_DEFAULTS: WizardValues = {
   restaurantName: "",
   areaId: "",
   currentTotal: "",
-  contactType: "whatsapp",
   dialCode: "+971",
   whatsappNumber: "",
-  email: "",
   marketingConsent: false,
 };
 

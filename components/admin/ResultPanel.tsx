@@ -1,21 +1,19 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Copy, Mail, MessageCircle, Send } from "lucide-react";
-import { markResultSent, sendResultByEmail } from "@/lib/admin/actions";
-import { buildMailtoLink, buildResultSubject, buildWhatsAppLink } from "@/lib/notifications/messages";
+import { Check, Copy, MessageCircle } from "lucide-react";
+import { markResultSent } from "@/lib/admin/actions";
+import { buildWhatsAppLink } from "@/lib/notifications/messages";
 import { Button } from "@/components/ui/Button";
 
 interface ResultPanelProps {
   submissionId: string;
-  reference: string;
   message: string;
-  hasSaving: boolean;
   contactType: "whatsapp" | "email";
   whatsappNumber: string | null;
+  /** Only ever set on rows taken before email was removed. */
   email: string | null;
   alreadySent: boolean;
-  emailConfigured: boolean;
 }
 
 /**
@@ -24,17 +22,20 @@ interface ResultPanelProps {
  * Phase 1 has no WhatsApp Business API: the admin opens a prefilled wa.me link
  * and sends it themselves. Opening that link is not treated as delivery -
  * "Mark as sent" stays a separate, deliberate action.
+ *
+ * WhatsApp is the only channel now. A handful of rows predate that and carry an
+ * email address instead; they still get the message and the address to send it
+ * to, because a request somebody made in good faith does not stop counting when
+ * we simplify the form. What they do not get is a Send button, because there is
+ * no longer anything behind it.
  */
 export function ResultPanel({
   submissionId,
-  reference,
   message,
-  hasSaving,
   contactType,
   whatsappNumber,
   email,
   alreadySent,
-  emailConfigured,
 }: ResultPanelProps) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -56,15 +57,6 @@ export function ResultPanel({
       setFeedback(result.message ?? (result.ok ? "Marked as sent." : "Could not update."));
     });
   };
-
-  const onSendEmail = () => {
-    startTransition(async () => {
-      const result = await sendResultByEmail(submissionId);
-      setFeedback(result.message ?? (result.ok ? "Email sent." : "Could not send."));
-    });
-  };
-
-  const subject = buildResultSubject(hasSaving, reference);
 
   return (
     <section className="rounded-2xl border border-ink-200 bg-white p-5">
@@ -94,23 +86,6 @@ export function ResultPanel({
           </a>
         ) : null}
 
-        {contactType === "email" && email ? (
-          emailConfigured ? (
-            <Button size="md" onClick={onSendEmail} loading={pending} loadingLabel="Sending…">
-              <Send aria-hidden="true" className="h-4 w-4" />
-              Send email
-            </Button>
-          ) : (
-            <a
-              href={buildMailtoLink(email, subject, message)}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-ink-200 bg-white px-4 text-sm font-semibold text-ink-800 hover:bg-ink-50"
-            >
-              <Mail aria-hidden="true" className="h-4 w-4" />
-              Open in email client
-            </a>
-          )
-        ) : null}
-
         <button
           type="button"
           onClick={() => void copy()}
@@ -121,13 +96,14 @@ export function ResultPanel({
           ) : (
             <Copy aria-hidden="true" className="h-4 w-4" />
           )}
-          {copied ? "Copied" : contactType === "email" ? "Copy email message" : "Copy message"}
+          {copied ? "Copied" : "Copy message"}
         </button>
       </div>
 
-      {contactType === "email" && !emailConfigured ? (
-        <p className="mt-3 text-xs text-ink-500">
-          Resend isn&apos;t configured, so send this one yourself and mark it as sent.
+      {contactType === "email" && email ? (
+        <p className="mt-3 rounded-xl bg-chip-amber-bg p-3 text-xs leading-relaxed text-ink-700">
+          This request came in before email was removed. Copy the message and send it to{" "}
+          <span className="font-semibold">{email}</span> yourself, then mark it as sent.
         </p>
       ) : null}
 

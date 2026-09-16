@@ -27,16 +27,14 @@ interface StepReviewProps {
   submitting: boolean;
   submitError: string | null;
   /** Contact errors surface here, because contact is asked here. */
-  errors: { whatsappNumber?: string; email?: string };
+  errors: { whatsappNumber?: string };
   onSubmit: () => void;
   onBack: () => void;
   /** Jump back to the step that owns a value, from its row on this screen. */
   onEditBasket: () => void;
   onEditArea: () => void;
-  onContactTypeChange: (type: "whatsapp" | "email") => void;
   onDialCodeChange: (code: string) => void;
   onWhatsappNumberChange: (value: string) => void;
-  onEmailChange: (value: string) => void;
   onMarketingConsentChange: (value: boolean) => void;
 }
 
@@ -136,14 +134,11 @@ export function StepReview({
   onBack,
   onEditBasket,
   onEditArea,
-  onContactTypeChange,
   onDialCodeChange,
   onWhatsappNumberChange,
-  onEmailChange,
   onMarketingConsentChange,
 }: StepReviewProps) {
   const phoneId = useId();
-  const emailId = useId();
   const consentId = useId();
   const cartThumb = useObjectUrl(files.cart);
   const checkoutThumb = useObjectUrl(files.checkout);
@@ -305,83 +300,45 @@ export function StepReview({
         </p>
 
         <div className="mt-3">
-          {values.contactType === "whatsapp" ? (
-            <>
-              <label htmlFor={phoneId} className="mb-2 block text-[0.9rem] font-bold text-ink-900">
-                WhatsApp number
-              </label>
-              <div
-                className={cn(
-                  "flex items-stretch overflow-hidden rounded-2xl border bg-white",
-                  "focus-within:outline focus-within:outline-[3px] focus-within:outline-offset-2 focus-within:outline-ink-900",
-                  errors.whatsappNumber ? "border-rose-400" : "border-ink-200",
-                )}
-              >
-                <label htmlFor={`${phoneId}-code`} className="sr-only">
-                  Country code
-                </label>
-                <select
-                  id={`${phoneId}-code`}
-                  value={values.dialCode}
-                  onChange={(event) => onDialCodeChange(event.target.value)}
-                  className="min-h-14 border-r border-ink-200 bg-ink-50 px-3 text-base font-bold text-ink-800"
-                >
-                  {DIAL_CODES.map((entry) => (
-                    <option key={entry.code} value={entry.code}>
-                      {entry.code}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  id={phoneId}
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel-national"
-                  placeholder="50 123 4567"
-                  value={values.whatsappNumber}
-                  onChange={(event) => onWhatsappNumberChange(event.target.value)}
-                  aria-describedby={errors.whatsappNumber ? `${phoneId}-error` : undefined}
-                  aria-invalid={errors.whatsappNumber ? true : undefined}
-                  className="min-h-14 w-full bg-transparent px-3.5 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400 focus:outline-none"
-                />
-              </div>
-              <FieldError id={`${phoneId}-error`} message={errors.whatsappNumber} />
-            </>
-          ) : (
-            <>
-              <label htmlFor={emailId} className="mb-2 block text-[0.9rem] font-bold text-ink-900">
-                Email address
-              </label>
-              <input
-                id={emailId}
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={values.email}
-                onChange={(event) => onEmailChange(event.target.value)}
-                aria-describedby={errors.email ? `${emailId}-error` : undefined}
-                aria-invalid={errors.email ? true : undefined}
-                className={cn(
-                  "min-h-14 w-full rounded-2xl border bg-white px-4 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400",
-                  errors.email ? "border-rose-400" : "border-ink-200",
-                )}
-              />
-              <FieldError id={`${emailId}-error`} message={errors.email} />
-            </>
-          )}
-
-          {/* One channel is shown, the other is one tap away. Choosing is work
-              too, and almost everyone wants WhatsApp. */}
-          <button
-            type="button"
-            onClick={() =>
-              onContactTypeChange(values.contactType === "whatsapp" ? "email" : "whatsapp")
-            }
-            className="mt-2.5 min-h-9 text-[0.88rem] font-bold text-ink-700 underline underline-offset-4 hover:text-ink-900"
+          <label htmlFor={phoneId} className="mb-2 block text-[0.9rem] font-bold text-ink-900">
+            WhatsApp number
+          </label>
+          <div
+            className={cn(
+              "flex items-stretch overflow-hidden rounded-2xl border bg-white",
+              "focus-within:outline focus-within:outline-[3px] focus-within:outline-offset-2 focus-within:outline-ink-900",
+              errors.whatsappNumber ? "border-rose-400" : "border-ink-200",
+            )}
           >
-            {values.contactType === "whatsapp" ? "Prefer email?" : "Use WhatsApp instead"}
-          </button>
+            <label htmlFor={`${phoneId}-code`} className="sr-only">
+              Country code
+            </label>
+            <select
+              id={`${phoneId}-code`}
+              value={values.dialCode}
+              onChange={(event) => onDialCodeChange(event.target.value)}
+              className="min-h-14 border-r border-ink-200 bg-ink-50 px-3 text-base font-bold text-ink-800"
+            >
+              {DIAL_CODES.map((entry) => (
+                <option key={entry.code} value={entry.code}>
+                  {entry.code}
+                </option>
+              ))}
+            </select>
+            <input
+              id={phoneId}
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel-national"
+              placeholder="50 123 4567"
+              value={values.whatsappNumber}
+              onChange={(event) => onWhatsappNumberChange(event.target.value)}
+              aria-describedby={errors.whatsappNumber ? `${phoneId}-error` : undefined}
+              aria-invalid={errors.whatsappNumber ? true : undefined}
+              className="min-h-14 w-full bg-transparent px-3.5 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400 focus:outline-none"
+            />
+          </div>
+          <FieldError id={`${phoneId}-error`} message={errors.whatsappNumber} />
         </div>
 
         {/*

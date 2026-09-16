@@ -1,7 +1,6 @@
 import "server-only";
 
-import { absoluteUrl, getAdminAlertEmail } from "@/lib/env";
-import { getEmailProvider } from "./resend";
+import { absoluteUrl } from "@/lib/env";
 import { isTelegramConfigured, sendTelegramMessage } from "./telegram";
 import { formatDecimalStringAsCurrency } from "@/lib/calculations/money";
 import { BRAND_NAME } from "@/lib/constants";
@@ -14,9 +13,9 @@ import { BRAND_NAME } from "@/lib/constants";
  * uploading a screenshot and somebody looking at it are entirely decided by
  * whether a phone buzzed.
  *
- * Two channels, both optional and independent: Telegram if a bot is configured,
- * email if an address is. Configure neither and submissions carry on exactly as
- * before, which is the same rule every other integration here follows.
+ * Telegram, if a bot token is set, alongside the browser push that does the
+ * real work. Optional, like every integration here: configure nothing and
+ * submissions carry on exactly as before.
  */
 
 export interface NewSubmissionAlert {
@@ -35,7 +34,7 @@ export interface NewSubmissionAlert {
  * admin login and stay there. What is here is what decides whether it is worth
  * getting up for: which restaurant, where, how much, and the link to work on.
  */
-function compose(alert: NewSubmissionAlert): { subject: string; body: string } {
+function compose(alert: NewSubmissionAlert): string {
   const total = formatDecimalStringAsCurrency(alert.currentTotal) ?? alert.currentTotal;
   const link = absoluteUrl("/admin");
 
@@ -50,7 +49,8 @@ function compose(alert: NewSubmissionAlert): { subject: string; body: string } {
     ...(link ? ["", link] : []),
   ];
 
-  return { subject: `New price check · ${alert.reference}`, body: lines.join("\n") };
+  // Body only: the subject line existed for the email channel, which is gone.
+  return lines.join("\n");
 }
 
 /**
@@ -63,18 +63,11 @@ function compose(alert: NewSubmissionAlert): { subject: string; body: string } {
  * missed alert must never cost a customer their submission.
  */
 export async function alertAdminOfNewSubmission(alert: NewSubmissionAlert): Promise<void> {
-  const { subject, body } = compose(alert);
+  const body = compose(alert);
   const jobs: Array<Promise<unknown>> = [];
 
   if (isTelegramConfigured()) jobs.push(sendTelegramMessage(body));
 
-  const email = getAdminAlertEmail();
-  if (email) {
-    const provider = getEmailProvider();
-    if (provider.configured) {
-      jobs.push(provider.send({ to: email, subject, body, reference: alert.reference }));
-    }
-  }
 
   if (jobs.length === 0) return;
   await Promise.allSettled(jobs);
@@ -84,7 +77,6 @@ export async function alertAdminOfNewSubmission(alert: NewSubmissionAlert): Prom
 export function alertChannels(): string[] {
   const channels: string[] = [];
   if (isTelegramConfigured()) channels.push("Telegram");
-  if (getAdminAlertEmail() && getEmailProvider().configured) channels.push("email");
   return channels;
 }
 
@@ -107,19 +99,6 @@ export async function sendTestAdminAlert(): Promise<boolean> {
 
   if (isTelegramConfigured()) results.push(await sendTelegramMessage(body));
 
-  const email = getAdminAlertEmail();
-  if (email) {
-    const provider = getEmailProvider();
-    if (provider.configured) {
-      const outcome = await provider.send({
-        to: email,
-        subject: `Test alert from ${BRAND_NAME}`,
-        body,
-        reference: "test",
-      });
-      results.push(outcome.sent);
-    }
-  }
 
   return results.length > 0 && results.some(Boolean);
 }

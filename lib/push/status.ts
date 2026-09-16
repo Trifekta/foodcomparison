@@ -35,7 +35,7 @@ export interface PushStatus {
   /** How long a submission may sit before the chaser nudges. */
   chaserAfterMinutes: number;
   /**
-   * The origin links in Telegram and email are built from.
+   * The origin links in Telegram and push notifications are built from.
    *
    * Here because a push subscription belongs to one origin: moving the site to
    * a new hostname leaves every existing subscription behind on the old one,

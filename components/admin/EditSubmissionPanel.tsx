@@ -43,7 +43,8 @@ export function EditSubmissionPanel({
   const [error, setError] = useState<string | null>(null);
 
   const phone = splitPhone(submission.whatsapp_number);
-  const [contactType, setContactType] = useState(submission.contact_type);
+  // Fixed for the life of the row now that WhatsApp is the only channel.
+  const contactType = submission.contact_type;
 
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -160,21 +161,10 @@ export function EditSubmissionPanel({
           </select>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className={labelClass} htmlFor="edit-contact-type">
-            Reply by
-          </label>
-          <select
-            id="edit-contact-type"
-            name="contactType"
-            value={contactType}
-            onChange={(event) => setContactType(event.target.value as "whatsapp" | "email")}
-            className={fieldClass}
-          >
-            <option value="whatsapp">WhatsApp</option>
-            <option value="email">Email</option>
-          </select>
-        </div>
+        {/* No channel picker: WhatsApp is the only one. The row's own value is
+            carried through untouched so a submission taken by email before the
+            removal can still be corrected rather than stranded. */}
+        <input type="hidden" name="contactType" value={contactType} />
 
         {contactType === "whatsapp" ? (
           <div className="flex flex-col gap-1">
@@ -206,7 +196,7 @@ export function EditSubmissionPanel({
         ) : (
           <div className="flex flex-col gap-1">
             <label className={labelClass} htmlFor="edit-email">
-              Email
+              Email <span className="font-normal text-ink-400">(taken before email was removed)</span>
             </label>
             <input
               id="edit-email"
