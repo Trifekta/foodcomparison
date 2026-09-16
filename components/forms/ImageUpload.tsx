@@ -42,8 +42,14 @@ interface ImageUploadProps {
    * Recommended is amber, and is deliberately neither - the checkout shot is
    * not demanded, and calling it optional undersold it to the point that people
    * skipped the one screen the final total actually lives on.
+   *
+   * Needed is flame - stronger than Recommended, short of Required. It is
+   * earned rather than assigned: it only appears once a screenshot has
+   * actually been read and come back without a total, so the app is no longer
+   * guessing this slot might matter, it knows. Still never gates Continue -
+   * "needed" describes the order, not a rule we enforce.
    */
-  requirement: "required" | "optional" | "recommended";
+  requirement: "required" | "optional" | "recommended" | "needed";
   allowRemove?: boolean;
   /** Which supplied render fills the empty dropzone. */
   art?: "cartDoc" | "receipt";
@@ -107,18 +113,34 @@ export function ImageUpload({
 
   const message = error ?? localError;
   const filled = Boolean(file && previewUrl);
+  // Earned attention, not decoration - only while the slot is both flagged
+  // "needed" and still empty. The moment it is filled, the point is made.
+  const emphasize = requirement === "needed" && !filled;
 
   return (
-    <section className="rounded-3xl bg-white p-4 shadow-[0_2px_14px_rgba(23,23,28,0.05)] ring-1 ring-ink-100">
+    <section
+      className={cn(
+        "rounded-3xl bg-white p-4 shadow-[0_2px_14px_rgba(23,23,28,0.05)] ring-1 transition-shadow",
+        emphasize ? "ring-2 ring-flame-300 shadow-[0_2px_18px_rgba(245,109,24,0.18)]" : "ring-ink-100",
+      )}
+    >
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
           className={cn(
-            "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-extrabold",
+            "relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-extrabold",
             filled ? "bg-emerald-500 text-white" : "bg-brand-300 text-ink-900",
           )}
         >
           {filled ? <Check className="h-4 w-4" strokeWidth={3} /> : step}
+          {/* A small pulse, not the whole card - draws the eye without
+              nagging. Gone the instant a file lands, same as the ring. */}
+          {emphasize ? (
+            <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-flame-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-flame-500" />
+            </span>
+          ) : null}
         </span>
 
         <div className="min-w-0 flex-1">
@@ -132,13 +154,16 @@ export function ImageUpload({
                 requirement === "required" && "bg-chip-red-bg text-chip-red-fg",
                 requirement === "recommended" && "bg-chip-amber-bg text-chip-amber-fg",
                 requirement === "optional" && "bg-chip-green-bg text-chip-green-fg",
+                requirement === "needed" && "bg-flame-100 text-flame-600",
               )}
             >
               {requirement === "required"
                 ? "Required"
                 : requirement === "recommended"
                   ? "Recommended"
-                  : "Optional"}
+                  : requirement === "needed"
+                    ? "Needed"
+                    : "Optional"}
             </span>
           </div>
           {hint ? <p className="mt-0.5 text-sm leading-snug text-slate-500">{hint}</p> : null}

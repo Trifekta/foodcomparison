@@ -26,6 +26,7 @@ import { StepWhereAndTotal } from "./StepWhereAndTotal";
 import { StepReview } from "./StepReview";
 import {
   WIZARD_DEFAULTS,
+  cartConfirmedShort as isCartConfirmedShort,
   combineStatus,
   hasAnyTotal,
   mergeReadTotals,
@@ -169,6 +170,17 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
    */
   const settled = totalsAreSettled(readTotals);
   const cartSettled = totalsAreSettled(cartTotals);
+  const cartReading = cartStatus === "reading";
+
+  // The cart screenshot has been read, in full, and it did not settle the
+  // bill - so the second slot is not a hedge against an app we have not
+  // identified anymore. We now know which kind of app this is. See
+  // cartConfirmedShort in types.ts for the rule itself.
+  const cartIsConfirmedShort = isCartConfirmedShort({
+    hasCartFile: files.cart !== null,
+    cartReading,
+    cartSettled,
+  });
 
   /**
    * The total, filled in from a screenshot rather than asked for again.
@@ -487,8 +499,9 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
         <StepUpload
           cartFile={files.cart}
           checkoutFile={files.checkout}
-          cartReading={cartStatus === "reading"}
+          cartReading={cartReading}
           cartSettlesTheBill={cartSettled}
+          cartConfirmedShort={cartIsConfirmedShort}
           onCartChange={(file: File | null, original?: File | null) => {
             setFiles((current) => ({ ...current, cart: file }));
             setCartError(null);
