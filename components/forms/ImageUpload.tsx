@@ -9,6 +9,10 @@ import { FieldError } from "@/components/ui/FieldError";
 import { ImageLightbox } from "@/components/ui/ImageLightbox";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { Sparks } from "@/components/customer/Motifs";
+import {
+  ScreenshotExampleButton,
+  type ScreenshotExample,
+} from "@/components/customer/ScreenshotExample";
 import { cn } from "@/lib/utils/cn";
 
 interface ImageUploadProps {
@@ -33,11 +37,18 @@ interface ImageUploadProps {
    */
   onChange: (file: File | null, original?: File | null) => void;
   error?: string | null;
-  /** Drives the pill: Required is red, Optional is green, as in the designs. */
-  requirement: "required" | "optional";
+  /**
+   * Drives the pill. Required is red and Optional green, as in the designs;
+   * Recommended is amber, and is deliberately neither - the checkout shot is
+   * not demanded, and calling it optional undersold it to the point that people
+   * skipped the one screen the final total actually lives on.
+   */
+  requirement: "required" | "optional" | "recommended";
   allowRemove?: boolean;
   /** Which supplied render fills the empty dropzone. */
   art?: "cartDoc" | "receipt";
+  /** Adds an (i) beside the label, opening a drawing of a good screenshot. */
+  example?: ScreenshotExample;
 }
 
 /**
@@ -59,6 +70,7 @@ export function ImageUpload({
   requirement,
   allowRemove = false,
   art = "cartDoc",
+  example,
 }: ImageUploadProps) {
   const inputId = useId();
   const errorId = `${inputId}-error`;
@@ -114,18 +126,28 @@ export function ImageUpload({
             <label htmlFor={inputId} className="text-[1.02rem] font-extrabold text-ink-900">
               {label}
             </label>
-            {requirement === "required" ? (
-              <span className="rounded-full bg-chip-red-bg px-2.5 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-wide text-chip-red-fg">
-                Required
-              </span>
-            ) : (
-              <span className="rounded-full bg-chip-green-bg px-2.5 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-wide text-chip-green-fg">
-                Optional
-              </span>
-            )}
+            <span
+              className={cn(
+                "rounded-full px-2.5 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-wide",
+                requirement === "required" && "bg-chip-red-bg text-chip-red-fg",
+                requirement === "recommended" && "bg-chip-amber-bg text-chip-amber-fg",
+                requirement === "optional" && "bg-chip-green-bg text-chip-green-fg",
+              )}
+            >
+              {requirement === "required"
+                ? "Required"
+                : requirement === "recommended"
+                  ? "Recommended"
+                  : "Optional"}
+            </span>
           </div>
           {hint ? <p className="mt-0.5 text-sm leading-snug text-slate-500">{hint}</p> : null}
         </div>
+
+        {/* At the trailing edge rather than inline after the pill: "Recommended"
+            is wide enough that an inline icon wrapped onto its own line and sat
+            there orphaned under the label. */}
+        {example ? <ScreenshotExampleButton example={example} forLabel={label} /> : null}
       </div>
 
       <input

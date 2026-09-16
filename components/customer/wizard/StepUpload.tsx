@@ -24,9 +24,16 @@ interface StepUploadProps {
 /**
  * Both screenshots in one place.
  *
- * The cart screenshot is required. The checkout one is genuinely optional: it
- * is labelled as such, never raises an error when missing, and does not gate
- * the Continue button.
+ * The cart screenshot is required. The checkout one is still not demanded -
+ * it raises no error when missing and does not gate Continue - but it is
+ * labelled Recommended rather than Optional, because "optional" was read as
+ * "skip it", and it is the only screen the real total appears on. Without it
+ * the comparison is against a number somebody typed from memory.
+ *
+ * Each slot carries an (i) to a drawing of a good screenshot. Behind an icon
+ * rather than on the page: this is where somebody weighs the wait against the
+ * effort of finding a screenshot, and a screen that lectures them there costs
+ * more uploads than a bad screenshot does.
  */
 export function StepUpload({
   cartFile,
@@ -97,8 +104,8 @@ export function StepUpload({
         <Sparks className="ml-1 h-5 w-5 shrink-0" />
       </h1>
       <p className="mt-1.5 text-[0.95rem] leading-relaxed text-slate-600">
-        Upload your cart screenshot. Adding the checkout screen helps us compare the final price
-        more accurately.
+        Upload your cart screenshot. Adding the checkout screen is what makes the comparison
+        exact rather than close.
       </p>
 
       {/* Repeated from the landing page on purpose. This is the screen where
@@ -117,6 +124,7 @@ export function StepUpload({
           helper="Make sure your restaurant name and ordered items are visible."
           requirement="required"
           art="cartDoc"
+          example="cart"
           file={cartFile}
           onChange={onCartChange}
           error={error}
@@ -126,9 +134,10 @@ export function StepUpload({
           step={2}
           label="Final checkout total"
           hint="Fees, discounts and final total"
-          helper="Include the total and fees if visible."
-          requirement="optional"
+          helper="Highly recommended for accuracy — the real total lives on this screen, with the fees and any discount."
+          requirement="recommended"
           art="receipt"
+          example="checkout"
           allowRemove
           file={checkoutFile}
           onChange={onCheckoutChange}
