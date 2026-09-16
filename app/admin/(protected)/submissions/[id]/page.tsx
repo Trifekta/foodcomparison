@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink, MapPin } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ExternalLink, MapPin } from "lucide-react";
 import {
   getLatestExtraction,
   getSignedImageUrl,
@@ -30,6 +30,7 @@ import { maskEmail } from "@/lib/utils/phone";
 import { statusLabel } from "@/lib/utils/status";
 import type { SubmissionItemSource } from "@/types/database";
 import { toPublicArea } from "@/lib/areas";
+import { areasMentionedIn } from "@/lib/area-mentions";
 
 export const metadata: Metadata = {
   title: "Submission",
@@ -85,6 +86,13 @@ export default async function SubmissionDetailPage({
     getLatestExtraction(submission.id),
     listAreas(false),
   ]);
+
+  /**
+   * Only what the OCR actually read. The vision route stores no ocr_text, and
+   * before an admin has run an extraction there is nothing to check against -
+   * so this is silent until there is real text, rather than reassuring.
+   */
+  const mentionedAreas = areasMentionedIn(extraction?.ocr_text, areas, submission.area_id);
 
   const appLabel =
     submission.source_app === LEGACY_OTHER_APP && submission.source_app_other
@@ -186,6 +194,38 @@ export default async function SubmissionDetailPage({
                 }
               />
             </dl>
+
+            {/* What the screenshot says about where this order is going.
+                Evidence, not a verdict: a mention is just as likely to be the
+                restaurant's own neighbourhood. It is here because the customer
+                answers "your delivery area" from where they are standing often
+                enough to matter, and the wrong area comes back as "not
+                available on Keeta" rather than as an obvious mistake. */}
+            {mentionedAreas.length > 0 ? (
+              <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3.5">
+                <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-900">
+                  <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />
+                  Check the delivery address
+                </p>
+                <p className="mt-1 text-sm text-ink-800">
+                  The screenshot text also mentions{" "}
+                  {mentionedAreas.map((mention, index) => (
+                    <span key={mention.id}>
+                      {index > 0 ? (index === mentionedAreas.length - 1 ? " and " : ", ") : null}
+                      <span className="font-semibold">{mention.name}</span>
+                      <span className="text-ink-500"> ({mention.city})</span>
+                    </span>
+                  ))}
+                  , but the customer chose{" "}
+                  <span className="font-semibold">{submission.areas?.name ?? "no area"}</span>.
+                </p>
+                <p className="mt-1.5 text-xs text-ink-600">
+                  It may just be the restaurant&apos;s own area. If the screenshot shows a
+                  different delivery address, correct it with Edit above before pricing —
+                  comparing from the wrong place can read as &ldquo;not on Keeta&rdquo;.
+                </p>
+              </div>
+            ) : null}
 
             {submission.areas?.test_location_label || submission.areas?.admin_location_notes ? (
               <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-3.5">

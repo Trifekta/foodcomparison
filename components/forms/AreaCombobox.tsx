@@ -200,8 +200,12 @@ export function AreaCombobox({
         </ul>
       ) : null}
 
+      {/* ink-600 rather than the lighter token: this sits on the beige card,
+          where ink-400 lands near 2.5:1 and reads as decoration. A line whose
+          whole job is to stop somebody answering the wrong question has to be
+          legible on a phone in daylight. */}
       {hint ? (
-        <p id={hintId} className="mt-2 text-xs text-ink-400">
+        <p id={hintId} className="mt-2 text-xs text-ink-600">
           {hint}
         </p>
       ) : null}
