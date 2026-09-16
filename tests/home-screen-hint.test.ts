@@ -39,69 +39,86 @@ const ANDROID_CHROME =
 const INSTAGRAM_IOS = `${IPHONE_SAFARI} Instagram 320.0.0.0 (iPhone16,2; iOS 17_4)`;
 const FACEBOOK_IOS = `${IPHONE_SAFARI} [FBAN/FBIOS;FBAV/450.0.0]`;
 
-const { shouldOfferHomeScreen, dismissHomeScreenHint, isStandalone } = await import(
-  "@/lib/pwa/install"
-);
+const { homeScreenRoute, dismissHomeScreenHint, isStandalone } = await import("@/lib/pwa/install");
 
 beforeEach(() => {
   store.clear();
   vi.unstubAllGlobals();
 });
 
-describe("who is offered the Home Screen", () => {
-  it("an iPhone in Safari, where push cannot reach a tab", () => {
+const ANDROID_INSTAGRAM =
+  "Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/124 Mobile Safari/537.36 Instagram 320.0.0.0 Android";
+
+describe("what this customer is told", () => {
+  it("an iPhone in Safari gets the two taps, and nothing else", () => {
     browser({ ua: IPHONE_SAFARI });
-    expect(shouldOfferHomeScreen(false)).toBe(true);
+    expect(homeScreenRoute(false)).toBe("ios-direct");
   });
 
   /**
-   * Android's browser already does push. Saying this there would be an install
-   * suggestion with nothing behind it, which is the thing this product
-   * deliberately does not do.
+   * The long road, and the only one there is: iOS sends push to a Home Screen
+   * copy and to nothing else, so somebody who arrived from an advert has to
+   * leave Instagram's browser first. Said out loud rather than hidden, because
+   * an instruction with a missing step is one nobody finishes.
    */
-  it("never Android, where the browser already sends notifications", () => {
-    browser({ ua: ANDROID_CHROME });
-    expect(shouldOfferHomeScreen(true)).toBe(false);
-  });
-
-  it("never when push already works, whatever the device", () => {
-    browser({ ua: IPHONE_SAFARI });
-    expect(shouldOfferHomeScreen(true)).toBe(false);
-  });
-
-  /**
-   * Most of this product's traffic arrives inside these. Their share sheets
-   * either lack "Add to Home Screen" or bury it behind opening Safari first,
-   * so the instruction would simply not work.
-   */
-  it("never inside Instagram's or Facebook's browser", () => {
+  it("an iPhone inside Instagram is sent to Safari first", () => {
     for (const ua of [INSTAGRAM_IOS, FACEBOOK_IOS]) {
       browser({ ua });
-      expect(shouldOfferHomeScreen(false), ua.slice(0, 40)).toBe(false);
+      expect(homeScreenRoute(false), ua.slice(0, 40)).toBe("ios-in-app");
     }
   });
 
-  it("never once it is already installed", () => {
-    browser({ ua: IPHONE_SAFARI, standalone: true });
-    expect(shouldOfferHomeScreen(false)).toBe(false);
+  /**
+   * Much easier. Chrome does push in an ordinary tab, so leaving the embedded
+   * browser IS the fix and there is nothing to install.
+   */
+  it("an Android inside Instagram is sent to Chrome, not to an install", () => {
+    browser({ ua: ANDROID_INSTAGRAM });
+    expect(homeScreenRoute(false)).toBe("android-in-app");
   });
 
-  /** One tap, and it is gone for good. */
-  it("never again once dismissed", () => {
+  it("says nothing when the browser can already reach them", () => {
+    browser({ ua: ANDROID_CHROME });
+    expect(homeScreenRoute(true)).toBeNull();
+
     browser({ ua: IPHONE_SAFARI });
-    expect(shouldOfferHomeScreen(false)).toBe(true);
+    expect(homeScreenRoute(true)).toBeNull();
+  });
+
+  /**
+   * Android's own browser already does push, so an Android that cannot is an
+   * embedded one - and if it is not Instagram's or Facebook's, its menu is not
+   * something to give instructions about.
+   */
+  it("says nothing in an embedded browser whose menu we cannot vouch for", () => {
+    browser({ ua: `${IPHONE_SAFARI} Snapchat/12.0` });
+    expect(homeScreenRoute(false)).toBeNull();
+
+    browser({ ua: `${ANDROID_CHROME} TikTok/33.0` });
+    expect(homeScreenRoute(false)).toBeNull();
+  });
+
+  it("says nothing once it is already installed", () => {
+    browser({ ua: IPHONE_SAFARI, standalone: true });
+    expect(homeScreenRoute(false)).toBeNull();
+  });
+
+  /** One tap, and it is gone for good - on every route. */
+  it("says nothing again once dismissed", () => {
+    browser({ ua: INSTAGRAM_IOS });
+    expect(homeScreenRoute(false)).toBe("ios-in-app");
     dismissHomeScreenHint();
-    expect(shouldOfferHomeScreen(false)).toBe(false);
+    expect(homeScreenRoute(false)).toBeNull();
   });
 
   /** An iPad reports itself as a Mac and is told apart by its touch points. */
   it("recognises an iPad, and does not mistake a desktop Mac for one", () => {
     const MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1";
     browser({ ua: MAC, touchPoints: 5 });
-    expect(shouldOfferHomeScreen(false)).toBe(true);
+    expect(homeScreenRoute(false)).toBe("ios-direct");
 
     browser({ ua: MAC, touchPoints: 0 });
-    expect(shouldOfferHomeScreen(false)).toBe(false);
+    expect(homeScreenRoute(false)).toBeNull();
   });
 
   it("survives storage being switched off", () => {
@@ -117,7 +134,7 @@ describe("who is offered the Home Screen", () => {
     });
 
     expect(() => dismissHomeScreenHint()).not.toThrow();
-    expect(shouldOfferHomeScreen(false)).toBe(true);
+    expect(homeScreenRoute(false)).toBe("ios-direct");
   });
 });
 
