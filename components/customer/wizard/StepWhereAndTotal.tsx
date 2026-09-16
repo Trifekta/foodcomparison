@@ -20,6 +20,8 @@ interface StepWhereAndTotalProps {
   readTotal: string | null;
   /** Whether that total came off the checkout screen rather than the cart. */
   totalFromCheckout: boolean;
+  /** The field already holds the number read off their checkout screen. */
+  prefilledFromCheckout: boolean;
   onAreaChange: (areaId: string) => void;
   onCurrentTotalChange: (value: string) => void;
   onUseReadTotal: () => void;
@@ -45,13 +47,16 @@ export function StepWhereAndTotal({
   hasCheckoutScreenshot,
   readTotal,
   totalFromCheckout,
+  prefilledFromCheckout,
   onAreaChange,
   onCurrentTotalChange,
   onUseReadTotal,
   onContinue,
 }: StepWhereAndTotalProps) {
-  // Offered, never filled in for them. This number is the baseline for the
-  // saving we quote back, and the read is rough - so it takes a deliberate tap.
+  // Offered, never filled in for them - unless it came off the checkout screen,
+  // which states the final total plainly and is the one figure the engine reads
+  // reliably. Everything else is a hint with a button, because the baseline for
+  // the saving we quote back is not a number to guess at on their behalf.
   const showHint = readTotal !== null && readTotal !== "" && readTotal !== currentTotal;
 
   return (
@@ -125,6 +130,15 @@ export function StepWhereAndTotal({
             />
           </div>
 
+          {prefilledFromCheckout ? (
+            <p className="mt-3 flex items-start gap-2 rounded-2xl bg-chip-green-bg px-3.5 py-3 text-sm leading-snug text-chip-green-fg">
+              <ScanLine aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Taken from your checkout screenshot. Change it if it doesn&apos;t match.
+              </span>
+            </p>
+          ) : null}
+
           {showHint ? (
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-chip-green-bg px-3.5 py-3">
               <p className="flex min-w-0 flex-1 items-start gap-2 text-sm leading-snug text-chip-green-fg">
@@ -150,9 +164,11 @@ export function StepWhereAndTotal({
           <p className="mt-3 flex items-start gap-2 rounded-2xl bg-flame-50 p-3.5 text-sm leading-relaxed text-ink-600">
             <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-flame-500" />
             <span>
-              {hasCheckoutScreenshot
-                ? "We'll cross-check this against the checkout screenshot you added."
-                : "Include delivery fees and any discounts — this is the number we compare against."}
+              {prefilledFromCheckout
+                ? "This is the number we compare against, so it's worth a glance before you continue."
+                : hasCheckoutScreenshot
+                  ? "We'll cross-check this against the checkout screenshot you added."
+                  : "Include delivery fees and any discounts — this is the number we compare against."}
             </span>
           </p>
         </div>

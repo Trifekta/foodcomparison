@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, type PathValue } from "react-hook-form";
 import type { z } from "zod";
@@ -28,6 +28,7 @@ import {
   combineStatus,
   hasAnyTotal,
   mergeReadTotals,
+  shouldAutofillTotal,
   usableItems,
   type CartItemDraft,
   type ExtractionStatus,
@@ -106,6 +107,41 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   const extractionStatus = combineStatus(cartStatus, checkoutStatus);
   const readTotals = mergeReadTotals(cartTotals, checkoutTotals);
   const totalsFromCheckout = hasAnyTotal(checkoutTotals);
+
+  /**
+   * The total, filled in from the checkout screen rather than asked for again.
+   *
+   * Only from the checkout screen. That screen states the final total in the
+   * largest type on it, next to the word Total, and the engine reads it: on the
+   * one real payment summary measured here it returned 40.50 against a true
+   * 40.50, at 79% confidence, while mangling the service fee beside it into
+   * 52.70 and missing the discount entirely. The number we need is the one it
+   * is best at.
+   *
+   * Never from the cart screen, which has no final total on it at all - what it
+   * has is an item subtotal, and quietly presenting that as "what you paid" is
+   * the precise mistake this whole thread is about. A cart-only read stays a
+   * hint with a button, where the customer decides.
+   *
+   * Filled, not locked. The field stays editable, because a read that is right
+   * on one payment summary is not right on every one, and the person holding
+   * the phone can see the screen we are guessing at.
+   */
+  const autofilled = useRef<string | null>(null);
+  const readCheckoutTotal = checkoutTotals?.finalTotal || "";
+
+  useEffect(() => {
+    const decision = shouldAutofillTotal({
+      readCheckoutTotal,
+      typed: getValues("currentTotal"),
+      lastAutofilled: autofilled.current,
+    });
+    if (!decision) return;
+
+    setValue("currentTotal", readCheckoutTotal);
+    clearErrors("currentTotal");
+    autofilled.current = readCheckoutTotal;
+  }, [readCheckoutTotal, getValues, setValue, clearErrors]);
 
   const setField = <K extends keyof WizardValues & string>(
     name: K,
@@ -431,6 +467,9 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           hasCheckoutScreenshot={files.checkout !== null}
           readTotal={readTotals?.finalTotal || null}
           totalFromCheckout={totalsFromCheckout && checkoutTotals.finalTotal !== ""}
+          prefilledFromCheckout={
+            readCheckoutTotal !== "" && values.currentTotal === readCheckoutTotal
+          }
           onAreaChange={(areaId) => setField("areaId", areaId)}
           onCurrentTotalChange={(value) => setField("currentTotal", value)}
           onUseReadTotal={() => {
