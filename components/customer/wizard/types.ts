@@ -151,23 +151,44 @@ export function combineStatus(
 }
 
 /**
- * Whether to put the checkout screen's total into the field for them.
+ * Whether the screenshots settled the bill, or only listed the food.
+ *
+ * The question the caveat on a result actually turns on, and it is not "how
+ * many screenshots did they send". Talabat, noon and Keeta print the whole
+ * payment summary - discount, delivery, service fee, total - on the cart page,
+ * so one screenshot from any of them answers everything; Deliveroo splits it
+ * across two screens, and is the only one of the four that needs both slots.
+ *
+ * Two conditions, together. A final total, which the extraction prompt is
+ * forbidden to derive - it may only copy what is printed - so a non-empty value
+ * is evidence the number was on the screen. And at least one fee or discount
+ * line beside it, because that is what separates a payment summary from an item
+ * list with a subtotal at the bottom, and the fees are precisely what the
+ * caveat says we could not check.
+ */
+export function totalsAreSettled(totals: ReadTotals | null): boolean {
+  if (!totals || !totals.finalTotal) return false;
+  return totals.deliveryFee !== "" || totals.serviceFee !== "" || totals.discount !== "";
+}
+
+/**
+ * Whether to put the total read off a screenshot into the field for them.
  *
  * Pulled out of the effect that calls it so the one rule with a decision in it
  * can be tested: an effect needs a browser, and this needs to be right. The
  * caller keeps the memory - what it last filled in - and passes it back.
  */
 export function shouldAutofillTotal(input: {
-  /** The final total read off the checkout screen, "" when there was none. */
-  readCheckoutTotal: string;
+  /** The final total read off either screenshot, "" when there was none. */
+  readFinalTotal: string;
   /** What is in the field now. */
   typed: string;
   /** What this filled in last time, if anything. */
   lastAutofilled: string | null;
 }): boolean {
-  if (!input.readCheckoutTotal) return false;
+  if (!input.readFinalTotal) return false;
   // Already done, and not undone by them.
-  if (input.lastAutofilled === input.readCheckoutTotal) return false;
+  if (input.lastAutofilled === input.readFinalTotal) return false;
   // Their own reading of their own screen beats ours. Only an empty field, or
   // one still holding a number we put there, may be written over.
   if (input.typed && input.typed !== input.lastAutofilled) return false;

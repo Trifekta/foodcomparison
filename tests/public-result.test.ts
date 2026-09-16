@@ -88,16 +88,27 @@ describe("getPublicResult", () => {
     });
   });
 
-  it("reports whether the checkout screenshot was sent, without naming it", async () => {
-    submission = row({ checkout_image_path: "submissions/abc/checkout.png" });
-    const withShot = await getPublicResult(TOKEN);
-    expect(withShot?.checkoutScreenshotProvided).toBe(true);
+  it("reports whether the fees were ever shown, without naming any file", async () => {
+    submission = row({
+      totals_confirmed: true,
+      checkout_image_path: "submissions/abc/checkout.png",
+    });
+    const settled = await getPublicResult(TOKEN);
+    expect(settled?.totalsConfirmed).toBe(true);
     // The flag, never the path: the page has no business knowing where a
     // customer's screenshot is stored.
-    expect(JSON.stringify(withShot)).not.toContain("checkout.png");
+    expect(JSON.stringify(settled)).not.toContain("checkout.png");
 
-    submission = row({ checkout_image_path: null });
-    expect((await getPublicResult(TOKEN))?.checkoutScreenshotProvided).toBe(false);
+    submission = row({ totals_confirmed: false });
+    expect((await getPublicResult(TOKEN))?.totalsConfirmed).toBe(false);
+  });
+
+  it("does not infer the answer from a second file being uploaded", async () => {
+    // Talabat, noon and Keeta print the payment summary on the cart page, so
+    // one screenshot there settles the bill and a second one adds nothing.
+    // Counting files told those customers we could not check their fees.
+    submission = row({ totals_confirmed: true, checkout_image_path: null });
+    expect((await getPublicResult(TOKEN))?.totalsConfirmed).toBe(true);
   });
 
   it("carries nothing private, however far the link travels", async () => {

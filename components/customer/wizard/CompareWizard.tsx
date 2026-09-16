@@ -30,6 +30,7 @@ import {
   hasAnyTotal,
   mergeReadTotals,
   shouldAutofillTotal,
+  totalsAreSettled,
   usableItems,
   type CartItemDraft,
   type ExtractionStatus,
@@ -156,39 +157,49 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   const totalsFromCheckout = hasAnyTotal(checkoutTotals);
 
   /**
-   * The total, filled in from the checkout screen rather than asked for again.
+   * Whether what came back is a settled bill rather than a list of food.
    *
-   * Only from the checkout screen. That screen states the final total in the
-   * largest type on it, next to the word Total, and the engine reads it: on the
-   * one real payment summary measured here it returned 40.50 against a true
-   * 40.50, at 79% confidence, while mangling the service fee beside it into
-   * 52.70 and missing the discount entirely. The number we need is the one it
-   * is best at.
+   * Asked of the merged read, not of one slot. This used to be asked of the
+   * checkout slot alone, on the belief that a cart screen never carries a final
+   * total - and on Talabat, noon and Keeta it plainly does: the payment summary
+   * sits under the items on the same screen, discount, delivery, service fee
+   * and total together. Deliveroo is the app that splits it in two. Believing
+   * the slot rather than the reading charged three apps' customers for the
+   * fourth one's layout.
+   */
+  const settled = totalsAreSettled(readTotals);
+  const cartSettled = totalsAreSettled(cartTotals);
+
+  /**
+   * The total, filled in from a screenshot rather than asked for again.
    *
-   * Never from the cart screen, which has no final total on it at all - what it
-   * has is an item subtotal, and quietly presenting that as "what you paid" is
-   * the precise mistake this whole thread is about. A cart-only read stays a
-   * hint with a button, where the customer decides.
+   * From whichever screenshot printed one, with the checkout screen preferred
+   * where both did - mergeReadTotals already resolves that, field by field.
+   * What earns the fill is that a total was printed at all: the extraction
+   * prompt forbids deriving or adding one up, so a value here was on the screen
+   * rather than computed out of an item list. The old rule - checkout slot or
+   * nothing - met a Talabat screenshot showing "Total amount 45.90" and asked
+   * the customer to type 45.90.
    *
    * Filled, not locked. The field stays editable, because a read that is right
    * on one payment summary is not right on every one, and the person holding
    * the phone can see the screen we are guessing at.
    */
   const autofilled = useRef<string | null>(null);
-  const readCheckoutTotal = checkoutTotals?.finalTotal || "";
+  const readFinalTotal = readTotals?.finalTotal || "";
 
   useEffect(() => {
     const decision = shouldAutofillTotal({
-      readCheckoutTotal,
+      readFinalTotal,
       typed: getValues("currentTotal"),
       lastAutofilled: autofilled.current,
     });
     if (!decision) return;
 
-    setValue("currentTotal", readCheckoutTotal);
+    setValue("currentTotal", readFinalTotal);
     clearErrors("currentTotal");
-    autofilled.current = readCheckoutTotal;
-  }, [readCheckoutTotal, getValues, setValue, clearErrors]);
+    autofilled.current = readFinalTotal;
+  }, [readFinalTotal, getValues, setValue, clearErrors]);
 
   const setField = <K extends keyof WizardValues & string>(
     name: K,
@@ -392,6 +403,21 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
         body.append(key, typeof value === "boolean" ? String(value) : value);
       }
 
+      // Whether the screenshots settled the bill, which decides whether the
+      // result carries the caveat about unchecked fees. Two conditions: a
+      // payment summary was read at all, and the number we are comparing
+      // against is still the one it printed. Retyped by hand and it is a figure
+      // we did not verify again, whatever the screenshot said - which is the
+      // whole of what the caveat claims.
+      //
+      // Asserted by the browser, like the per-row source labels. It buys
+      // nobody anything to forge: the only thing it can do is hide a sentence
+      // on the forger's own result page.
+      body.append(
+        "totalsConfirmed",
+        String(settled && readTotals?.finalTotal === parsed.data.currentTotal),
+      );
+
       // Where this customer came from, captured when they arrived and carried
       // here so it can be stored on the submission. Everything downstream - the
       // result, the switch to Keeta - inherits it from the row rather than
@@ -461,6 +487,8 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
         <StepUpload
           cartFile={files.cart}
           checkoutFile={files.checkout}
+          cartReading={cartStatus === "reading"}
+          cartSettlesTheBill={cartSettled}
           onCartChange={(file: File | null, original?: File | null) => {
             setFiles((current) => ({ ...current, cart: file }));
             setCartError(null);
@@ -502,9 +530,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           hasCheckoutScreenshot={files.checkout !== null}
           readTotal={readTotals?.finalTotal || null}
           totalFromCheckout={totalsFromCheckout && checkoutTotals.finalTotal !== ""}
-          prefilledFromCheckout={
-            readCheckoutTotal !== "" && values.currentTotal === readCheckoutTotal
-          }
+          prefilledFromScreenshot={readFinalTotal !== "" && values.currentTotal === readFinalTotal}
           onAreaChange={(areaId) => setField("areaId", areaId)}
           onCurrentTotalChange={(value) => setField("currentTotal", value)}
           onUseReadTotal={() => {

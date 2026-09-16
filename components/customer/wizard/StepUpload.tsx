@@ -14,6 +14,10 @@ import { RESULT_PROMISE } from "@/lib/constants";
 interface StepUploadProps {
   cartFile: File | null;
   checkoutFile: File | null;
+  /** The first screenshot is still being read, so we cannot say yet. */
+  cartReading: boolean;
+  /** It carried a printed final total beside its fees - nothing else is needed. */
+  cartSettlesTheBill: boolean;
   /** `original` is the untouched file, before it was compressed for upload. */
   onCartChange: (file: File | null, original?: File | null) => void;
   onCheckoutChange: (file: File | null, original?: File | null) => void;
@@ -22,13 +26,23 @@ interface StepUploadProps {
 }
 
 /**
- * Both screenshots in one place.
+ * One screenshot, and a second one only where the app needs it.
  *
- * The cart screenshot is required. The checkout one is still not demanded -
- * it raises no error when missing and does not gate Continue - but it is
- * labelled Recommended rather than Optional, because "optional" was read as
- * "skip it", and it is the only screen the real total appears on. Without it
- * the comparison is against a number somebody typed from memory.
+ * Which is not a thing this screen can know in advance. Talabat, noon and Keeta
+ * print the payment summary under the items on the cart page - discount,
+ * delivery, service fee and the final total, all on the screen somebody is
+ * already looking at - so one screenshot from any of those three settles the
+ * bill completely. Deliveroo puts the money on a separate screen. Asking
+ * everybody for two up front taxes the majority for the minority; asking for
+ * one and comparing against an item subtotal is the worse mistake in the other
+ * direction.
+ *
+ * So the second slot is asked for, and then withdrawn. It starts Recommended,
+ * because until the first screenshot has been read the odds are simply unknown.
+ * The moment that read comes back carrying a total and its fees, the slot drops
+ * to Optional and says so: nothing further is needed, and continuing to press
+ * for a screen they have already effectively sent is how a person decides this
+ * is too much work. It still never gates Continue, in either state.
  *
  * Each slot carries an (i) to a drawing of a good screenshot. Behind an icon
  * rather than on the page: this is where somebody weighs the wait against the
@@ -38,6 +52,8 @@ interface StepUploadProps {
 export function StepUpload({
   cartFile,
   checkoutFile,
+  cartReading,
+  cartSettlesTheBill,
   onCartChange,
   onCheckoutChange,
   error,
@@ -104,8 +120,9 @@ export function StepUpload({
         <Sparks className="ml-1 h-5 w-5 shrink-0" />
       </h1>
       <p className="mt-1.5 text-[0.95rem] leading-relaxed text-slate-600">
-        Upload your cart screenshot. Adding the checkout screen is what makes the comparison
-        exact rather than close.
+        {cartSettlesTheBill
+          ? "Your screenshot shows the total already — you're set. Add the checkout screen only if you want to."
+          : "Upload your cart screenshot. If your app keeps the total on a separate screen, add that one too."}
       </p>
 
       {/* Repeated from the landing page on purpose. This is the screen where
@@ -130,12 +147,26 @@ export function StepUpload({
           error={error}
         />
 
+        {/* Withdrawn rather than removed. The slot stays on the screen once the
+            first screenshot has settled the bill, because somebody who took two
+            screenshots before opening this page should still have somewhere to
+            put the second - it just stops being asked for. */}
         <ImageUpload
           step={2}
           label="Final checkout total"
-          hint="Fees, discounts and final total"
-          helper="Recommended for the most accurate comparison — this shows your discounts, fees and final total."
-          requirement="recommended"
+          hint={
+            cartSettlesTheBill
+              ? "Already covered by your first screenshot"
+              : "Fees, discounts and final total"
+          }
+          helper={
+            cartSettlesTheBill
+              ? "Your first screenshot already showed the fees and total, so you can skip this."
+              : cartReading
+                ? "Checking your first screenshot — add this if your total is on a different screen."
+                : "Recommended for the most accurate comparison — this shows your discounts, fees and final total."
+          }
+          requirement={cartSettlesTheBill ? "optional" : "recommended"}
           art="receipt"
           example="checkout"
           allowRemove
