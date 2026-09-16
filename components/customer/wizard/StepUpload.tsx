@@ -134,7 +134,7 @@ export function StepUpload({
           step={2}
           label="Final checkout total"
           hint="Fees, discounts and final total"
-          helper="Highly recommended for accuracy — the real total lives on this screen, with the fees and any discount."
+          helper="Recommended for the most accurate comparison — this shows your discounts, fees and final total."
           requirement="recommended"
           art="receipt"
           example="checkout"

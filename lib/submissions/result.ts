@@ -63,6 +63,15 @@ export interface PublicResult {
    */
   switchPath: string | null;
   items: Array<{ name: string; quantity: number; linePrice: string | null }>;
+  /**
+   * Whether they sent the checkout screen as well as the cart.
+   *
+   * Carried so the page can say the same thing the message does: without it,
+   * the total we compared against is one they typed and we could not check for
+   * fees or a discount. A boolean rather than the path itself - the page has no
+   * business knowing where their screenshot is stored.
+   */
+  checkoutScreenshotProvided: boolean;
   createdAt: string;
 }
 
@@ -97,7 +106,7 @@ export async function getPublicResult(token: string): Promise<PublicResult | nul
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, reference_number, status, restaurant_name, current_total, comparison_app, comparison_total, saving_amount, saving_percentage, comparison_url, redirect_token, unavailable_reason, created_at",
+      "id, reference_number, status, restaurant_name, current_total, comparison_app, comparison_total, saving_amount, saving_percentage, comparison_url, redirect_token, unavailable_reason, created_at, checkout_image_path",
     )
     .eq("result_token", token)
     .maybeSingle();
@@ -149,6 +158,7 @@ export async function getPublicResult(token: string): Promise<PublicResult | nul
         ? keetaRedirectPath(row.redirect_token)
         : null,
     items,
+    checkoutScreenshotProvided: Boolean(row.checkout_image_path),
     createdAt: row.created_at,
   };
 }

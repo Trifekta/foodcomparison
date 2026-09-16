@@ -28,6 +28,27 @@ export function sourceAppLabel(source: {
   return source.source_app;
 }
 
+/**
+ * What we say when the checkout screenshot never arrived.
+ *
+ * Deliberately not "compared on the item subtotal", which would be a claim
+ * about a number we never used: the baseline is whatever the customer typed
+ * into the total field, and plenty of people type the real final total
+ * straight off their own screen. What is actually missing is the means to
+ * check it - fees and a discount are exactly what a cart screen does not show,
+ * and they are where a typed total goes wrong.
+ *
+ * So the caveat is about verification, not arithmetic. Saying something
+ * definite and wrong about somebody's own order is a worse outcome than not
+ * warning them at all.
+ *
+ * One string, exported, because it is read in two places - the message we send
+ * and the result page - and a caveat that is worded two ways is a caveat
+ * nobody trusts.
+ */
+export const UNVERIFIED_TOTAL_NOTE =
+  "We compared against the total you entered. Without your checkout screenshot we couldn't confirm the fees and discounts, so your actual saving may differ.";
+
 export interface ResultMessageInput {
   sourceAppLabel: string;
   currentTotal: string;
@@ -35,6 +56,12 @@ export interface ResultMessageInput {
   comparisonAppLabel?: string;
   /** Absolute link to the customer's own result page, when we can build one. */
   resultUrl?: string | null;
+  /**
+   * Whether a checkout screenshot was sent. Required rather than defaulted: a
+   * caller that forgets it would quietly drop a caveat off a real customer's
+   * message, and that is not a decision to make by omission.
+   */
+  checkoutScreenshotProvided: boolean;
 }
 
 export interface GeneratedResult {
@@ -109,6 +136,7 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
         formatMinorAsCurrency(saving.savingMinor),
         "",
         `That's about ${Math.round(saving.savingPercentage)}% less.`,
+        ...(input.checkoutScreenshotProvided ? [] : ["", UNVERIFIED_TOTAL_NOTE]),
         ...(input.resultUrl ? ["", "See it and open the restaurant:", input.resultUrl] : []),
         "",
         "Prices and promotions can change, so please confirm the final amount in the delivery app before ordering.",
@@ -125,6 +153,7 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
         formatMinorAsCurrency(comparisonMinor),
         "",
         "Your current option appears better right now.",
+        ...(input.checkoutScreenshotProvided ? [] : ["", UNVERIFIED_TOTAL_NOTE]),
         "",
         "We'll keep working to help you catch the orders where switching actually makes sense.",
         "",

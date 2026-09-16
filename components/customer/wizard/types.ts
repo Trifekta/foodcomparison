@@ -151,3 +151,27 @@ export function combineStatus(
   if (both.includes("empty")) return "empty";
   return "idle";
 }
+
+/**
+ * Whether to put the checkout screen's total into the field for them.
+ *
+ * Pulled out of the effect that calls it so the one rule with a decision in it
+ * can be tested: an effect needs a browser, and this needs to be right. The
+ * caller keeps the memory - what it last filled in - and passes it back.
+ */
+export function shouldAutofillTotal(input: {
+  /** The final total read off the checkout screen, "" when there was none. */
+  readCheckoutTotal: string;
+  /** What is in the field now. */
+  typed: string;
+  /** What this filled in last time, if anything. */
+  lastAutofilled: string | null;
+}): boolean {
+  if (!input.readCheckoutTotal) return false;
+  // Already done, and not undone by them.
+  if (input.lastAutofilled === input.readCheckoutTotal) return false;
+  // Their own reading of their own screen beats ours. Only an empty field, or
+  // one still holding a number we put there, may be written over.
+  if (input.typed && input.typed !== input.lastAutofilled) return false;
+  return true;
+}

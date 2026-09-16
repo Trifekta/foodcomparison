@@ -20,6 +20,7 @@ import { NotificationPrompt } from "@/components/customer/NotificationPrompt";
 import { AddToHomeScreen } from "@/components/customer/AddToHomeScreen";
 import { track, visitId } from "@/lib/analytics/track";
 import type { PublicResult } from "@/lib/submissions/result";
+import { UNVERIFIED_TOTAL_NOTE } from "@/lib/notifications/messages";
 
 /**
  * The customer's result.
@@ -458,11 +459,33 @@ function Saving({ result, token }: { result: PublicResult; token: string }) {
         </div>
       ) : null}
 
+      <UnverifiedTotalNote result={result} />
+
       <p className="mt-4 mb-6 rounded-2xl bg-flame-50 p-3.5 text-[0.85rem] leading-relaxed text-ink-600">
         Prices and promotions change. Check the final amount in the app before you order — this
         was the price when we looked.
       </p>
     </>
+  );
+}
+
+/**
+ * Shown when the checkout screen never arrived.
+ *
+ * The same sentence the message carries, from the same constant, because a
+ * caveat worded two ways is a caveat nobody trusts. Silent when they sent it -
+ * there is nothing to warn about, and a note that always appears is furniture.
+ *
+ * Amber rather than red: this is a limit on what we could check, not a mistake
+ * they made, and the tone should not suggest otherwise.
+ */
+function UnverifiedTotalNote({ result }: { result: PublicResult }) {
+  if (result.checkoutScreenshotProvided) return null;
+
+  return (
+    <p className="mt-4 rounded-2xl bg-chip-amber-bg p-3.5 text-[0.85rem] leading-relaxed text-ink-700">
+      {UNVERIFIED_TOTAL_NOTE}
+    </p>
   );
 }
 
@@ -481,6 +504,8 @@ function NoSaving({ result }: { result: PublicResult }) {
       </p>
 
       {result.comparisonTotal ? <PriceRows result={result} /> : null}
+
+      <UnverifiedTotalNote result={result} />
 
       <div className="mt-5 mb-6">
         <Link
