@@ -975,9 +975,21 @@ not the layout one. Sticky rides the bottom of the screen while there is more
 below and comes to rest at its own place when the page ends.
 
 `app/manifest.ts` and `app/apple-icon.png` make an installed copy open as an app
-rather than a bookmark. **Nothing prompts anybody to install it** and nothing
-should while the product is being validated: the first click from an advert has
-to be the page, immediately.
+rather than a bookmark. The first click from an advert is the page, immediately -
+nothing is asked of anybody before they have had anything.
+
+There is exactly one place that mentions the Home Screen, and it is not an
+install prompt. On the waiting screen the customer has just been told they will
+be notified when their result is ready, and on an iPhone in Safari that promise
+cannot be kept - Apple sends Web Push only to a Home Screen copy, so the
+notification button renders nothing there. `AddToHomeScreen` is the missing half
+of a promise already made, shown while it still changes what happens to *this*
+order.
+
+It stays quiet for everybody else, and the rules are in `lib/pwa/install.ts`:
+not Android, where the browser already does push; not inside Instagram's or
+Facebook's browser, whose share sheets do not offer it; not once installed; and
+never again after one tap on the dismiss.
 
 Checked with a real browser at 360x800, 390x844, 393x852, 412x915 and 430x932 -
 `npm run build`, serve, then drive Chromium over every customer page looking for
