@@ -56,9 +56,52 @@ export const RESULT_PROMISE_MINUTES = 5;
 export const UNANSWERED_AFTER_MINUTES = 10;
 export const RESULT_PROMISE = `under ${RESULT_PROMISE_MINUTES} minutes`;
 
-/** Phase 1 launches in Dubai only. */
+/**
+ * Where the product is sold. The ads run here and the comparison work is done
+ * here; it is not the same question as where a customer is allowed to be.
+ */
 export const LAUNCH_CITY = "Dubai";
 export const LAUNCH_EMIRATE = "Dubai";
+
+/**
+ * The groups a customer picks their area from, in the order they are offered.
+ *
+ * Dubai first, because that is who the ads reach. The rest exist because an ad
+ * that works gets forwarded - somebody in Al Nahda tells their cousin in
+ * Sharjah - and a dropdown with nowhere to put yourself is where that person
+ * leaves. Being listed is not a promise of coverage: a basket we cannot price
+ * already has an honest answer, which is a better outcome than a form that
+ * cannot be completed.
+ *
+ * city is the heading, emirate is the truth. They differ only for Al Ain, which
+ * is legally Abu Dhabi and is nobody's idea of it - thirty Al Ain areas buried
+ * inside an "Abu Dhabi" heading is a list its own residents would not find
+ * themselves in. Reporting still groups by emirate and still gets the right
+ * answer.
+ */
+export const UAE_REGIONS = [
+  { city: "Dubai", emirate: "Dubai" },
+  { city: "Abu Dhabi", emirate: "Abu Dhabi" },
+  { city: "Al Ain", emirate: "Abu Dhabi" },
+  { city: "Sharjah", emirate: "Sharjah" },
+  { city: "Ajman", emirate: "Ajman" },
+  { city: "Umm Al Quwain", emirate: "Umm Al Quwain" },
+  { city: "Ras Al Khaimah", emirate: "Ras Al Khaimah" },
+  { city: "Fujairah", emirate: "Fujairah" },
+] as const;
+
+/**
+ * The emirate a group belongs to.
+ *
+ * Falls back to the city itself rather than to Dubai: an admin who adds a place
+ * this file has never heard of gets a row that is merely incomplete, where a
+ * default of Dubai would be a row that is confidently wrong, and wrong in the
+ * column the funnel report groups by.
+ */
+export function emirateForCity(city: string): string {
+  const match = UAE_REGIONS.find((region) => region.city === city);
+  return match ? match.emirate : city;
+}
 
 /** The platform we currently compare every basket against. */
 export const COMPARISON_APP = "Keeta";

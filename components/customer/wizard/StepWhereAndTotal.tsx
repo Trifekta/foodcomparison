@@ -93,10 +93,10 @@ export function StepWhereAndTotal({
             >
               <MapPin className="h-4.5 w-4.5 text-ink-900" />
             </span>
-            <span className="text-[1.02rem] font-extrabold text-ink-900">Delivery area in Dubai</span>
+            <span className="text-[1.02rem] font-extrabold text-ink-900">Your delivery area</span>
           </div>
           <AreaCombobox
-            label="Delivery area in Dubai"
+            label="Your delivery area"
             hideLabel
             areas={areas}
             value={areaId}

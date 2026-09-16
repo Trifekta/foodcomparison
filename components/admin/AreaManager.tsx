@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Plus, Save } from "lucide-react";
 import type { AreaRow } from "@/types/database";
 import { createArea, toggleAreaActive, updateArea } from "@/lib/admin/actions";
+import { LAUNCH_CITY, UAE_REGIONS } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -11,6 +12,11 @@ import { Button } from "@/components/ui/Button";
  *
  * Areas are data, not code: adding, renaming, reordering or deactivating one
  * here changes the customer dropdown immediately, with no deploy.
+ *
+ * City is a select rather than a free-text box. It is the heading the customer
+ * browses by, so one typo does not make a bad row - it makes a second Sharjah
+ * sitting under the first. The emirate is derived from the choice server-side
+ * and never posted, which is why it is not a field here.
  */
 export function AreaManager({ areas }: { areas: AreaRow[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -19,6 +25,13 @@ export function AreaManager({ areas }: { areas: AreaRow[] }) {
 
   const inputClass =
     "min-h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm text-ink-900";
+
+  const cityOptions = UAE_REGIONS.map((region) => (
+    <option key={region.city} value={region.city}>
+      {region.city}
+      {region.emirate === region.city ? "" : ` (${region.emirate})`}
+    </option>
+  ));
 
   const submit = (formData: FormData, action: typeof createArea) => {
     startTransition(async () => {
@@ -33,7 +46,7 @@ export function AreaManager({ areas }: { areas: AreaRow[] }) {
       <section className="rounded-2xl border border-ink-200 bg-white p-5">
         <h2 className="text-base font-semibold text-ink-900">Add an area</h2>
         <form
-          className="mt-3 grid gap-3 sm:grid-cols-[2fr_1fr_2fr_auto]"
+          className="mt-3 grid gap-3 sm:grid-cols-[2fr_1.5fr_1fr_2fr_auto]"
           onSubmit={(event) => {
             event.preventDefault();
             const form = event.currentTarget;
@@ -48,6 +61,14 @@ export function AreaManager({ areas }: { areas: AreaRow[] }) {
               Name
             </label>
             <input id="new-area-name" name="name" required className={inputClass} placeholder="Al Wasl" />
+          </div>
+          <div>
+            <label htmlFor="new-area-city" className="mb-1 block text-xs font-semibold text-ink-500">
+              City
+            </label>
+            <select id="new-area-city" name="city" defaultValue={LAUNCH_CITY} className={inputClass}>
+              {cityOptions}
+            </select>
           </div>
           <div>
             <label htmlFor="new-area-sort" className="mb-1 block text-xs font-semibold text-ink-500">
@@ -92,10 +113,11 @@ export function AreaManager({ areas }: { areas: AreaRow[] }) {
 
       <div className="rounded-2xl border border-ink-200 bg-white">
         <table className="w-full border-collapse text-sm">
-          <caption className="sr-only">Supported Dubai areas</caption>
+          <caption className="sr-only">Supported delivery areas</caption>
           <thead>
             <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
               <th scope="col" className="px-4 py-3 font-semibold">Area</th>
+              <th scope="col" className="px-4 py-3 font-semibold">City</th>
               <th scope="col" className="hidden px-4 py-3 font-semibold sm:table-cell">Sort</th>
               <th scope="col" className="hidden px-4 py-3 font-semibold lg:table-cell">
                 Test location (internal)
@@ -110,9 +132,9 @@ export function AreaManager({ areas }: { areas: AreaRow[] }) {
             {areas.map((area) =>
               editingId === area.id ? (
                 <tr key={area.id} className="bg-brand-50/50">
-                  <td colSpan={5} className="px-4 py-4">
+                  <td colSpan={6} className="px-4 py-4">
                     <form
-                      className="grid gap-3 sm:grid-cols-[2fr_1fr_2fr_2fr_auto]"
+                      className="grid gap-3 sm:grid-cols-[2fr_1.5fr_1fr_2fr_2fr_auto]"
                       onSubmit={(event) => {
                         event.preventDefault();
                         const formData = new FormData(event.currentTarget);
@@ -127,6 +149,19 @@ export function AreaManager({ areas }: { areas: AreaRow[] }) {
                         aria-label="Area name"
                         className={inputClass}
                       />
+                      <select
+                        name="city"
+                        defaultValue={area.city}
+                        aria-label="City"
+                        className={inputClass}
+                      >
+                        {/* An area whose city predates this list still shows its
+                            own value, so saving never silently moves it. */}
+                        {UAE_REGIONS.some((region) => region.city === area.city) ? null : (
+                          <option value={area.city}>{area.city}</option>
+                        )}
+                        {cityOptions}
+                      </select>
                       <input
                         name="sortOrder"
                         type="number"
@@ -170,6 +205,7 @@ export function AreaManager({ areas }: { areas: AreaRow[] }) {
               ) : (
                 <tr key={area.id}>
                   <td className="px-4 py-3 font-medium text-ink-900">{area.name}</td>
+                  <td className="px-4 py-3 text-ink-600">{area.city}</td>
                   <td className="hidden px-4 py-3 tabular-nums text-ink-600 sm:table-cell">
                     {area.sort_order}
                   </td>

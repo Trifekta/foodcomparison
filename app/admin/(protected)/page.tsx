@@ -18,6 +18,7 @@ import { computeValidationMetrics } from "@/lib/calculations/analytics";
 import { alertChannels } from "@/lib/notifications/admin-alert";
 import { getWebPushPublicKey } from "@/lib/env";
 import { findMissingMigrations } from "@/lib/admin/schema-check";
+import { toPublicArea } from "@/lib/areas";
 
 export const metadata: Metadata = {
   title: "Submissions",
@@ -77,7 +78,7 @@ export default async function AdminDashboardPage({
       <ValidationStrip metrics={metrics} />
 
       <Suspense fallback={<div className="h-20 rounded-2xl border border-ink-200 bg-white" />}>
-        <SubmissionFilters areas={areas.map((area) => ({ id: area.id, name: area.name }))} />
+        <SubmissionFilters areas={areas.map(toPublicArea)} />
       </Suspense>
 
       <SubmissionsTable rows={rows} />
