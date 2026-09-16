@@ -89,14 +89,35 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="How your order is read">
+          {readsScreenshots ? (
+            <>
+              <p>
+                When you upload a screenshot, it is sent to Anthropic&apos;s Claude API to be
+                read, and the restaurant, items and totals it finds are filled into the next
+                screen for you. This happens automatically, as soon as you upload, and it
+                happens outside the UAE.
+              </p>
+              <p>
+                Anthropic reads it on our behalf to answer that one request and does not use it
+                to train their models. We do not keep a copy of the reading — the screenshot you
+                upload is stored with us in the ordinary way, and the reading itself is used to
+                fill the form and then discarded.
+              </p>
+              <p>
+                If that reading cannot be done — it is switched off, or the service is
+                unavailable — your own phone reads the screenshot instead, inside your browser,
+                and nothing is sent anywhere to do it.
+              </p>
+            </>
+          ) : (
+            <p>
+              When you upload a screenshot, your own phone reads the text off it and fills in the
+              next screen. That happens entirely on your device — the reading is done by software
+              running inside your browser, and nothing is sent anywhere to do it.
+            </p>
+          )}
           <p>
-            When you upload your cart screenshot, your own phone reads the text off
-            it and fills in the next screen. That happens entirely on your device —
-            the reading is done by software running inside your browser, and nothing
-            is sent anywhere to do it.
-          </p>
-          <p>
-            What it produces is a first guess, not a decision. It is shown to you to
+            Either way, what it produces is a first guess, not a decision. It is shown to you to
             correct, and what we keep is the version you confirmed.
           </p>
         </Section>
@@ -104,18 +125,10 @@ export default function PrivacyPage() {
         {readsScreenshots ? (
           <Section title="If our staff need a second look">
             <p>
-              While working on your comparison, a member of staff may ask for help tidying the
-              basket into a list. In that case the reading is done on their computer and only the
-              resulting <em>text</em> — restaurant, items, quantities, prices — is sent to
-              Anthropic&apos;s Claude API. Your screenshot itself stays with us. Anthropic processes
-              that text on our behalf to answer that one request and does not use it to train their
-              models.
-            </p>
-            <p>
-              Occasionally the reading software cannot cope — an unclear photo, or Arabic it cannot
-              make out. A staff member may then choose to send the screenshot itself to be read
-              instead. This is a deliberate decision taken by a person, not something that happens
-              automatically, and it happens outside the UAE.
+              While working on your comparison, a member of staff may read the screenshot again —
+              either by having their own computer read the text off it and sending only that{" "}
+              <em>text</em> to Anthropic, or by sending the screenshot itself, as happened when you
+              uploaded it. Both go to the same place, on the same terms.
             </p>
             <p>
               Nothing read this way is treated as final either. A member of staff checks and
