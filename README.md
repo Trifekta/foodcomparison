@@ -986,10 +986,28 @@ notification button renders nothing there. `AddToHomeScreen` is the missing half
 of a promise already made, shown while it still changes what happens to *this*
 order.
 
-It stays quiet for everybody else, and the rules are in `lib/pwa/install.ts`:
-not Android, where the browser already does push; not inside Instagram's or
-Facebook's browser, whose share sheets do not offer it; not once installed; and
-never again after one tap on the dismiss.
+What it says depends on where they are, and the rules are in
+`lib/pwa/install.ts`:
+
+| Where | What they are told |
+| --- | --- |
+| Safari on iPhone | Share → Add to Home Screen |
+| Instagram or Facebook on iPhone | Menu → Open in Safari → Add to Home Screen |
+| Instagram or Facebook on Android | Menu → Open in Chrome. Nothing to install — Chrome does push in an ordinary tab |
+| Anywhere push already works | Nothing |
+| Any other embedded browser | Nothing — their menus are not something to give instructions about |
+
+The iPhone-inside-Instagram route is three steps and says so. An instruction
+with a missing step is one nobody finishes, and iOS sends push to a Home Screen
+copy and to nothing else, so there is no shorter road to offer.
+
+It is shown once. One tap on the dismiss and it never returns, on any route.
+
+**During validation this matters more than it looks.** A result is produced by a
+person and takes a few minutes, so the customer has genuinely closed the tab -
+which makes this the difference between a result they see and one they miss.
+The WhatsApp message the admin sends is the channel that works regardless, and
+remains the thing to rely on.
 
 Checked with a real browser at 360x800, 390x844, 393x852, 412x915 and 430x932 -
 `npm run build`, serve, then drive Chromium over every customer page looking for
