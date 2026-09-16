@@ -701,3 +701,141 @@ describe("the same cart, with the image column leaking a stray digit", () => {
     expect(basket.items[0].line_total).toBe("45");
   });
 });
+
+/**
+ * Chicking cart, two items, read in the browser at 63 percent confidence.
+ *
+ * The bug this pins down: "Mashed Potato" was filed as an option of the pack
+ * above it, because a description line was appended to the open row without
+ * anyone checking whether that row had already been priced. The price line
+ * underneath it then had no name left to take, so the second item arrived
+ * called "B 5800 ete =" - the struck-through 8.00 and some photo debris.
+ *
+ * It matters more than one wrong name. The mistake repeats per item, so a
+ * four-item basket would have come back as one real name and three pieces of
+ * OCR noise, and the customer would have had to retype the lot.
+ */
+describe("Chicking cart, real OCR (two items)", () => {
+  const CART = [
+    "456 eOM\u2122 -                              Ze all all @",
+    "Cart",
+    "<     Chicking",
+    "9 Pcs Fusion Pack",
+    "Fried Chicken Spicy, Strips Spicy,                      |         nit",
+    "French Fries Regular                           Br ay",
+    "=X pe 57",
+    "2. Edit",
+    "oO 1 +",
+    "B 32.20 546.00",
+    "Mashed Potato                                           \u00bb",
+    "V4 Edit                                                      d   d y",
+    "og 1 +",
+    "B 5.60 5800                                 ete =",
+    "You might also like...",
+    "Save B 0.60                Save B 2.40                  Save \u00a32.70",
+    "4                                         :  2",
+    "Ni nd 5                 A     \u00a7",
+    "~              FED                      Z",
+    "NF     = + BE              + \u00a7 5d",
+    "-            \u2014\u2014\u2014               \u2014",
+    "Garlic Paste          Coleslaw (R)          French Fries (R) Chee",
+    "B 1.40                  B 5.60                 B 6.30                  Garlic",
+    "52.00                   & 8.00                   59.00                   B 6.3",
+    "5 9.0C",
+    "EX You're saving & 4.90 with talabat pro \u20ac-",
+    "Add items                      Checkout",
+    "1                   O                   <",
+    "",
+  ].join("\n");
+
+  it("keeps the two items apart", () => {
+    const { basket } = parseOcrText(CART);
+    expect(basket.items).toHaveLength(2);
+  });
+
+  it("names the second item from the screen, not from its own price line", () => {
+    const { basket } = parseOcrText(CART);
+    expect(basket.items.map((item) => item.name)).toEqual(["9 Pcs Fusion Pack", "Mashed Potato"]);
+  });
+
+  it("takes the discounted price, not the struck-through one", () => {
+    const { basket } = parseOcrText(CART);
+    expect(basket.items.map((item) => item.line_total)).toEqual(["32.20", "5.60"]);
+  });
+
+  it("reads the restaurant off the header", () => {
+    expect(parseOcrText(CART).basket.restaurant_name).toBe("Chicking");
+  });
+
+  it("leaves the upsell shelf alone", () => {
+    // "You might also like..." lists Garlic Paste, Coleslaw and French Fries at
+    // real prices. None of them is in this order.
+    const names = parseOcrText(CART).basket.items.map((item) => item.name).join(" ");
+    expect(names).not.toContain("Garlic Paste");
+    expect(names).not.toContain("Coleslaw");
+  });
+});
+
+/**
+ * More than two rows of the same shape.
+ *
+ * Synthetic, and labelled as such: it repeats the Chicking layout above, whose
+ * every line is real OCR, because no four-item screenshot has been collected
+ * yet. It is here because the failure it guards scales with the basket - the
+ * two-item cart lost one name, and a four-item cart built the same way lost two
+ * whole items and AED 11.90 with them, silently, before anybody saw a price.
+ *
+ * The two priced lines differ on purpose. Row 1 ends in a line that is nothing
+ * but money; row 2 ends in one with "ete =" welded on by the photo behind it.
+ * They take different branches, and the fix has to close the row on both.
+ */
+describe("a longer cart of the same shape (synthetic)", () => {
+  const head = ["456 eOM™ -   Ze all all @", "Cart", "<     Chicking"];
+  const rows = [
+    ["9 Pcs Fusion Pack", "Fried Chicken Spicy, Strips Spicy,   |   nit", "2. Edit", "oO 1 +", "B 32.20 546.00"],
+    ["Mashed Potato    »", "V4 Edit    d   d y", "og 1 +", "B 5.60 5800    ete ="],
+    ["Coleslaw (R)", "V4 Edit", "og 1 +", "B 5.60 5800"],
+    ["French Fries (R)", "V4 Edit", "og 1 +", "B 6.30 59.00"],
+  ];
+  const cartOf = (count: number) => [...head, ...rows.slice(0, count).flat()].join("\n");
+
+  it("keeps every row as the basket grows", () => {
+    for (let count = 1; count <= 4; count++) {
+      expect(parseOcrText(cartOf(count)).basket.items).toHaveLength(count);
+    }
+  });
+
+  it("gets all four names and prices right", () => {
+    const { basket } = parseOcrText(cartOf(4));
+    expect(basket.items.map((item) => [item.name, item.line_total])).toEqual([
+      ["9 Pcs Fusion Pack", "32.20"],
+      ["Mashed Potato", "5.60"],
+      ["Coleslaw (R)", "5.60"],
+      ["French Fries (R)", "6.30"],
+    ]);
+  });
+});
+
+/**
+ * The case the rule deliberately leaves alone.
+ *
+ * A row born with its price on the same line stays open, because some apps
+ * print the options underneath it. Closing every row on its price would be a
+ * simpler rule and would break this - so it is written down here rather than
+ * left to be rediscovered.
+ */
+describe("a cart that prints options under the price", () => {
+  it("keeps the description with its item instead of starting a new one", () => {
+    const { basket } = parseOcrText(
+      [
+        "Al Safadi",
+        "Mixed Grill Platter        AED 84.00",
+        "Extra rice, no onion",
+        "Garlic sauce on the side",
+      ].join("\n"),
+    );
+    expect(basket.items).toHaveLength(1);
+    expect(basket.items[0].name).toBe("Mixed Grill Platter");
+    expect(basket.items[0].modifiers).toContain("Extra rice, no onion");
+  });
+});

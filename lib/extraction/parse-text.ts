@@ -709,6 +709,26 @@ export function parseOcrText(raw: string): ParseResult {
    * by the next item starting.
    */
   let pending: StructuredItem | null = null;
+  /**
+   * Whether the open row's price has already arrived on a line of its own.
+   *
+   * The rule is about where the row got its price, not about which line it
+   * landed on: a row born from a name is closed by its price; a row born with
+   * its price on the same line stays open for the description that follows it,
+   * which is how some apps print a cart.
+   *
+   * Keying it on the branch that attached the price would be the same rule
+   * written three times and wrong once - the two items in the Chicking cart
+   * below take different branches only because OCR dropped "ete =" onto the
+   * second one's price line.
+   *
+   * Without the distinction, a two-item cart came back as one: "Mashed Potato"
+   * was filed as an option of the pack above it, and the price line under it
+   * then had no name left to take, so it became an item called "B 5800 ete =".
+   * The cost grows with the basket - four items would have produced one real
+   * name and three pieces of OCR debris.
+   */
+  let pendingPriceClosedRow = false;
   /** Set once an upsell or settings heading is passed; items stop, money does not. */
   let itemsClosed = false;
   /** A gap before this line means a new row started; no gap means it continues. */
@@ -736,6 +756,7 @@ export function parseOcrText(raw: string): ParseResult {
       items.push(pending);
     }
     pending = null;
+    pendingPriceClosedRow = false;
   };
 
   for (const [index, entry] of lines.entries()) {
@@ -870,6 +891,7 @@ export function parseOcrText(raw: string): ParseResult {
         looksLikeMoney(line, priced.price)
       ) {
         pending.line_total = cheapestOf(line, priced.price);
+        pendingPriceClosedRow = true;
       }
       continue;
     }
@@ -880,6 +902,7 @@ export function parseOcrText(raw: string): ParseResult {
     // opened, this is still that item's row - not a second item.
     if (priced && pending !== null && pending.line_total === "" && !startsNewRow) {
       pending.line_total = priced.price;
+      pendingPriceClosedRow = true;
       if (longestWord(priced.rest) >= 3 && pending.modifiers.length < 4) {
         pending.modifiers.push(priced.rest);
       }
@@ -906,6 +929,7 @@ export function parseOcrText(raw: string): ParseResult {
     if (priced && letterCount(priced.rest) < 3) {
       if (pending && pending.line_total === "" && looksLikeMoney(line, priced.price)) {
         pending.line_total = cheapestOf(line, priced.price);
+        pendingPriceClosedRow = true;
       }
       continue;
     }
@@ -918,6 +942,10 @@ export function parseOcrText(raw: string): ParseResult {
       uncertain.add("restaurant_name");
       continue;
     }
+
+    // The row above already had its price land on a line of its own, so it is
+    // finished. This is the next dish, not another option for the last one.
+    if (pending !== null && pendingPriceClosedRow) flush();
 
     if (pending === null) {
       const { quantity, name } = extractQuantity(line);
