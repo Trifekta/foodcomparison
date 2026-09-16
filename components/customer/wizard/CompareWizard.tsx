@@ -488,21 +488,13 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           areaName={areaName}
           submitting={submitting}
           submitError={submitError}
-          errors={{
-            whatsappNumber: errors.whatsappNumber?.message,
-            email: errors.email?.message,
-          }}
+          errors={{ whatsappNumber: errors.whatsappNumber?.message }}
           onSubmit={() => void handleSubmit()}
           onBack={() => goTo(STEP_WHERE)}
           onEditBasket={() => goTo(STEP_BASKET)}
           onEditArea={() => goTo(STEP_WHERE)}
-          onContactTypeChange={(type) => {
-            setField("contactType", type);
-            clearErrors(["whatsappNumber", "email"]);
-          }}
           onDialCodeChange={(code) => setField("dialCode", code)}
           onWhatsappNumberChange={(value) => setField("whatsappNumber", value)}
-          onEmailChange={(value) => setField("email", value)}
           onMarketingConsentChange={(value) => setField("marketingConsent", value)}
         />
       ) : null}

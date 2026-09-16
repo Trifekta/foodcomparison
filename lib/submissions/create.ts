@@ -145,10 +145,8 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     restaurantName: String(formData.get("restaurantName") ?? ""),
     areaId: String(formData.get("areaId") ?? ""),
     currentTotal: String(formData.get("currentTotal") ?? ""),
-    contactType: String(formData.get("contactType") ?? ""),
     dialCode: String(formData.get("dialCode") ?? ""),
     whatsappNumber: String(formData.get("whatsappNumber") ?? ""),
-    email: String(formData.get("email") ?? ""),
     marketingConsent: formData.get("marketingConsent") === "true",
   });
 
@@ -214,22 +212,19 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     };
   }
 
-  let whatsappNumber: string | null = null;
-  let email: string | null = null;
-
-  if (fields.contactType === "whatsapp") {
-    try {
-      whatsappNumber = normalisePhone(fields.dialCode, fields.whatsappNumber).e164;
-    } catch {
-      return {
-        ok: false,
-        status: 400,
-        error: "Enter a valid mobile number.",
-        field: "whatsappNumber",
-      };
-    }
-  } else {
-    email = fields.email.trim().toLowerCase();
+  // WhatsApp is the only channel a result goes out on. The column and its
+  // check constraint still permit 'email' because rows taken that way exist and
+  // have to stay valid; nothing new is ever written with it.
+  let whatsappNumber: string;
+  try {
+    whatsappNumber = normalisePhone(fields.dialCode, fields.whatsappNumber).e164;
+  } catch {
+    return {
+      ok: false,
+      status: 400,
+      error: "Enter a valid mobile number.",
+      field: "whatsappNumber",
+    };
   }
 
   const supabase = createAdminClient();
@@ -321,9 +316,9 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       comparison_app: COMPARISON_APP,
       cart_image_path: cartPath,
       checkout_image_path: checkoutPath,
-      contact_type: fields.contactType,
+      contact_type: "whatsapp",
       whatsapp_number: whatsappNumber,
-      email,
+      email: null,
       marketing_consent: fields.marketingConsent,
       restaurant_name: sanitiseText(fields.restaurantName, MAX_RESTAURANT_NAME_LENGTH),
       ...attribution,

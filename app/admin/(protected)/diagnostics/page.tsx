@@ -6,7 +6,6 @@ import { getPushStatus, pushNextStep } from "@/lib/push/status";
 import { checkEnvironment, environmentNextStep } from "@/lib/admin/env-check";
 import { alertChannels } from "@/lib/notifications/admin-alert";
 import { isExtractionConfigured } from "@/lib/env";
-import { isEmailConfigured } from "@/lib/notifications/resend";
 
 export const metadata: Metadata = {
   title: "Diagnostics",
@@ -87,7 +86,6 @@ export default async function DiagnosticsPage() {
         <dl className="divide-y divide-ink-100">
           {[
             ["New order alerts", channels.length > 0 ? channels.join(" and ") : "none configured"],
-            ["Email sending", isEmailConfigured() ? "configured" : "not configured"],
             ["Screenshot extraction", isExtractionConfigured() ? "configured" : "not configured"],
             ["Site address (links in alerts)", push.appUrl ?? "not set — alerts go out without a link"],
           ].map(([label, value]) => (

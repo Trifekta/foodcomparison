@@ -168,13 +168,6 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
   };
 }
 
-/** Short subject line for the email channel. */
-export function buildResultSubject(hasSaving: boolean, reference: string): string {
-  return hasSaving
-    ? `You could save on your order (${reference})`
-    : `We checked your order (${reference})`;
-}
-
 /**
  * wa.me deep link. The admin sends the message by hand in Phase 1 - there is no
  * WhatsApp Business API here, and opening the link is not treated as delivery.
@@ -184,7 +177,3 @@ export function buildWhatsAppLink(phoneE164OrDigits: string, message: string): s
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
-/** mailto: fallback so an admin can send from their own client. */
-export function buildMailtoLink(email: string, subject: string, message: string): string {
-  return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-}

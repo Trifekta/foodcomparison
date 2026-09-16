@@ -14,13 +14,11 @@ import {
 import { calculateSavingFromStrings, toPersistableSaving } from "@/lib/calculations/saving";
 import {
   buildResultMessage,
-  buildResultSubject,
   buildUnavailableMessage,
   sourceAppLabel,
 } from "@/lib/notifications/messages";
 import { alertChannels, sendTestAdminAlert } from "@/lib/notifications/admin-alert";
 import { PUSH_CONFLICT_TARGET, pushToAdmins, pushToCustomer } from "@/lib/push/send";
-import { getEmailProvider } from "@/lib/notifications/resend";
 import { sanitiseMultiline, sanitiseText } from "@/lib/utils/text";
 import { normalisePhone } from "@/lib/utils/phone";
 import {
@@ -444,58 +442,6 @@ export async function markResultSent(submissionId: string): Promise<ActionResult
   });
 }
 
-/** Sends the result by email when Resend is configured; otherwise says so. */
-export async function sendResultByEmail(submissionId: string): Promise<ActionResult> {
-  const { user } = await requireAdmin();
-  return reported(async () => {
-
-    const submission = await loadSubmission(submissionId);
-    if (!submission) return { ok: false, message: LOAD_FAILED };
-    if (submission.contact_type !== "email" || !submission.email) {
-      return { ok: false, message: "This customer asked for WhatsApp." };
-    }
-    if (!submission.result_message) {
-      return { ok: false, message: "Generate the result first." };
-    }
-
-    const provider = getEmailProvider();
-    if (!provider.configured) {
-      return {
-        ok: false,
-        message: "Email isn't configured. Use “Copy email message” and send it yourself.",
-      };
-    }
-
-    const outcome = await provider.send({
-      to: submission.email,
-      subject: buildResultSubject(submission.status !== "no_saving", submission.reference_number),
-      body: submission.result_message,
-      reference: submission.reference_number,
-    });
-
-    if (!outcome.sent) return { ok: false, message: outcome.reason };
-
-    const supabase = await createServerSupabaseClient();
-    await supabase
-      .from("submissions")
-      .update({ status: "result_sent", result_sent_at: new Date().toISOString() })
-      .eq("id", submissionId);
-
-    await recordEvent({
-      submissionId,
-      eventType: "result_sent",
-      previousStatus: submission.status,
-      newStatus: "result_sent",
-      metadata: { channel: "email", provider: outcome.providerId },
-      actorId: user.id,
-    });
-
-    revalidatePath(`/admin/submissions/${submissionId}`);
-    revalidatePath("/admin");
-    return { ok: true, message: "Email sent." };
-  });
-}
-
 export async function updateStatus(
   submissionId: string,
   status: SubmissionStatus,
@@ -562,7 +508,7 @@ export async function sendTestAlert(): Promise<ActionResult> {
       return {
         ok: false,
         message:
-          "No alert channel is configured. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, or ADMIN_ALERT_EMAIL, or the WEB_PUSH keys.",
+          "No alert channel is configured. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, or the WEB_PUSH keys.",
       };
     }
 

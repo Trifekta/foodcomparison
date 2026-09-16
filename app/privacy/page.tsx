@@ -46,7 +46,7 @@ export default function PrivacyPage() {
             <li>your checkout screenshot, if you choose to add one</li>
             <li>the delivery area you selected</li>
             <li>the order total you typed in</li>
-            <li>your WhatsApp number or email address</li>
+            <li>your WhatsApp number</li>
           </ul>
           <p>
             We also note which delivery app your screenshot came from, which we can see by looking
@@ -75,7 +75,7 @@ export default function PrivacyPage() {
           </p>
           <p>
             The page shows your basket, the two prices and the saving. It never shows your phone
-            number, your email address or your screenshots.
+            number or your screenshots.
           </p>
         </Section>
 

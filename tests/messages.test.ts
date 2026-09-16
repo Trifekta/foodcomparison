@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   UNVERIFIED_TOTAL_NOTE,
-  buildMailtoLink,
   buildResultMessage,
-  buildResultSubject,
   buildUnavailableMessage,
   buildWhatsAppLink,
   sourceAppLabel,
@@ -115,17 +113,7 @@ describe("delivery links", () => {
     expect(decodeURIComponent(link.split("?text=")[1])).toBe(message);
   });
 
-  it("builds a mailto link with a subject and body", () => {
-    const link = buildMailtoLink("customer@example.com", "Subject line", "Body text");
-    expect(link.startsWith("mailto:")).toBe(true);
-    expect(link).toContain("subject=Subject%20line");
-    expect(link).toContain("body=Body%20text");
-  });
 
-  it("titles the email according to the outcome", () => {
-    expect(buildResultSubject(true, "FFA-260910-0042")).toContain("could save");
-    expect(buildResultSubject(false, "FFA-260910-0042")).toContain("We checked");
-  });
 });
 
 describe("sourceAppLabel", () => {

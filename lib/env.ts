@@ -67,19 +67,6 @@ export function isExtractionConfigured(): boolean {
   return getAnthropicApiKey() !== null;
 }
 
-export interface ResendConfig {
-  apiKey: string;
-  from: string;
-}
-
-/** Returns null when email is not configured - the app must still work. */
-export function getResendConfig(): ResendConfig | null {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
-  if (!apiKey || !from) return null;
-  return { apiKey, from };
-}
-
 /**
  * The shared secret a scheduler proves itself with.
  *
@@ -101,7 +88,7 @@ export interface WebPushConfig {
  * Browser push, when keys are configured.
  *
  * Null when they are not, and every caller treats that as "this feature is
- * off" - the same rule Resend and Telegram follow here. The app has to work
+ * off" - the same rule Telegram follows here. The app has to work
  * without it: the result page polls, the customer can keep the tab open, and
  * the admin still has Telegram. Push is the improvement, not the mechanism.
  *
@@ -153,6 +140,3 @@ export function getTelegramConfig(): TelegramConfig | null {
 }
 
 /** Where a "new price check" email goes, when email is the chosen alert. */
-export function getAdminAlertEmail(): string | null {
-  return process.env.ADMIN_ALERT_EMAIL?.trim() || null;
-}

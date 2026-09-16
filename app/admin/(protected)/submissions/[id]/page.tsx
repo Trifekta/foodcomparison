@@ -10,7 +10,6 @@ import {
   getSubmissionItems,
   listAreas,
 } from "@/lib/admin/queries";
-import { isEmailConfigured } from "@/lib/notifications/resend";
 import { isExtractionConfigured } from "@/lib/env";
 import { ExtractionPanel } from "@/components/admin/ExtractionPanel";
 import type { StructuredBasket } from "@/lib/extraction/schema";
@@ -99,7 +98,6 @@ export default async function SubmissionDetailPage({
       ? submission.source_app_other
       : submission.source_app;
 
-  const hasSaving = Number(submission.saving_amount ?? 0) > 0;
 
   const pricedItems = items.filter((item) => item.line_price_minor !== null);
   const pricedCount = pricedItems.length;
@@ -361,14 +359,11 @@ export default async function SubmissionDetailPage({
           {submission.result_message ? (
             <ResultPanel
               submissionId={submission.id}
-              reference={submission.reference_number}
               message={submission.result_message}
-              hasSaving={hasSaving}
               contactType={submission.contact_type}
               whatsappNumber={submission.whatsapp_number}
               email={submission.email}
               alreadySent={submission.status === "result_sent"}
-              emailConfigured={isEmailConfigured()}
             />
           ) : (
             <section className="rounded-2xl border border-dashed border-ink-300 bg-white p-5">

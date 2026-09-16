@@ -115,7 +115,7 @@ export function FindOrder() {
 
         <div>
           <label htmlFor="contact" className="mb-2 block text-[0.95rem] font-bold text-ink-900">
-            WhatsApp number or email
+            WhatsApp number
           </label>
           <input
             id="contact"
