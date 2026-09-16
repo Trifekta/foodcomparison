@@ -1,19 +1,17 @@
 "use client";
 
 /**
- * Whether adding this to the Home Screen would actually buy the customer
- * anything - which is a narrower question than "could they".
+ * How this customer could be reached, when the browser they are in cannot
+ * reach them.
  *
- * Anybody can add any page to their Home Screen. The only person worth
- * mentioning it to is the one for whom it changes something, and here exactly
- * one person qualifies: an iPhone user in Safari. Apple does not deliver Web
- * Push to a browser tab under any circumstances, so for them the Home Screen
- * copy is the only way to be told their result is ready - which is the thing
- * the screen above has just promised.
+ * The question is never "could they install this" - anybody can add any page to
+ * their Home Screen. It is "can we tell them their result is ready", and the
+ * answer depends on two things the browser will not volunteer: whose browser it
+ * is, and whether it is somebody else's browser embedded in an app.
  *
- * On Android the browser already does push. Suggesting an install there would
- * be an install prompt with nothing behind it, which is the thing this product
- * deliberately does not do.
+ * During validation a result is produced by a person and takes a few minutes,
+ * so the customer has genuinely gone. That makes this the difference between a
+ * result they see and a result they miss, rather than a convenience.
  */
 
 const DISMISSED = "snipsavor.homescreen.dismissed";
@@ -41,17 +39,20 @@ function isIos(): boolean {
 }
 
 /**
- * Instagram's browser, Facebook's, and the rest of the embedded ones.
+ * Instagram's browser and Facebook's, which is where the adverts land.
  *
- * The share sheet inside them either has no "Add to Home Screen" or hides it
- * behind "Open in Safari" first, so telling somebody to look for it there is an
- * instruction that does not work. Most of this product's traffic arrives this
- * way, and the right thing to do about it is say nothing: they still get the
- * result on the page, and the WhatsApp message the admin sends.
+ * Told apart from the other embedded browsers because these two are the only
+ * ones whose menu is known to carry "Open in Safari" / "Open in Chrome" - so
+ * these are the only ones where an instruction can be given that actually
+ * works. For anything else embedded, nothing is said at all.
  */
-function isEmbeddedBrowser(): boolean {
+function isMetaBrowser(): boolean {
+  return /FBAN|FBAV|FB_IAB|Instagram/i.test(navigator.userAgent);
+}
+
+function isOtherEmbeddedBrowser(): boolean {
   const ua = navigator.userAgent;
-  return /FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|MicroMessenger|Snapchat/i.test(ua);
+  return !isMetaBrowser() && /Line\/|Twitter|MicroMessenger|Snapchat|TikTok/i.test(ua);
 }
 
 export function dismissHomeScreenHint(): void {
@@ -72,19 +73,40 @@ function wasDismissed(): boolean {
 }
 
 /**
- * Every condition, in one place.
+ * What to tell this customer, if anything.
  *
- * Read after mount and never during render: half of these are browser-only
- * values, and reading them while rendering makes the server and the client
- * disagree.
+ *  - "ios-direct"      Safari on an iPhone. Share, then Add to Home Screen.
+ *  - "ios-in-app"      Inside Instagram or Facebook on an iPhone. Safari first,
+ *                      then the same two taps. A longer road, and the only one
+ *                      there is: iOS sends push to a Home Screen copy and to
+ *                      nothing else.
+ *  - "android-in-app"  Inside Instagram or Facebook on Android. Much easier -
+ *                      Chrome does push in an ordinary tab, so opening it there
+ *                      is the whole fix and nothing needs installing.
+ *  - null              Say nothing.
  */
-export function shouldOfferHomeScreen(pushIsSupported: boolean): boolean {
-  if (typeof window === "undefined") return false;
+export type HomeScreenRoute = "ios-direct" | "ios-in-app" | "android-in-app" | null;
 
-  // Push works here already. Nothing to offer.
-  if (pushIsSupported) return false;
-  if (isStandalone()) return false;
-  if (!isIos()) return false;
-  if (isEmbeddedBrowser()) return false;
-  return !wasDismissed();
+/**
+ * Read after mount and never during render: every value behind this is
+ * browser-only, and reading them while rendering makes the server and the
+ * client disagree.
+ */
+export function homeScreenRoute(pushIsSupported: boolean): HomeScreenRoute {
+  if (typeof window === "undefined") return null;
+
+  // The browser can already reach them. Nothing to say.
+  if (pushIsSupported) return null;
+  if (isStandalone()) return null;
+  if (wasDismissed()) return null;
+
+  // An embedded browser whose menu we cannot vouch for. An instruction that
+  // does not match what somebody sees is worse than silence.
+  if (isOtherEmbeddedBrowser()) return null;
+
+  if (isIos()) return isMetaBrowser() ? "ios-in-app" : "ios-direct";
+
+  // Android, and push is unavailable - which on Android means an embedded
+  // WebView rather than a real browser. Chrome fixes it without an install.
+  return isMetaBrowser() ? "android-in-app" : null;
 }
