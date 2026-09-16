@@ -17,6 +17,7 @@ import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { BrandTagline, ScriptBubble, ScriptNote, SkylineFooter, Sparks } from "@/components/customer/Motifs";
 import { Wordmark } from "@/components/customer/Wordmark";
 import { NotificationPrompt } from "@/components/customer/NotificationPrompt";
+import { AddToHomeScreen } from "@/components/customer/AddToHomeScreen";
 import { track, visitId } from "@/lib/analytics/track";
 import type { PublicResult } from "@/lib/submissions/result";
 
@@ -285,6 +286,12 @@ function Checking({
       {pushPublicKey ? (
         <NotificationPrompt token={token} publicKey={pushPublicKey} />
       ) : null}
+
+      {/* The other half of the same promise. On an iPhone in Safari the button
+          above renders nothing at all - Apple sends Web Push only to a Home
+          Screen copy - so this is what "we'll notify you" means for them. It
+          shows itself only to that person: see lib/pwa/install.ts. */}
+      <AddToHomeScreen />
 
       <div className="mt-5 flex items-center gap-3 rounded-3xl bg-cream px-4 py-4 ring-1 ring-sand">
         <div className="min-w-0 flex-1">
