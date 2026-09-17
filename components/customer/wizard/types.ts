@@ -172,6 +172,26 @@ export function totalsAreSettled(totals: ReadTotals | null): boolean {
 }
 
 /**
+ * The one figure worth offering as an answer, out of everything read.
+ *
+ * Not "whatever final_total holds" - a Keeta basket screen can print "Order
+ * total AED 71.95" in the same type and position a real payment summary
+ * uses, while a delivery fee still waits to be added at checkout. The
+ * extraction has no way to know that from the number alone; only
+ * totalsAreSettled's evidence - a fee or discount printed beside it - says
+ * this screen is done adding things up.
+ *
+ * Used everywhere a read total is about to become the customer's own
+ * answer: the silent autofill, the "Use this" hint, and the caveat's own
+ * check of what was confirmed. Not used for the raw per-field display on the
+ * basket-confirm step, which shows exactly what was read, unfiltered,
+ * because that screen is not offering anything as the answer.
+ */
+export function trustedFinalTotal(totals: ReadTotals | null): string {
+  return totalsAreSettled(totals) ? (totals?.finalTotal ?? "") : "";
+}
+
+/**
  * Whether the second upload slot should stop hedging and say so.
  *
  * Pulled out of the JSX that reads it for the same reason shouldAutofillTotal

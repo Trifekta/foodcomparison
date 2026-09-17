@@ -32,6 +32,7 @@ import {
   mergeReadTotals,
   shouldAutofillTotal,
   totalsAreSettled,
+  trustedFinalTotal,
   usableItems,
   type CartItemDraft,
   type ExtractionStatus,
@@ -157,18 +158,14 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   const readTotals = mergeReadTotals(cartTotals, checkoutTotals);
   const totalsFromCheckout = hasAnyTotal(checkoutTotals);
 
-  /**
-   * Whether what came back is a settled bill rather than a list of food.
-   *
-   * Asked of the merged read, not of one slot. This used to be asked of the
-   * checkout slot alone, on the belief that a cart screen never carries a final
-   * total - and on Talabat, noon and Keeta it plainly does: the payment summary
-   * sits under the items on the same screen, discount, delivery, service fee
-   * and total together. Deliveroo is the app that splits it in two. Believing
-   * the slot rather than the reading charged three apps' customers for the
-   * fourth one's layout.
-   */
-  const settled = totalsAreSettled(readTotals);
+  // Whether a bill is settled (trustedFinalTotal, below, is where this
+  // actually gets used) is asked of the merged read, not of one slot. This
+  // used to be asked of the checkout slot alone, on the belief that a cart
+  // screen never carries a final total - and on Talabat, noon and Keeta it
+  // plainly does: the payment summary sits under the items on the same
+  // screen, discount, delivery, service fee and total together. Deliveroo is
+  // the app that splits it in two. Believing the slot rather than the
+  // reading charged three apps' customers for the fourth one's layout.
   const cartSettled = totalsAreSettled(cartTotals);
   const cartReading = cartStatus === "reading";
 
@@ -196,22 +193,32 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
    * Filled, not locked. The field stays editable, because a read that is right
    * on one payment summary is not right on every one, and the person holding
    * the phone can see the screen we are guessing at.
+   *
+   * Gated on settled, not merely on final_total being non-empty. A Keeta
+   * basket page can print "Order total AED 71.95" in exactly the type a real
+   * payment summary uses, and the extraction has no way to know that number
+   * excludes a delivery fee still to be added at checkout - only that nothing
+   * beside it looked like a fee or a discount. Filling the field from that
+   * number anyway is the mistake the block above is written against: it
+   * would quietly present an incomplete figure as "what you paid" in the one
+   * field this entire product measures a saving against, in the same breath
+   * the upload screen is telling the customer this slot still needs a look.
    */
   const autofilled = useRef<string | null>(null);
-  const readFinalTotal = readTotals?.finalTotal || "";
+  const trustedTotal = trustedFinalTotal(readTotals);
 
   useEffect(() => {
     const decision = shouldAutofillTotal({
-      readFinalTotal,
+      readFinalTotal: trustedTotal,
       typed: getValues("currentTotal"),
       lastAutofilled: autofilled.current,
     });
     if (!decision) return;
 
-    setValue("currentTotal", readFinalTotal);
+    setValue("currentTotal", trustedTotal);
     clearErrors("currentTotal");
-    autofilled.current = readFinalTotal;
-  }, [readFinalTotal, getValues, setValue, clearErrors]);
+    autofilled.current = trustedTotal;
+  }, [trustedTotal, getValues, setValue, clearErrors]);
 
   const setField = <K extends keyof WizardValues & string>(
     name: K,
@@ -427,7 +434,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       // on the forger's own result page.
       body.append(
         "totalsConfirmed",
-        String(settled && readTotals?.finalTotal === parsed.data.currentTotal),
+        String(trustedTotal !== "" && trustedTotal === parsed.data.currentTotal),
       );
 
       // Where this customer came from, captured when they arrived and carried
@@ -541,14 +548,19 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           currentTotal={values.currentTotal}
           errors={{ areaId: errors.areaId?.message, currentTotal: errors.currentTotal?.message }}
           hasCheckoutScreenshot={files.checkout !== null}
-          readTotal={readTotals?.finalTotal || null}
+          // Both the hint chip and its "Use this" button offer a figure as
+          // something to trust, same as the silent autofill above - so both
+          // read from trustedTotal, not from whatever final_total happened to
+          // hold. An unsettled total stays visible on the basket-confirm step
+          // (StepBasket, further up, shows every field exactly as read), just
+          // never offered here as an answer.
+          readTotal={trustedTotal || null}
           totalFromCheckout={totalsFromCheckout && checkoutTotals.finalTotal !== ""}
-          prefilledFromScreenshot={readFinalTotal !== "" && values.currentTotal === readFinalTotal}
+          prefilledFromScreenshot={trustedTotal !== "" && values.currentTotal === trustedTotal}
           onAreaChange={(areaId) => setField("areaId", areaId)}
           onCurrentTotalChange={(value) => setField("currentTotal", value)}
           onUseReadTotal={() => {
-            const total = readTotals?.finalTotal;
-            if (total) setField("currentTotal", total);
+            if (trustedTotal) setField("currentTotal", trustedTotal);
           }}
           onContinue={handleWhereContinue}
         />

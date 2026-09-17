@@ -3,6 +3,7 @@ import {
   cartConfirmedShort,
   mergeReadTotals,
   totalsAreSettled,
+  trustedFinalTotal,
 } from "@/components/customer/wizard/types";
 import type { ReadTotals } from "@/components/customer/wizard/types";
 
@@ -102,5 +103,26 @@ describe("cartConfirmedShort", () => {
     expect(
       cartConfirmedShort({ hasCartFile: true, cartReading: false, cartSettled: true }),
     ).toBe(false);
+  });
+});
+
+describe("trustedFinalTotal", () => {
+  it("returns nothing when nothing was read", () => {
+    expect(trustedFinalTotal(null)).toBe("");
+  });
+
+  it("withholds a lone total with no fee or discount beside it", () => {
+    // The exact shape a real customer hit: Keeta's own basket page prints
+    // "Order total AED 71.95" in the same type a payment summary uses, but a
+    // delivery fee is still to be added once you tap through to checkout.
+    // The old code trusted this number anyway, because it only checked that
+    // final_total was non-empty - and then silently filled the customer's
+    // own total field with it, in the same breath the upload screen was
+    // telling them this slot still needed a second look.
+    expect(trustedFinalTotal({ ...EMPTY, finalTotal: "71.95" })).toBe("");
+  });
+
+  it("returns the total once a fee or discount confirms the bill is settled", () => {
+    expect(trustedFinalTotal({ ...EMPTY, finalTotal: "45.90", discount: "7.65" })).toBe("45.90");
   });
 });
