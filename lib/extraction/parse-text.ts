@@ -34,6 +34,14 @@ function westernise(text: string): string {
 /**
  * Words that mean a line is a total or a fee rather than something you eat.
  * English and Arabic, because a Dubai receipt may be in either.
+ *
+ * "saving"/"savings" is deliberately absent from discount. "Saving a total of
+ * AED 68.45" is a loyalty banner stating what the order saved overall, not a
+ * charge line the way "Discount -10.00" is - and a bare "Order total" on a
+ * basket page reading as settled just because a savings banner sat near it is
+ * exactly the false confidence totalsAreSettled (in the customer wizard) exists
+ * to prevent. Add "saving" here only alongside a rule that first confirms the
+ * line is a payment-summary entry, not a banner.
  */
 const KEYWORDS = {
   subtotal: ["subtotal", "sub total", "sub-total", "المجموع الفرعي", "المجموع الجزئي"],
