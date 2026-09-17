@@ -23,6 +23,14 @@ interface StepUploadProps {
   /** `original` is the untouched file, before it was compressed for upload. */
   onCartChange: (file: File | null, original?: File | null) => void;
   onCheckoutChange: (file: File | null, original?: File | null) => void;
+  /**
+   * Fires the instant a file is chosen, ahead of onCartChange/onCheckoutChange
+   * - which wait on the display copy to finish downscaling. The read wants the
+   * original bytes anyway, so starting it here rather than there is most of
+   * where "the emphasis feels slow" actually goes.
+   */
+  onCartPicked: (file: File) => void;
+  onCheckoutPicked: (file: File) => void;
   error: string | null;
   onContinue: () => void;
 }
@@ -68,6 +76,8 @@ export function StepUpload({
   cartConfirmedShort,
   onCartChange,
   onCheckoutChange,
+  onCartPicked,
+  onCheckoutPicked,
   error,
   onContinue,
 }: StepUploadProps) {
@@ -158,6 +168,7 @@ export function StepUpload({
           example="cart"
           file={cartFile}
           onChange={onCartChange}
+          onFilePicked={onCartPicked}
           error={error}
         />
 
@@ -194,6 +205,7 @@ export function StepUpload({
           allowRemove
           file={checkoutFile}
           onChange={onCheckoutChange}
+          onFilePicked={onCheckoutPicked}
         />
       </div>
 

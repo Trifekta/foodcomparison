@@ -36,6 +36,18 @@ interface ImageUploadProps {
    * be done on a JPEG re-encode, which destroys small print and Arabic.
    */
   onChange: (file: File | null, original?: File | null) => void;
+  /**
+   * Fires the moment a valid file is chosen, before downscaling starts.
+   *
+   * The extraction read wants the original bytes anyway - onChange's own
+   * `original` argument - so it has no reason to wait for downscaleImage to
+   * finish resizing and re-encoding a copy it will never use. Downscaling a
+   * multi-megabyte phone screenshot is real canvas work, and stacking it in
+   * front of a network call the customer is already waiting on is latency
+   * with no payoff. This lets the caller start that call immediately, in
+   * parallel with the downscale rather than after it.
+   */
+  onFilePicked?: (file: File) => void;
   error?: string | null;
   /**
    * Drives the pill. Required is red and Optional green, as in the designs;
@@ -74,6 +86,7 @@ export function ImageUpload({
   helper,
   file,
   onChange,
+  onFilePicked,
   error,
   requirement,
   allowRemove = false,
@@ -106,6 +119,9 @@ export function ImageUpload({
       return;
     }
     setLocalError(null);
+    // Before the downscale, not after: the read wants exactly this file, and
+    // has no reason to sit behind canvas work whose output it never sees.
+    onFilePicked?.(candidate);
     setProcessing(true);
     try {
       onChange(await downscaleImage(candidate), candidate);
