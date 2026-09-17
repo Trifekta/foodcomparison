@@ -839,3 +839,59 @@ describe("a cart that prints options under the price", () => {
     expect(basket.items[0].modifiers).toContain("Extra rice, no onion");
   });
 });
+
+/**
+ * A "total" on a basket page is not always the final amount.
+ *
+ * Verbatim tesseract output for a real Keeta basket screen (Burger King - Al
+ * Maqam) - a "Go to checkout" button still on screen, meaning delivery and
+ * service fees have not been added yet. The screen prints "Order total AED
+ * 71.95" in exactly the position a genuine payment summary would, with a
+ * loyalty banner - "Saving a total of AED 68.45" - sitting right beside it.
+ *
+ * Two ways this line could be misread, and both matter downstream in the
+ * customer wizard's totalsAreSettled: reading the savings banner as a
+ * discount would make an unsettled total look settled, and it is the whole
+ * reason "saving" is kept out of the discount keyword list (see KEYWORDS in
+ * parse-text.ts).
+ */
+describe("a Keeta basket screen with a total but no fee breakdown (real)", () => {
+  const KEETA_BURGER_KING = `8:19 ete ié @ Jl 8 al
+« Your order [T]
+Burger King - Al Magam
+Basket
+If anyone eating has an allergy, contact the restaurant >
+Meal for 2 1 +
+Chicken Fries 10 Pcs,
+French Fries Small,
+Whopper, Sprite, Sprite,
+Meal For 2, Whopper,
+French Fries Small
+AED 64 AEB-428
+BBQ Sauce oa +
+© o>
+Rael Hot Sprinkle Sachet 1 +
+LJ
+AED 1
+Any extras?
+> WW
+h J h i
+Order total AED 71.95
+Saving a total of AED 68.45 e
+I O <`;
+
+  it("reads the order total but not the fees that were never shown", () => {
+    const { basket } = parseOcrText(KEETA_BURGER_KING);
+    expect(basket.final_total).toBe("71.95");
+    expect(basket.delivery_fee).toBe("");
+    expect(basket.service_fee).toBe("");
+  });
+
+  it("never reads the savings banner as a discount line", () => {
+    // "Saving a total of AED 68.45" is a loyalty banner, not a payment-summary
+    // discount - reading it as one would make this screen look settled when
+    // it is not, and quietly present 71.95 as the customer's final total.
+    const { basket } = parseOcrText(KEETA_BURGER_KING);
+    expect(basket.discount).toBe("");
+  });
+});
