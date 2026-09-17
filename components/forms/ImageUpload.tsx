@@ -49,6 +49,14 @@ interface ImageUploadProps {
   art?: "cartDoc" | "receipt";
   /** Adds an (i) beside the label, opening a drawing of a good screenshot. */
   example?: ScreenshotExample;
+  /**
+   * A visual nudge, independent of the pill. Draws the eye to a slot that is
+   * still empty and now known to matter, without touching what the pill says -
+   * the wording stays Recommended, because it still is one: nothing here ever
+   * gates Continue, and dressing the slot up as Required in a second color
+   * would say otherwise. Ignored once the slot is filled.
+   */
+  emphasize?: boolean;
 }
 
 /**
@@ -71,6 +79,7 @@ export function ImageUpload({
   allowRemove = false,
   art = "cartDoc",
   example,
+  emphasize: emphasizeProp = false,
 }: ImageUploadProps) {
   const inputId = useId();
   const errorId = `${inputId}-error`;
@@ -107,18 +116,34 @@ export function ImageUpload({
 
   const message = error ?? localError;
   const filled = Boolean(file && previewUrl);
+  // Earned attention, not decoration - only while the caller has flagged it
+  // and the slot is still empty. The moment it is filled, the point is made.
+  const emphasize = emphasizeProp && !filled;
 
   return (
-    <section className="rounded-3xl bg-white p-4 shadow-[0_2px_14px_rgba(23,23,28,0.05)] ring-1 ring-ink-100">
+    <section
+      className={cn(
+        "rounded-3xl bg-white p-4 shadow-[0_2px_14px_rgba(23,23,28,0.05)] ring-1 transition-shadow",
+        emphasize ? "ring-2 ring-flame-300 shadow-[0_2px_18px_rgba(245,109,24,0.18)]" : "ring-ink-100",
+      )}
+    >
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
           className={cn(
-            "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-extrabold",
+            "relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-extrabold",
             filled ? "bg-emerald-500 text-white" : "bg-brand-300 text-ink-900",
           )}
         >
           {filled ? <Check className="h-4 w-4" strokeWidth={3} /> : step}
+          {/* A small pulse, not the whole card - draws the eye without
+              nagging. Gone the instant a file lands, same as the ring. */}
+          {emphasize ? (
+            <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-flame-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-flame-500" />
+            </span>
+          ) : null}
         </span>
 
         <div className="min-w-0 flex-1">

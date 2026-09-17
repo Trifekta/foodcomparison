@@ -172,6 +172,31 @@ export function totalsAreSettled(totals: ReadTotals | null): boolean {
 }
 
 /**
+ * Whether the second upload slot should stop hedging and say so.
+ *
+ * Pulled out of the JSX that reads it for the same reason shouldAutofillTotal
+ * was: it is a decision, not a rendering detail, and a decision is worth
+ * pinning down with a test rather than eyeballed on a screen.
+ *
+ * True only once the cart screenshot has been read in full and it did not
+ * carry a settled bill - an item list with no payment summary under it, the
+ * Deliveroo shape. Before that read finishes, or once it has confirmed the
+ * bill is already settled, there is nothing to escalate: either the question
+ * is still open, or it is already answered the good way.
+ */
+export function cartConfirmedShort(input: {
+  /** Whether a cart screenshot has been chosen at all. */
+  hasCartFile: boolean;
+  /** The cart screenshot is still being read. */
+  cartReading: boolean;
+  /** What that read came back with, once it is done. */
+  cartSettled: boolean;
+}): boolean {
+  if (!input.hasCartFile || input.cartReading) return false;
+  return !input.cartSettled;
+}
+
+/**
  * Whether to put the total read off a screenshot into the field for them.
  *
  * Pulled out of the effect that calls it so the one rule with a decision in it

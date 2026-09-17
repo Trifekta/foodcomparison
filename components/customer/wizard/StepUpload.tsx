@@ -18,6 +18,8 @@ interface StepUploadProps {
   cartReading: boolean;
   /** It carried a printed final total beside its fees - nothing else is needed. */
   cartSettlesTheBill: boolean;
+  /** It was read in full and came back without one - now we know, not guess. */
+  cartConfirmedShort: boolean;
   /** `original` is the untouched file, before it was compressed for upload. */
   onCartChange: (file: File | null, original?: File | null) => void;
   onCheckoutChange: (file: File | null, original?: File | null) => void;
@@ -37,12 +39,21 @@ interface StepUploadProps {
  * one and comparing against an item subtotal is the worse mistake in the other
  * direction.
  *
- * So the second slot is asked for, and then withdrawn. It starts Recommended,
- * because until the first screenshot has been read the odds are simply unknown.
- * The moment that read comes back carrying a total and its fees, the slot drops
- * to Optional and says so: nothing further is needed, and continuing to press
- * for a screen they have already effectively sent is how a person decides this
- * is too much work. It still never gates Continue, in either state.
+ * So the second slot moves in two ways, but only one of them touches what it
+ * says. It starts Recommended, because until the first screenshot has been
+ * read the odds are simply unknown. The moment that read comes back carrying a
+ * total and its fees, the slot drops to Optional and says so: nothing further
+ * is needed, and continuing to press for a screen they have already
+ * effectively sent is how a person decides this is too much work.
+ *
+ * But if that same read comes back and the total is not on it - an item list
+ * with no payment summary under it, the Deliveroo shape - the slot stays
+ * exactly Recommended in what it says, and gets visually louder in how it
+ * says it: a ring, a small pulse. Not a fourth tier next to Required, because
+ * it still is not required - nothing here has ever gated Continue, and a
+ * stronger badge would claim otherwise. The pill's job is to state the rule;
+ * the emphasis's job is only to earn a second look once we know, rather than
+ * guess, that this slot is what completes the comparison.
  *
  * Each slot carries an (i) to a drawing of a good screenshot. Behind an icon
  * rather than on the page: this is where somebody weighs the wait against the
@@ -54,6 +65,7 @@ export function StepUpload({
   checkoutFile,
   cartReading,
   cartSettlesTheBill,
+  cartConfirmedShort,
   onCartChange,
   onCheckoutChange,
   error,
@@ -122,7 +134,9 @@ export function StepUpload({
       <p className="mt-1.5 text-[0.95rem] leading-relaxed text-slate-600">
         {cartSettlesTheBill
           ? "Your screenshot shows the total already — you're set. Add the checkout screen only if you want to."
-          : "Upload your cart screenshot. If your app keeps the total on a separate screen, add that one too."}
+          : cartConfirmedShort
+            ? "Your cart screenshot doesn't show a total — add the checkout screen below for an exact comparison."
+            : "Upload your cart screenshot. If your app keeps the total on a separate screen, add that one too."}
       </p>
 
       {/* Repeated from the landing page on purpose. This is the screen where
@@ -147,26 +161,34 @@ export function StepUpload({
           error={error}
         />
 
-        {/* Withdrawn rather than removed. The slot stays on the screen once the
-            first screenshot has settled the bill, because somebody who took two
-            screenshots before opening this page should still have somewhere to
-            put the second - it just stops being asked for. */}
+        {/* Withdrawn, not just quieted, once the first screenshot settles the
+            bill - the slot stays on the screen but stops being asked for.
+            Confirmed short, the pill still says Recommended; only the
+            emphasize prop changes, because a read that came back with items
+            and no payment summary is the one case here where we know, rather
+            than guess, that this slot is what completes the comparison - and
+            knowing that earns a stronger look, not a stronger rule. */}
         <ImageUpload
           step={2}
           label="Final checkout total"
           hint={
             cartSettlesTheBill
               ? "Already covered by your first screenshot"
-              : "Fees, discounts and final total"
+              : cartConfirmedShort
+                ? "Your total wasn't on the first screenshot"
+                : "Fees, discounts and final total"
           }
           helper={
             cartSettlesTheBill
               ? "Your first screenshot already showed the fees and total, so you can skip this."
-              : cartReading
-                ? "Checking your first screenshot — add this if your total is on a different screen."
-                : "Recommended for the most accurate comparison — this shows your discounts, fees and final total."
+              : cartConfirmedShort
+                ? "We read your cart screenshot but didn't find a total on it — add this one so we compare the right number."
+                : cartReading
+                  ? "Checking your first screenshot — add this if your total is on a different screen."
+                  : "Recommended for the most accurate comparison — this shows your discounts, fees and final total."
           }
           requirement={cartSettlesTheBill ? "optional" : "recommended"}
+          emphasize={cartConfirmedShort}
           art="receipt"
           example="checkout"
           allowRemove

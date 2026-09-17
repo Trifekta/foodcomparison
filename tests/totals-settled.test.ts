@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mergeReadTotals, totalsAreSettled } from "@/components/customer/wizard/types";
+import {
+  cartConfirmedShort,
+  mergeReadTotals,
+  totalsAreSettled,
+} from "@/components/customer/wizard/types";
 import type { ReadTotals } from "@/components/customer/wizard/types";
 
 const EMPTY: ReadTotals = {
@@ -69,5 +73,34 @@ describe("totalsAreSettled", () => {
 
     expect(totalsAreSettled(cart)).toBe(false);
     expect(totalsAreSettled(mergeReadTotals(cart, checkout))).toBe(true);
+  });
+});
+
+describe("cartConfirmedShort", () => {
+  it("stays quiet before anything has been uploaded", () => {
+    expect(
+      cartConfirmedShort({ hasCartFile: false, cartReading: false, cartSettled: false }),
+    ).toBe(false);
+  });
+
+  it("stays quiet while the cart screenshot is still being read", () => {
+    // The question is still open - escalating here would be a guess dressed
+    // up as a finding.
+    expect(
+      cartConfirmedShort({ hasCartFile: true, cartReading: true, cartSettled: false }),
+    ).toBe(false);
+  });
+
+  it("escalates once a finished read comes back without a settled bill", () => {
+    // The Deliveroo shape: items came back, no payment summary did.
+    expect(
+      cartConfirmedShort({ hasCartFile: true, cartReading: false, cartSettled: false }),
+    ).toBe(true);
+  });
+
+  it("stays quiet once the read has already settled the bill", () => {
+    expect(
+      cartConfirmedShort({ hasCartFile: true, cartReading: false, cartSettled: true }),
+    ).toBe(false);
   });
 });
