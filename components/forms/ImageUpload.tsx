@@ -42,19 +42,21 @@ interface ImageUploadProps {
    * Recommended is amber, and is deliberately neither - the checkout shot is
    * not demanded, and calling it optional undersold it to the point that people
    * skipped the one screen the final total actually lives on.
-   *
-   * Needed is flame - stronger than Recommended, short of Required. It is
-   * earned rather than assigned: it only appears once a screenshot has
-   * actually been read and come back without a total, so the app is no longer
-   * guessing this slot might matter, it knows. Still never gates Continue -
-   * "needed" describes the order, not a rule we enforce.
    */
-  requirement: "required" | "optional" | "recommended" | "needed";
+  requirement: "required" | "optional" | "recommended";
   allowRemove?: boolean;
   /** Which supplied render fills the empty dropzone. */
   art?: "cartDoc" | "receipt";
   /** Adds an (i) beside the label, opening a drawing of a good screenshot. */
   example?: ScreenshotExample;
+  /**
+   * A visual nudge, independent of the pill. Draws the eye to a slot that is
+   * still empty and now known to matter, without touching what the pill says -
+   * the wording stays Recommended, because it still is one: nothing here ever
+   * gates Continue, and dressing the slot up as Required in a second color
+   * would say otherwise. Ignored once the slot is filled.
+   */
+  emphasize?: boolean;
 }
 
 /**
@@ -77,6 +79,7 @@ export function ImageUpload({
   allowRemove = false,
   art = "cartDoc",
   example,
+  emphasize: emphasizeProp = false,
 }: ImageUploadProps) {
   const inputId = useId();
   const errorId = `${inputId}-error`;
@@ -113,9 +116,9 @@ export function ImageUpload({
 
   const message = error ?? localError;
   const filled = Boolean(file && previewUrl);
-  // Earned attention, not decoration - only while the slot is both flagged
-  // "needed" and still empty. The moment it is filled, the point is made.
-  const emphasize = requirement === "needed" && !filled;
+  // Earned attention, not decoration - only while the caller has flagged it
+  // and the slot is still empty. The moment it is filled, the point is made.
+  const emphasize = emphasizeProp && !filled;
 
   return (
     <section
@@ -154,16 +157,13 @@ export function ImageUpload({
                 requirement === "required" && "bg-chip-red-bg text-chip-red-fg",
                 requirement === "recommended" && "bg-chip-amber-bg text-chip-amber-fg",
                 requirement === "optional" && "bg-chip-green-bg text-chip-green-fg",
-                requirement === "needed" && "bg-flame-100 text-flame-600",
               )}
             >
               {requirement === "required"
                 ? "Required"
                 : requirement === "recommended"
                   ? "Recommended"
-                  : requirement === "needed"
-                    ? "Needed"
-                    : "Optional"}
+                  : "Optional"}
             </span>
           </div>
           {hint ? <p className="mt-0.5 text-sm leading-snug text-slate-500">{hint}</p> : null}

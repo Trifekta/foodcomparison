@@ -39,18 +39,21 @@ interface StepUploadProps {
  * one and comparing against an item subtotal is the worse mistake in the other
  * direction.
  *
- * So the second slot moves in both directions. It starts Recommended, because
- * until the first screenshot has been read the odds are simply unknown. The
- * moment that read comes back carrying a total and its fees, the slot drops to
- * Optional and says so: nothing further is needed, and continuing to press for
- * a screen they have already effectively sent is how a person decides this is
- * too much work. But if that same read comes back and the total is not on it -
- * an item list with no payment summary under it, the Deliveroo shape - the
- * slot is not left sitting at a generic Recommended: it steps up to Needed,
- * visually louder, because we are no longer hedging against an app we have not
- * identified. We now know this one splits the money onto a second screen. It
- * still never gates Continue, in any state - Needed describes the order, not a
- * rule enforced on them.
+ * So the second slot moves in two ways, but only one of them touches what it
+ * says. It starts Recommended, because until the first screenshot has been
+ * read the odds are simply unknown. The moment that read comes back carrying a
+ * total and its fees, the slot drops to Optional and says so: nothing further
+ * is needed, and continuing to press for a screen they have already
+ * effectively sent is how a person decides this is too much work.
+ *
+ * But if that same read comes back and the total is not on it - an item list
+ * with no payment summary under it, the Deliveroo shape - the slot stays
+ * exactly Recommended in what it says, and gets visually louder in how it
+ * says it: a ring, a small pulse. Not a fourth tier next to Required, because
+ * it still is not required - nothing here has ever gated Continue, and a
+ * stronger badge would claim otherwise. The pill's job is to state the rule;
+ * the emphasis's job is only to earn a second look once we know, rather than
+ * guess, that this slot is what completes the comparison.
  *
  * Each slot carries an (i) to a drawing of a good screenshot. Behind an icon
  * rather than on the page: this is where somebody weighs the wait against the
@@ -158,13 +161,13 @@ export function StepUpload({
           error={error}
         />
 
-        {/* Moves in both directions rather than only ever being withdrawn.
-            Settled: it stays on the screen but stops being asked for, because
-            somebody who took two screenshots before opening this page should
-            still have somewhere to put the second. Confirmed short: it gets
-            louder, because a read that came back with items and no payment
-            summary is the one case here where we know, not guess, that this
-            slot is what completes the comparison. */}
+        {/* Withdrawn, not just quieted, once the first screenshot settles the
+            bill - the slot stays on the screen but stops being asked for.
+            Confirmed short, the pill still says Recommended; only the
+            emphasize prop changes, because a read that came back with items
+            and no payment summary is the one case here where we know, rather
+            than guess, that this slot is what completes the comparison - and
+            knowing that earns a stronger look, not a stronger rule. */}
         <ImageUpload
           step={2}
           label="Final checkout total"
@@ -184,7 +187,8 @@ export function StepUpload({
                   ? "Checking your first screenshot — add this if your total is on a different screen."
                   : "Recommended for the most accurate comparison — this shows your discounts, fees and final total."
           }
-          requirement={cartSettlesTheBill ? "optional" : cartConfirmedShort ? "needed" : "recommended"}
+          requirement={cartSettlesTheBill ? "optional" : "recommended"}
+          emphasize={cartConfirmedShort}
           art="receipt"
           example="checkout"
           allowRemove
