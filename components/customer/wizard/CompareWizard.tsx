@@ -509,19 +509,22 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           cartReading={cartReading}
           cartSettlesTheBill={cartSettled}
           cartConfirmedShort={cartIsConfirmedShort}
-          onCartChange={(file: File | null, original?: File | null) => {
+          onCartChange={(file: File | null) => {
             setFiles((current) => ({ ...current, cart: file }));
             setCartError(null);
-            // Read the original, not the compressed upload: JPEG artifacts on
-            // small text cost far more accuracy than the extra pixels cost time.
-            if (file) startRead(original ?? file, "cart");
-            else clearRead("cart");
+            if (!file) clearRead("cart");
           }}
-          onCheckoutChange={(file: File | null, original?: File | null) => {
+          onCheckoutChange={(file: File | null) => {
             setFiles((current) => ({ ...current, checkout: file }));
-            if (file) startRead(original ?? file, "checkout");
-            else clearRead("checkout");
+            if (!file) clearRead("checkout");
           }}
+          // Fired the instant a file is picked, ahead of the display copy's
+          // downscale - see onFilePicked on ImageUpload. Reads the original,
+          // not the compressed upload: JPEG artifacts on small text cost far
+          // more accuracy than the extra pixels cost time, and that copy is
+          // not even ready yet at this point.
+          onCartPicked={(file) => startRead(file, "cart")}
+          onCheckoutPicked={(file) => startRead(file, "checkout")}
           error={cartError}
           onContinue={handleUploadContinue}
         />
