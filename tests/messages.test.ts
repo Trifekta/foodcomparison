@@ -309,8 +309,11 @@ describe("the new-customer-discount note", () => {
     expect(message).toContain(NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE);
   });
 
-  it("never states a discount percentage - that figure isn't confirmed", () => {
-    expect(NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE).not.toMatch(/%|\bpercent\b/i);
-    expect(NEW_CUSTOMER_DISCOUNT_BELOW_MINIMUM_NOTE).not.toMatch(/%|\bpercent\b/i);
+  it("states the real figures off the Keeta coupon, not a guess", () => {
+    // "50% off 1st order - Min. order AED 45; Save up to AED 25" - copied
+    // from the coupon itself, not invented.
+    expect(NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE).toContain("50%");
+    expect(NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE).toContain("AED 25.00");
+    expect(NEW_CUSTOMER_DISCOUNT_BELOW_MINIMUM_NOTE).toContain("50%");
   });
 });

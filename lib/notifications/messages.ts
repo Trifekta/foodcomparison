@@ -1,4 +1,12 @@
-import { BRAND_NAME, COMPARISON_APP, LEGACY_OTHER_APP, NEW_CUSTOMER_DISCOUNT_MIN_AED, UNKNOWN_SOURCE_APP } from "@/lib/constants";
+import {
+  BRAND_NAME,
+  COMPARISON_APP,
+  LEGACY_OTHER_APP,
+  NEW_CUSTOMER_DISCOUNT_MAX_AED,
+  NEW_CUSTOMER_DISCOUNT_MIN_AED,
+  NEW_CUSTOMER_DISCOUNT_PERCENTAGE,
+  UNKNOWN_SOURCE_APP,
+} from "@/lib/constants";
 import { calculateSaving } from "@/lib/calculations/saving";
 import { formatMinorAsCurrency, parseAmountToMinor } from "@/lib/calculations/money";
 import { newCustomerDiscountStatus } from "@/lib/calculations/new-customer-discount";
@@ -55,16 +63,20 @@ export const UNVERIFIED_TOTAL_NOTE =
  *
  * Said either way, not just the good news - a customer who told us they're
  * new to Keeta and then hears nothing back about it has no way to tell "you
- * don't qualify" from "we forgot to check." No percentage is stated anywhere
- * in either string: that figure is Keeta's own and is not confirmed at this
- * app's end, so naming one here would be a guess dressed up as a fact.
+ * don't qualify" from "we forgot to check." The figures themselves - 50%,
+ * capped at AED 25, on orders of AED 45 or more - are copied from a real
+ * Keeta coupon ("50% off 1st order - Min. order AED 45; Save up to AED 25"),
+ * not a guess: see NEW_CUSTOMER_DISCOUNT_PERCENTAGE and
+ * NEW_CUSTOMER_DISCOUNT_MAX_AED in lib/constants.ts if Keeta changes them.
  */
 export const NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE =
-  `You told us you're new to Keeta — orders there of ${formatMinorAsCurrency(
+  `You told us you're new to Keeta — first orders there of ${formatMinorAsCurrency(
     NEW_CUSTOMER_DISCOUNT_MIN_AED * 100,
-  )} or more can come with a new-customer discount, and this one clears it. Keeta will show the exact amount at checkout.`;
+  )} or more get ${NEW_CUSTOMER_DISCOUNT_PERCENTAGE}% off, up to ${formatMinorAsCurrency(
+    NEW_CUSTOMER_DISCOUNT_MAX_AED * 100,
+  )}, and this one clears it. Keeta will show the exact amount at checkout.`;
 export const NEW_CUSTOMER_DISCOUNT_BELOW_MINIMUM_NOTE =
-  `You told us you're new to Keeta — their new-customer discount needs an order of at least ${formatMinorAsCurrency(
+  `You told us you're new to Keeta — their ${NEW_CUSTOMER_DISCOUNT_PERCENTAGE}% new-customer discount needs an order of at least ${formatMinorAsCurrency(
     NEW_CUSTOMER_DISCOUNT_MIN_AED * 100,
   )}, so it won't apply to this one.`;
 

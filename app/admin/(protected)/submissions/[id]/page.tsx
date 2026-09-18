@@ -184,10 +184,10 @@ export default async function SubmissionDetailPage({
                 }
               />
               {/* Said out loud, not just carried in the data: Keeta runs its
-                  own new-customer discount with a minimum order, and a
-                  submission flagged here is one worth pricing with that in
-                  mind. The exact discount is Keeta's own and confirmed at
-                  their end, not stated here. */}
+                  own new-customer discount (50% off, up to AED 25, on orders
+                  of AED 45 or more - see NEW_CUSTOMER_DISCOUNT_PERCENTAGE in
+                  lib/constants.ts), and a submission flagged here is one
+                  worth pricing with that in mind. */}
               <Row
                 label="New to Keeta"
                 value={

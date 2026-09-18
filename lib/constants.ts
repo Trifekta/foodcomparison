@@ -185,15 +185,14 @@ export const MAX_TOTAL_AED = 5000;
 export const CURRENCY = "AED";
 
 /**
- * Keeta's own minimum order for its new-customer discount.
- *
- * The percentage itself is Keeta's, set at their end, and is not confirmed
- * here - only this minimum is fixed. Nothing in this codebase states a
- * discount percentage until a real, confirmed figure replaces this comment;
- * an invented number would be worse than none. See
- * lib/calculations/new-customer-discount.ts.
+ * Keeta's new-customer discount, as it actually appears in the app: "50% off
+ * 1st order - Min. order AED 45; Save up to AED 25 - 50% OFF New User Gift."
+ * Confirmed by a real coupon screenshot, not carried over from an earlier
+ * guess. See lib/calculations/new-customer-discount.ts.
  */
 export const NEW_CUSTOMER_DISCOUNT_MIN_AED = 45;
+export const NEW_CUSTOMER_DISCOUNT_PERCENTAGE = 50;
+export const NEW_CUSTOMER_DISCOUNT_MAX_AED = 25;
 
 /**
  * How long uploaded screenshots should be kept. Deletion is not automated in the
