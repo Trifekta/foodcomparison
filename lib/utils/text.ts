@@ -57,3 +57,27 @@ export function formatDubaiDate(value: string | Date): string {
     year: "numeric",
   }).format(date);
 }
+
+/**
+ * "3 min ago", for a live view read at a glance rather than looked up.
+ *
+ * Computed once at render time, which is enough on a page that re-fetches on
+ * its own interval (the admin's live view) - unlike a page left open for
+ * hours, this one is never stale for longer than that interval.
+ */
+export function formatRelativeTime(value: string | Date, now: number = Date.now()): string {
+  const then = typeof value === "string" ? Date.parse(value) : value.getTime();
+  const seconds = Math.max(0, Math.round((now - then) / 1000));
+
+  if (seconds < 10) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
+}

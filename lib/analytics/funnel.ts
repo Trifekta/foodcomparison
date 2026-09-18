@@ -28,6 +28,11 @@ export function isFunnelEvent(value: string): value is FunnelEvent {
   return EVENTS.has(value);
 }
 
+/** A step's label, for anywhere that only has the event name - the live view included. */
+export const FUNNEL_STEP_LABELS: Record<string, string> = Object.fromEntries(
+  FUNNEL_STEPS.map((step) => [step.event, step.label]),
+);
+
 /** Matches the database's own check, so a bad id is refused before the query. */
 export const VISIT_ID_PATTERN = /^[0-9a-f]{16,32}$/;
 
