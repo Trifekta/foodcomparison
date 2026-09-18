@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  NEW_CUSTOMER_DISCOUNT_BELOW_MINIMUM_NOTE,
+  NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE,
   UNVERIFIED_TOTAL_NOTE,
   buildResultMessage,
   buildUnavailableMessage,
@@ -14,6 +16,7 @@ describe("buildResultMessage", () => {
       currentTotal: "82.00",
       comparisonTotal: "63.00",
       totalsConfirmed: true,
+      newToKeeta: false,
     });
 
     expect(result.hasSaving).toBe(true);
@@ -37,6 +40,7 @@ describe("buildResultMessage", () => {
       currentTotal: "82.00",
       comparisonTotal: "63.00",
       totalsConfirmed: true,
+      newToKeeta: false,
     });
     expect(message.toLowerCase()).not.toContain("guarantee");
   });
@@ -47,6 +51,7 @@ describe("buildResultMessage", () => {
       currentTotal: "65.00",
       comparisonTotal: "66.50",
       totalsConfirmed: true,
+      newToKeeta: false,
     });
 
     expect(result.hasSaving).toBe(false);
@@ -66,6 +71,7 @@ describe("buildResultMessage", () => {
         currentTotal: "50.00",
         comparisonTotal: "50.00",
         totalsConfirmed: true,
+        newToKeeta: false,
       }).hasSaving,
     ).toBe(false);
   });
@@ -76,6 +82,7 @@ describe("buildResultMessage", () => {
       currentTotal: "50.00",
       comparisonTotal: "54.00",
       totalsConfirmed: true,
+      newToKeeta: false,
     });
     expect(result.hasSaving).toBe(false);
     expect(result.message).toContain("Keeta checked:");
@@ -88,6 +95,7 @@ describe("buildResultMessage", () => {
       currentTotal: "40.00",
       comparisonTotal: "35.00",
       totalsConfirmed: true,
+      newToKeeta: false,
     });
     expect(message).toContain("Smiles — AED 40.00");
   });
@@ -108,6 +116,7 @@ describe("delivery links", () => {
       currentTotal: "82.00",
       comparisonTotal: "63.00",
       totalsConfirmed: true,
+      newToKeeta: false,
     });
     const link = buildWhatsAppLink("+971501234567", message);
     expect(decodeURIComponent(link.split("?text=")[1])).toBe(message);
@@ -143,13 +152,13 @@ describe("the result link in a message", () => {
     currentTotal: "34.65",
     comparisonTotal: "29.00",
     totalsConfirmed: true,
+    newToKeeta: false,
   };
 
   it("sends the customer back to their own result page", () => {
     const { message } = buildResultMessage({
       ...base,
       resultUrl: "https://snipsavor.example/r/0123456789abcdef0123456789abcdef",
-      totalsConfirmed: true,
     });
     expect(message).toContain("https://snipsavor.example/r/0123456789abcdef0123456789abcdef");
   });
@@ -210,6 +219,7 @@ describe("a comparison whose fees were never shown", () => {
     sourceAppLabel: "Talabat",
     currentTotal: "133.40",
     comparisonTotal: "120.00",
+    newToKeeta: false,
   };
 
   it("says nothing extra when a screenshot settled the bill", () => {
@@ -244,5 +254,63 @@ describe("a comparison whose fees were never shown", () => {
   it("keeps the sign-off last, so the caveat does not end the message", () => {
     const { message } = buildResultMessage({ ...base, totalsConfirmed: false });
     expect(message.trimEnd().endsWith("— SnipSavor")).toBe(true);
+  });
+});
+
+/**
+ * Keeta's new-customer discount, checked against the price the admin found
+ * (not what the customer typed) once they said yes on step 3.
+ */
+describe("the new-customer-discount note", () => {
+  const base = {
+    sourceAppLabel: "Talabat",
+    currentTotal: "133.40",
+    totalsConfirmed: true,
+  };
+
+  it("says nothing when they never said they were new to Keeta", () => {
+    const { message } = buildResultMessage({ ...base, comparisonTotal: "60.00", newToKeeta: false });
+    expect(message).not.toContain(NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE);
+    expect(message).not.toContain(NEW_CUSTOMER_DISCOUNT_BELOW_MINIMUM_NOTE);
+  });
+
+  it("says they qualify once the Keeta price clears the minimum", () => {
+    const { message } = buildResultMessage({ ...base, comparisonTotal: "45.00", newToKeeta: true });
+    expect(message).toContain(NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE);
+  });
+
+  it("says they don't qualify when the Keeta price is under the minimum", () => {
+    const { message } = buildResultMessage({ ...base, comparisonTotal: "44.99", newToKeeta: true });
+    expect(message).toContain(NEW_CUSTOMER_DISCOUNT_BELOW_MINIMUM_NOTE);
+  });
+
+  it("is checked against the Keeta price, not the total they typed", () => {
+    // currentTotal is well over the minimum here; comparisonTotal is not -
+    // and it's the Keeta order the discount minimum belongs to.
+    const { message } = buildResultMessage({
+      sourceAppLabel: "Talabat",
+      currentTotal: "200.00",
+      comparisonTotal: "30.00",
+      totalsConfirmed: true,
+      newToKeeta: true,
+    });
+    expect(message).toContain(NEW_CUSTOMER_DISCOUNT_BELOW_MINIMUM_NOTE);
+  });
+
+  it("says so on the no-saving message too", () => {
+    const { message } = buildResultMessage({
+      sourceAppLabel: "Talabat",
+      currentTotal: "40.00",
+      comparisonTotal: "45.00",
+      totalsConfirmed: true,
+      newToKeeta: true,
+    });
+    expect(message).toContain("Your current option appears better right now.");
+    expect(message).toContain(NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE);
+  });
+
+  it("never states a discount percentage - that figure isn't confirmed", () => {
+    expect(NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE).not.toMatch(/%|\bpercent\b/i);
+    expect(NEW_CUSTOMER_DISCOUNT_BELOW_MINIMUM_NOTE).not.toMatch(/%|\bpercent\b/i);
   });
 });

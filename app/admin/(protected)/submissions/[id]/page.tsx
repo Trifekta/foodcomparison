@@ -183,6 +183,23 @@ export default async function SubmissionDetailPage({
                   </span>
                 }
               />
+              {/* Said out loud, not just carried in the data: Keeta runs its
+                  own new-customer discount with a minimum order, and a
+                  submission flagged here is one worth pricing with that in
+                  mind. The exact discount is Keeta's own and confirmed at
+                  their end, not stated here. */}
+              <Row
+                label="New to Keeta"
+                value={
+                  submission.new_to_keeta ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-chip-green-bg px-2.5 py-0.5 text-xs font-bold text-chip-green-fg">
+                      Yes — check the new-customer discount
+                    </span>
+                  ) : (
+                    "No"
+                  )
+                }
+              />
               <Row
                 label="Contact"
                 value={

@@ -73,6 +73,8 @@ export interface PublicResult {
    * those customers were being warned about something they had plainly sent.
    */
   totalsConfirmed: boolean;
+  /** Whether the customer told us, on step 3, that they're new to Keeta. */
+  newToKeeta: boolean;
   createdAt: string;
 }
 
@@ -107,7 +109,7 @@ export async function getPublicResult(token: string): Promise<PublicResult | nul
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, reference_number, status, restaurant_name, current_total, comparison_app, comparison_total, saving_amount, saving_percentage, comparison_url, redirect_token, unavailable_reason, created_at, totals_confirmed",
+      "id, reference_number, status, restaurant_name, current_total, comparison_app, comparison_total, saving_amount, saving_percentage, comparison_url, redirect_token, unavailable_reason, created_at, totals_confirmed, new_to_keeta",
     )
     .eq("result_token", token)
     .maybeSingle();
@@ -160,6 +162,7 @@ export async function getPublicResult(token: string): Promise<PublicResult | nul
         : null,
     items,
     totalsConfirmed: row.totals_confirmed,
+    newToKeeta: row.new_to_keeta,
     createdAt: row.created_at,
   };
 }

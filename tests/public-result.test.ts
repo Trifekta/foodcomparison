@@ -54,6 +54,7 @@ function row(overrides: Record<string, unknown> = {}) {
     comparison_url: "https://keeta.example/restaurant/123",
     redirect_token: "b7d1c0a94e3f42a8b1d6e5f0c2a37948",
     created_at: "2026-09-10T10:15:00.000Z",
+    new_to_keeta: false,
     ...overrides,
   };
 }
@@ -218,5 +219,13 @@ describe("getPublicResult", () => {
   it("explains a cancelled request rather than leaving it spinning", async () => {
     submission = row({ status: "cancelled" });
     expect((await getPublicResult(TOKEN))?.state).toBe("cancelled");
+  });
+
+  it("carries whether they said they were new to Keeta", async () => {
+    submission = row({ new_to_keeta: true });
+    expect((await getPublicResult(TOKEN))?.newToKeeta).toBe(true);
+
+    submission = row({ new_to_keeta: false });
+    expect((await getPublicResult(TOKEN))?.newToKeeta).toBe(false);
   });
 });

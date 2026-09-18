@@ -374,7 +374,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   };
 
   const handleWhereContinue = () => {
-    if (validateStep(whereStepSchema, ["areaId", "currentTotal"])) goTo(STEP_REVIEW);
+    if (validateStep(whereStepSchema, ["areaId", "currentTotal", "newToKeeta"])) goTo(STEP_REVIEW);
   };
 
   const handleSubmit = async () => {
@@ -396,7 +396,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       // Contact is asked on this screen, so a contact problem stays here.
       const bad = parsed.error.issues[0]?.path[0];
       if (bad === "restaurantName") goTo(STEP_BASKET);
-      else if (bad === "areaId" || bad === "currentTotal") goTo(STEP_WHERE);
+      else if (bad === "areaId" || bad === "currentTotal" || bad === "newToKeeta") goTo(STEP_WHERE);
       return;
     }
 
@@ -549,7 +549,12 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           areas={areas}
           areaId={values.areaId}
           currentTotal={values.currentTotal}
-          errors={{ areaId: errors.areaId?.message, currentTotal: errors.currentTotal?.message }}
+          newToKeeta={values.newToKeeta}
+          errors={{
+            areaId: errors.areaId?.message,
+            currentTotal: errors.currentTotal?.message,
+            newToKeeta: errors.newToKeeta?.message,
+          }}
           hasCheckoutScreenshot={files.checkout !== null}
           // Both the hint chip and its "Use this" button offer a figure as
           // something to trust, same as the silent autofill above - so both
@@ -562,6 +567,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           prefilledFromScreenshot={trustedTotal !== "" && values.currentTotal === trustedTotal}
           onAreaChange={(areaId) => setField("areaId", areaId)}
           onCurrentTotalChange={(value) => setField("currentTotal", value)}
+          onNewToKeetaChange={(value) => setField("newToKeeta", value)}
           onUseReadTotal={() => {
             if (trustedTotal) setField("currentTotal", trustedTotal);
           }}

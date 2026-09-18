@@ -67,6 +67,12 @@ export const WIZARD_DEFAULTS: WizardValues = {
   restaurantName: "",
   areaId: "",
   currentTotal: "",
+  // Blank, not "no" - the schema's "yes" | "no" has no room for "not yet
+  // answered", the same way areaId's uuid type has no room for "not yet
+  // picked". The cast is what areaId gets for free from z.uuid() inferring to
+  // plain string; an enum's literal union needs it said explicitly. Either
+  // way "" fails validation and the wizard will not advance past it silently.
+  newToKeeta: "" as WizardValues["newToKeeta"],
   dialCode: "+971",
   whatsappNumber: "",
   marketingConsent: false,
