@@ -55,6 +55,21 @@ const PROBES: MigrationProbe[] = [
     column: "utm_campaign",
     breaks: "recording which advert a customer came from, all the way to the Keeta switch",
   },
+  {
+    file: "0018_totals_confirmed.sql",
+    column: "totals_confirmed",
+    breaks: "submitting an order, and the unverified-total caveat on the result",
+  },
+  {
+    // Missing here is what actually happened: a customer's submission failed
+    // with the generic "we couldn't submit your order" message the moment
+    // this column started being written on every insert, and nothing on the
+    // dashboard said why - the exact failure this file exists to turn into a
+    // sentence instead.
+    file: "0019_new_to_keeta.sql",
+    column: "new_to_keeta",
+    breaks: "submitting an order, and the new-customer-discount note on the result",
+  },
 ];
 
 /**
