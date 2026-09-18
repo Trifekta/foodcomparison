@@ -73,6 +73,7 @@ function formData(overrides: Record<string, string> = {}): FormData {
     restaurantName: "Al Safadi",
     areaId: AREA_ID,
     currentTotal: "82.00",
+    newToKeeta: "no",
     contactType: "whatsapp",
     dialCode: "+971",
     whatsappNumber: "501234567",
@@ -124,6 +125,22 @@ describe("createSubmission", () => {
     const result = await createSubmission(formData({ sourceApp: "Talabat" }));
     expect(result.ok).toBe(true);
     expect(submissionRow().source_app).toBe("Unknown");
+  });
+
+  it("stores yes as true", async () => {
+    expect((await createSubmission(formData({ newToKeeta: "yes" }))).ok).toBe(true);
+    expect(submissionRow().new_to_keeta).toBe(true);
+  });
+
+  it("stores no as false", async () => {
+    expect((await createSubmission(formData({ newToKeeta: "no" }))).ok).toBe(true);
+    expect(submissionRow().new_to_keeta).toBe(false);
+  });
+
+  it("rejects a submission where the question was never answered", async () => {
+    const result = await createSubmission(formData({ newToKeeta: "" }));
+    expect(result.ok).toBe(false);
+    expect(result.ok ? null : result.field).toBe("newToKeeta");
   });
 
   it("tells the admin, because nobody watches a dashboard", async () => {

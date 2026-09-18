@@ -1,20 +1,24 @@
 "use client";
 
-import { Info, MapPin, ScanLine } from "lucide-react";
+import { Gift, Info, MapPin, ScanLine } from "lucide-react";
 import type { PublicArea } from "@/types/database";
 import { CURRENCY } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
+import { FieldError } from "@/components/ui/FieldError";
 import { StepActions } from "./StepActions";
 import { AmountInput } from "@/components/forms/AmountInput";
 import { AreaCombobox } from "@/components/forms/AreaCombobox";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble } from "@/components/customer/Motifs";
+import { cn } from "@/lib/utils/cn";
 
 interface StepWhereAndTotalProps {
   areas: PublicArea[];
   areaId: string;
   currentTotal: string;
-  errors: { areaId?: string; currentTotal?: string };
+  /** "yes" | "no" | "" - blank until answered, same as areaId and currentTotal. */
+  newToKeeta: string;
+  errors: { areaId?: string; currentTotal?: string; newToKeeta?: string };
   hasCheckoutScreenshot: boolean;
   /** The total read off the screenshots, if one was found. */
   readTotal: string | null;
@@ -24,6 +28,7 @@ interface StepWhereAndTotalProps {
   prefilledFromScreenshot: boolean;
   onAreaChange: (areaId: string) => void;
   onCurrentTotalChange: (value: string) => void;
+  onNewToKeetaChange: (value: "yes" | "no") => void;
   onUseReadTotal: () => void;
   onContinue: () => void;
 }
@@ -43,6 +48,7 @@ export function StepWhereAndTotal({
   areas,
   areaId,
   currentTotal,
+  newToKeeta,
   errors,
   hasCheckoutScreenshot,
   readTotal,
@@ -50,6 +56,7 @@ export function StepWhereAndTotal({
   prefilledFromScreenshot,
   onAreaChange,
   onCurrentTotalChange,
+  onNewToKeetaChange,
   onUseReadTotal,
   onContinue,
 }: StepWhereAndTotalProps) {
@@ -118,6 +125,45 @@ export function StepWhereAndTotal({
                product can give, and one line prevents most of them. */
             hint="Where the food is going — not where you are right now."
           />
+        </div>
+
+        {/* New to Keeta - asked here rather than on its own screen, for the
+            same reason area and total share this one: it changes what the
+            admin should expect to find, so it belongs with the other two
+            things that shape the comparison, not after it. */}
+        <div className="rounded-3xl bg-linear-to-b from-brand-100 to-beige p-3.5">
+          <div className="mb-2.5 flex items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-300"
+            >
+              <Gift className="h-4.5 w-4.5 text-ink-900" />
+            </span>
+            <span className="text-[1.02rem] font-extrabold text-ink-900">New to Keeta?</span>
+          </div>
+          <p className="mb-2.5 text-sm leading-snug text-slate-600">
+            First orders on Keeta can come with a discount — we&apos;ll check if yours
+            qualifies once we have a price.
+          </p>
+          <div className="flex gap-2.5" role="group" aria-label="Are you new to Keeta?">
+            {(["yes", "no"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={newToKeeta === option}
+                onClick={() => onNewToKeetaChange(option)}
+                className={cn(
+                  "min-h-11 flex-1 rounded-full text-sm font-bold capitalize transition-colors",
+                  newToKeeta === option
+                    ? "bg-ink-900 text-white"
+                    : "bg-white text-ink-700 ring-1 ring-ink-200 hover:bg-ink-50",
+                )}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+          <FieldError id="new-to-keeta-error" message={errors.newToKeeta} />
         </div>
 
         {/* Final total */}

@@ -25,6 +25,7 @@ export const ERROR_MESSAGES = {
   restaurantTooLong: `Keep the restaurant name under ${MAX_RESTAURANT_NAME_LENGTH} characters.`,
   itemsInvalid: "Please check the items you added.",
   areaMissing: "Please select your Dubai area.",
+  newToKeetaMissing: "Please tell us if you're new to Keeta.",
   invalidTotal: "Enter the final amount you would pay.",
   totalTooHigh: `Enter an amount under AED ${MAX_TOTAL_AED.toLocaleString("en-AE")}.`,
   contactMissing: "Please tell us where to send your result.",
@@ -86,6 +87,16 @@ const baseFields = {
     .max(MAX_RESTAURANT_NAME_LENGTH, ERROR_MESSAGES.restaurantTooLong),
   areaId: z.uuid({ message: ERROR_MESSAGES.areaMissing }),
   currentTotal: amountSchema,
+  /**
+   * Asked alongside area and total on the same step, because it changes what
+   * the admin should expect when pricing the comparison - Keeta's own
+   * new-customer discount has a minimum order, checked once the admin has a
+   * real Keeta price. No default: an unanswered question is a validation
+   * error here, not a silent "no" - the wizard's own default value ("") is
+   * deliberately outside this type and only ever reaches the server if
+   * validation is bypassed entirely, which the server re-checks anyway.
+   */
+  newToKeeta: z.enum(["yes", "no"], { message: ERROR_MESSAGES.newToKeetaMissing }),
   dialCode: z.string(),
   whatsappNumber: z.string(),
   marketingConsent: z.boolean(),
@@ -95,6 +106,7 @@ type BaseValues = {
   restaurantName: string;
   areaId: string;
   currentTotal: string;
+  newToKeeta: "yes" | "no";
   dialCode: string;
   whatsappNumber: string;
   marketingConsent: boolean;
@@ -145,6 +157,7 @@ export const basketStepSchema = z.object({ restaurantName: baseFields.restaurant
 export const whereStepSchema = z.object({
   areaId: baseFields.areaId,
   currentTotal: amountSchema,
+  newToKeeta: baseFields.newToKeeta,
 });
 
 export const contactStepSchema = z

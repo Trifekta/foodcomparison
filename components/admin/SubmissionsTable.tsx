@@ -1,10 +1,29 @@
 import Link from "next/link";
-import { Mail, MessageCircle } from "lucide-react";
+import { Gift, Mail, MessageCircle } from "lucide-react";
 import type { SubmissionListRow } from "@/lib/admin/queries";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDecimalStringAsCurrency, formatPercentage } from "@/lib/calculations/money";
 import { formatDubaiTime } from "@/lib/utils/text";
 import { SubmissionRowActions } from "@/components/admin/SubmissionRowActions";
+
+/**
+ * A small flag beside the reference, not a whole extra column - the table
+ * already runs nine wide, and this is a "worth a glance" signal, not
+ * something worth its own header. Title text carries the full sentence for
+ * anyone who hovers; the icon alone is for scanning the queue at a glance.
+ */
+function NewToKeetaFlag({ row }: { row: SubmissionListRow }) {
+  if (!row.new_to_keeta) return null;
+  return (
+    <span
+      title="New to Keeta — check the new-customer discount"
+      className="ml-1.5 inline-flex align-text-bottom text-chip-green-fg"
+    >
+      <Gift aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+      <span className="sr-only">New to Keeta</span>
+    </span>
+  );
+}
 
 function appLabel(row: SubmissionListRow): string {
   return row.source_app === "Other" && row.source_app_other
@@ -56,7 +75,10 @@ export function SubmissionsTable({ rows }: { rows: SubmissionListRow[] }) {
           <li key={row.id} className="rounded-2xl border border-ink-200 bg-white p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-semibold tabular-nums text-ink-900">{row.reference_number}</p>
+                <p className="font-semibold tabular-nums text-ink-900">
+                  {row.reference_number}
+                  <NewToKeetaFlag row={row} />
+                </p>
                 <p className="mt-0.5 text-xs text-ink-500">
                   {formatDubaiTime(row.created_at)} · {row.areas?.name ?? "—"}
                 </p>
@@ -128,6 +150,7 @@ export function SubmissionsTable({ rows }: { rows: SubmissionListRow[] }) {
             <tr key={row.id} className="hover:bg-brand-50/40">
               <td className="px-4 py-3 font-semibold tabular-nums text-ink-900">
                 {row.reference_number}
+                <NewToKeetaFlag row={row} />
               </td>
               <td className="px-4 py-3 whitespace-nowrap text-ink-600">
                 {formatDubaiTime(row.created_at)}

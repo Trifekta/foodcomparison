@@ -38,7 +38,7 @@ export interface SubmissionFilters {
 }
 
 const LIST_COLUMNS =
-  "id, reference_number, created_at, status, source_app, source_app_other, current_total, comparison_total, saving_amount, saving_percentage, contact_type, area_id, archived_at, areas(id, name)";
+  "id, reference_number, created_at, status, source_app, source_app_other, current_total, comparison_total, saving_amount, saving_percentage, contact_type, area_id, archived_at, new_to_keeta, areas(id, name)";
 
 export interface SubmissionListRow {
   id: string;
@@ -54,6 +54,8 @@ export interface SubmissionListRow {
   contact_type: "whatsapp" | "email";
   area_id: string | null;
   archived_at: string | null;
+  /** Said yes on step 3 - worth pricing with Keeta's new-customer discount in mind. */
+  new_to_keeta: boolean;
   areas: { id: string; name: string } | null;
 }
 

@@ -159,7 +159,7 @@ async function loadSubmission(id: string) {
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, status, source_app, source_app_other, current_total, comparison_total, comparison_app, contact_type, whatsapp_number, email, reference_number, restaurant_name, result_message, result_token, totals_confirmed",
+      "id, status, source_app, source_app_other, current_total, comparison_total, comparison_app, contact_type, whatsapp_number, email, reference_number, restaurant_name, result_message, result_token, totals_confirmed, new_to_keeta",
     )
     .eq("id", id)
     .maybeSingle<
@@ -180,6 +180,7 @@ async function loadSubmission(id: string) {
         | "reference_number"
         | "result_message"
         | "totals_confirmed"
+        | "new_to_keeta"
       >
     >();
 
@@ -279,6 +280,7 @@ export async function saveComparison(formData: FormData): Promise<ActionResult> 
       // stay put. It is not a count of files: one Talabat cart screenshot
       // settles the bill, and two Deliveroo screens are what it takes there.
       totalsConfirmed: submission.totals_confirmed,
+      newToKeeta: submission.new_to_keeta,
     });
 
     const supabase = await createServerSupabaseClient();

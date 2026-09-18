@@ -1,6 +1,7 @@
-import { BRAND_NAME, COMPARISON_APP, LEGACY_OTHER_APP, UNKNOWN_SOURCE_APP } from "@/lib/constants";
+import { BRAND_NAME, COMPARISON_APP, LEGACY_OTHER_APP, NEW_CUSTOMER_DISCOUNT_MIN_AED, UNKNOWN_SOURCE_APP } from "@/lib/constants";
 import { calculateSaving } from "@/lib/calculations/saving";
 import { formatMinorAsCurrency, parseAmountToMinor } from "@/lib/calculations/money";
+import { newCustomerDiscountStatus } from "@/lib/calculations/new-customer-discount";
 
 /**
  * Customer result message templates.
@@ -49,6 +50,24 @@ export function sourceAppLabel(source: {
 export const UNVERIFIED_TOTAL_NOTE =
   "We compared against the total you entered. We couldn't see the fees and discounts on your screenshot, so your actual saving may differ.";
 
+/**
+ * The new-customer-discount note, both directions.
+ *
+ * Said either way, not just the good news - a customer who told us they're
+ * new to Keeta and then hears nothing back about it has no way to tell "you
+ * don't qualify" from "we forgot to check." No percentage is stated anywhere
+ * in either string: that figure is Keeta's own and is not confirmed at this
+ * app's end, so naming one here would be a guess dressed up as a fact.
+ */
+export const NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE =
+  `You told us you're new to Keeta — orders there of ${formatMinorAsCurrency(
+    NEW_CUSTOMER_DISCOUNT_MIN_AED * 100,
+  )} or more can come with a new-customer discount, and this one clears it. Keeta will show the exact amount at checkout.`;
+export const NEW_CUSTOMER_DISCOUNT_BELOW_MINIMUM_NOTE =
+  `You told us you're new to Keeta — their new-customer discount needs an order of at least ${formatMinorAsCurrency(
+    NEW_CUSTOMER_DISCOUNT_MIN_AED * 100,
+  )}, so it won't apply to this one.`;
+
 export interface ResultMessageInput {
   sourceAppLabel: string;
   currentTotal: string;
@@ -63,6 +82,8 @@ export interface ResultMessageInput {
    * message, and that is not a decision to make by omission.
    */
   totalsConfirmed: boolean;
+  /** Whether the customer told us, on step 3, that they're new to Keeta. */
+  newToKeeta: boolean;
 }
 
 export interface GeneratedResult {
@@ -115,6 +136,17 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
   const currentLine = `${input.sourceAppLabel} — ${formatMinorAsCurrency(currentMinor)}`;
   const comparisonLine = `${comparisonApp} — ${formatMinorAsCurrency(comparisonMinor)}`;
 
+  // Checked against the Keeta price, not what they typed - the discount is
+  // Keeta's own new-customer offer, so it's the Keeta order that has to clear
+  // the minimum. "not_new" means they never said yes, and adds nothing here.
+  const discountStatus = newCustomerDiscountStatus(input.newToKeeta, input.comparisonTotal);
+  const discountNote =
+    discountStatus === "eligible"
+      ? NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE
+      : discountStatus === "below_minimum"
+        ? NEW_CUSTOMER_DISCOUNT_BELOW_MINIMUM_NOTE
+        : null;
+
   // The first line names us, because of where this message lands.
   //
   // It arrives on WhatsApp from a number the customer has never seen, and the
@@ -138,6 +170,7 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
         "",
         `That's about ${Math.round(saving.savingPercentage)}% less.`,
         ...(input.totalsConfirmed ? [] : ["", UNVERIFIED_TOTAL_NOTE]),
+        ...(discountNote ? ["", discountNote] : []),
         ...(input.resultUrl ? ["", "See it and open the restaurant:", input.resultUrl] : []),
         "",
         "Prices and promotions can change, so please confirm the final amount in the delivery app before ordering.",
@@ -155,6 +188,7 @@ export function buildResultMessage(input: ResultMessageInput): GeneratedResult {
         "",
         "Your current option appears better right now.",
         ...(input.totalsConfirmed ? [] : ["", UNVERIFIED_TOTAL_NOTE]),
+        ...(discountNote ? ["", discountNote] : []),
         "",
         "We'll keep working to help you catch the orders where switching actually makes sense.",
         "",

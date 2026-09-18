@@ -32,6 +32,7 @@ function row(overrides: Partial<SubmissionListRow> = {}): SubmissionListRow {
     contact_type: "whatsapp",
     area_id: "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
     archived_at: null,
+    new_to_keeta: false,
     areas: { id: "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa", name: "Al Karama" },
     ...overrides,
   };

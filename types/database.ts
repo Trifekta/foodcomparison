@@ -71,6 +71,14 @@ export interface SubmissionRow {
   source_app_other: string | null;
   area_id: string | null;
   current_total: string;
+  /**
+   * Customer said (step 3) they are new to Keeta.
+   *
+   * Drives the new-customer-discount note on the result once the admin has a
+   * Keeta price - see lib/calculations/new-customer-discount.ts. Not a
+   * promise this app makes on Keeta's behalf; existing rows default false.
+   */
+  new_to_keeta: boolean;
   comparison_app: string;
   comparison_total: string | null;
   saving_amount: string | null;

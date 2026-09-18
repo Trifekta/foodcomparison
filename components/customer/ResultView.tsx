@@ -20,7 +20,12 @@ import { NotificationPrompt } from "@/components/customer/NotificationPrompt";
 import { AddToHomeScreen } from "@/components/customer/AddToHomeScreen";
 import { track, visitId } from "@/lib/analytics/track";
 import type { PublicResult } from "@/lib/submissions/result";
-import { UNVERIFIED_TOTAL_NOTE } from "@/lib/notifications/messages";
+import {
+  NEW_CUSTOMER_DISCOUNT_BELOW_MINIMUM_NOTE,
+  NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE,
+  UNVERIFIED_TOTAL_NOTE,
+} from "@/lib/notifications/messages";
+import { newCustomerDiscountStatus } from "@/lib/calculations/new-customer-discount";
 
 /**
  * The customer's result.
@@ -460,6 +465,7 @@ function Saving({ result, token }: { result: PublicResult; token: string }) {
       ) : null}
 
       <UnverifiedTotalNote result={result} />
+      <NewCustomerDiscountNote result={result} />
 
       <p className="mt-4 mb-6 rounded-2xl bg-flame-50 p-3.5 text-[0.85rem] leading-relaxed text-ink-600">
         Prices and promotions change. Check the final amount in the app before you order — this
@@ -489,6 +495,32 @@ function UnverifiedTotalNote({ result }: { result: PublicResult }) {
   );
 }
 
+/**
+ * The new-customer-discount note, said either way once they said yes.
+ *
+ * Same reasoning as UnverifiedTotalNote's own comment: silent when the
+ * question never applied (they never said yes), spoken when it does -
+ * "eligible" and "below the minimum" both, because a customer who checked
+ * yes on step 3 and hears nothing back cannot tell one from the other.
+ * Green for eligible, amber for below the minimum - a limit on the order,
+ * not a mistake they made.
+ */
+function NewCustomerDiscountNote({ result }: { result: PublicResult }) {
+  if (result.comparisonTotal === null) return null;
+  const status = newCustomerDiscountStatus(result.newToKeeta, result.comparisonTotal);
+  if (status === "not_new") return null;
+
+  return (
+    <p
+      className={`mt-4 rounded-2xl p-3.5 text-[0.85rem] leading-relaxed ${
+        status === "eligible" ? "bg-chip-green-bg text-chip-green-fg" : "bg-chip-amber-bg text-ink-700"
+      }`}
+    >
+      {status === "eligible" ? NEW_CUSTOMER_DISCOUNT_ELIGIBLE_NOTE : NEW_CUSTOMER_DISCOUNT_BELOW_MINIMUM_NOTE}
+    </p>
+  );
+}
+
 function NoSaving({ result }: { result: PublicResult }) {
   return (
     <>
@@ -506,6 +538,7 @@ function NoSaving({ result }: { result: PublicResult }) {
       {result.comparisonTotal ? <PriceRows result={result} /> : null}
 
       <UnverifiedTotalNote result={result} />
+      <NewCustomerDiscountNote result={result} />
 
       <div className="mt-5 mb-6">
         <Link

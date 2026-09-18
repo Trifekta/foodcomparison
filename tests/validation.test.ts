@@ -17,6 +17,7 @@ function baseSubmission(overrides: Record<string, unknown> = {}) {
     restaurantName: "Al Safadi",
     areaId: VALID_AREA_ID,
     currentTotal: "82.00",
+    newToKeeta: "no",
     dialCode: "+971",
     whatsappNumber: "501234567",
     marketingConsent: false,
@@ -26,7 +27,7 @@ function baseSubmission(overrides: Record<string, unknown> = {}) {
 
 describe("amount validation", () => {
   const where = (currentTotal: string) =>
-    whereStepSchema.safeParse({ areaId: VALID_AREA_ID, currentTotal });
+    whereStepSchema.safeParse({ areaId: VALID_AREA_ID, currentTotal, newToKeeta: "no" });
 
   it("accepts a normal Dubai order total", () => {
     expect(where("72.50").success).toBe(true);
@@ -53,7 +54,7 @@ describe("where step", () => {
     // The area is not a formality: Keeta's fee, its menu and whether the
     // restaurant delivers at all change with the zone, so a comparison quoted
     // without one is not a comparison.
-    const result = whereStepSchema.safeParse({ areaId: "", currentTotal: "82.00" });
+    const result = whereStepSchema.safeParse({ areaId: "", currentTotal: "82.00", newToKeeta: "no" });
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].message).toBe(ERROR_MESSAGES.areaMissing);
@@ -61,12 +62,38 @@ describe("where step", () => {
   });
 
   it("asks for the area and the total together", () => {
-    const result = whereStepSchema.safeParse({ areaId: "", currentTotal: "" });
+    const result = whereStepSchema.safeParse({ areaId: "", currentTotal: "", newToKeeta: "no" });
     expect(result.success).toBe(false);
     if (!result.success) {
       const fields = result.error.issues.map((issue) => issue.path[0]);
       expect(fields).toContain("areaId");
       expect(fields).toContain("currentTotal");
+    }
+  });
+
+  it("requires the new-to-Keeta question to actually be answered", () => {
+    // No default: an unanswered "yes" | "no" question is a validation error,
+    // not a silent "no" - a wizard-only "" placeholder is what represents
+    // "not yet answered", and it is deliberately not part of this type.
+    const result = whereStepSchema.safeParse({
+      areaId: VALID_AREA_ID,
+      currentTotal: "82.00",
+      newToKeeta: "",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe(ERROR_MESSAGES.newToKeetaMissing);
+    }
+  });
+
+  it("accepts yes or no once answered", () => {
+    for (const answer of ["yes", "no"]) {
+      const result = whereStepSchema.safeParse({
+        areaId: VALID_AREA_ID,
+        currentTotal: "82.00",
+        newToKeeta: answer,
+      });
+      expect(result.success, `expected "${answer}" to be accepted`).toBe(true);
     }
   });
 
