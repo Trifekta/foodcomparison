@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { StepActions } from "./StepActions";
 import { ImageUpload } from "@/components/forms/ImageUpload";
@@ -81,6 +81,13 @@ export function StepUpload({
   error,
   onContinue,
 }: StepUploadProps) {
+  // Whether a new cart screenshot has been picked on this visit. Local, not
+  // read from cartFile: cartFile only updates once the display copy finishes
+  // downscaling, and a slow phone on a big screenshot is exactly the case the
+  // read's own latency fix (onFilePicked, ahead of that same downscale) exists
+  // for. The banner should disappear on the same signal, not lag behind it.
+  const [uploadStarted, setUploadStarted] = useState(false);
+
   // Start fetching the reading engine now, while they are in their gallery
   // choosing a photo. Waiting until they have chosen puts several megabytes
   // directly in front of the screen meant to impress them.
@@ -134,8 +141,10 @@ export function StepUpload({
       </div>
 
       {/* Above everything, because somebody who already has an order in flight
-          is not here to start another one. */}
-      <LastOrderBanner />
+          is not here to start another one - until they pick a screenshot,
+          which says the opposite: whatever this banner is offering to resume,
+          they have just demonstrated they are not resuming it. */}
+      {uploadStarted ? null : <LastOrderBanner />}
 
       <h1 className="relative mt-4 inline-flex items-start text-[1.9rem] font-extrabold leading-tight text-ink-900">
         Upload your order
@@ -168,7 +177,10 @@ export function StepUpload({
           example="cart"
           file={cartFile}
           onChange={onCartChange}
-          onFilePicked={onCartPicked}
+          onFilePicked={(file) => {
+            setUploadStarted(true);
+            onCartPicked(file);
+          }}
           error={error}
         />
 
@@ -205,7 +217,10 @@ export function StepUpload({
           allowRemove
           file={checkoutFile}
           onChange={onCheckoutChange}
-          onFilePicked={onCheckoutPicked}
+          onFilePicked={(file) => {
+            setUploadStarted(true);
+            onCheckoutPicked(file);
+          }}
         />
       </div>
 

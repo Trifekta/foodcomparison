@@ -134,6 +134,9 @@ export function ImageUpload({
   const filled = Boolean(file && previewUrl);
   // Earned attention, not decoration - only while the caller has flagged it
   // and the slot is still empty. The moment it is filled, the point is made.
+  // Drives the ring and pulse below, and also the hint and helper text color -
+  // the copy is what actually explains why, and a ring nobody reads past
+  // would be emphasis on the wrong half of the card.
   const emphasize = emphasizeProp && !filled;
 
   return (
@@ -182,7 +185,16 @@ export function ImageUpload({
                   : "Optional"}
             </span>
           </div>
-          {hint ? <p className="mt-0.5 text-sm leading-snug text-slate-500">{hint}</p> : null}
+          {hint ? (
+            <p
+              className={cn(
+                "mt-0.5 text-sm leading-snug",
+                emphasize ? "font-bold text-flame-600" : "text-slate-500",
+              )}
+            >
+              {hint}
+            </p>
+          ) : null}
         </div>
 
         {/* At the trailing edge rather than inline after the pill: "Recommended"
@@ -309,7 +321,14 @@ export function ImageUpload({
       )}
 
       {helper ? (
-        <p className="mt-2 px-0.5 text-xs leading-snug text-slate-500">{helper}</p>
+        <p
+          className={cn(
+            "mt-2 px-0.5 text-xs leading-snug",
+            emphasize ? "font-semibold text-flame-600" : "text-slate-500",
+          )}
+        >
+          {helper}
+        </p>
       ) : null}
 
       <FieldError id={errorId} message={message} />
