@@ -44,6 +44,21 @@ export function visitId(): string | null {
   }
 }
 
+/** sendBeacon where it exists, an ordinary keepalive fetch where it does not. */
+function send(body: string): void {
+  if (typeof navigator.sendBeacon === "function") {
+    navigator.sendBeacon("/api/events", new Blob([body], { type: "application/json" }));
+    return;
+  }
+
+  void fetch("/api/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+    keepalive: true,
+  }).catch(() => {});
+}
+
 /**
  * @param areaId Sent from the area step onwards, once the customer has said
  *   where they are. It is the only attribute attached to a visit, and it is one
@@ -57,19 +72,29 @@ export function track(event: FunnelEvent, token?: string, areaId?: string | null
     const id = visitId();
     if (!id) return;
 
-    const body = JSON.stringify({ event, visitId: id, token, areaId: areaId || undefined });
+    send(JSON.stringify({ event, visitId: id, token, areaId: areaId || undefined }));
+  } catch {
+    // Never the reason a screen fails.
+  }
+}
 
-    if (typeof navigator.sendBeacon === "function") {
-      navigator.sendBeacon("/api/events", new Blob([body], { type: "application/json" }));
-      return;
-    }
+/**
+ * A pulse, not a step.
+ *
+ * The funnel only records when somebody moves between screens, never while
+ * they sit on one - so a visit reading the review step for two minutes looks,
+ * to funnel_events, identical to one that closed the tab. This is what tells
+ * the admin's live view "still here": sent once on mount and then every
+ * HEARTBEAT_INTERVAL_MS while the tab is visible, from PresenceHeartbeat.
+ */
+export function heartbeat(): void {
+  if (typeof window === "undefined") return;
 
-    void fetch("/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-      keepalive: true,
-    }).catch(() => {});
+  try {
+    const id = visitId();
+    if (!id) return;
+
+    send(JSON.stringify({ event: "heartbeat", visitId: id }));
   } catch {
     // Never the reason a screen fails.
   }

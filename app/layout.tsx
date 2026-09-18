@@ -4,6 +4,7 @@ import "./globals.css";
 import { PRODUCT_NAME, PRODUCT_DESCRIPTION } from "@/lib/constants";
 import { socialCard } from "@/lib/metadata";
 import { absoluteUrl } from "@/lib/env";
+import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 
 // Self-hosted at build time by next/font, so there is no runtime request to
 // Google and no layout shift.
@@ -100,7 +101,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${jakarta.variable} ${caveat.variable}`}>
-      <body className="min-h-dvh antialiased">{children}</body>
+      <body className="min-h-dvh antialiased">
+        <PresenceHeartbeat />
+        {children}
+      </body>
     </html>
   );
 }

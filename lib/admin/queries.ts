@@ -321,3 +321,75 @@ export async function getFunnelRows(
   if (error) throw new Error(`Could not load the funnel: ${error.message}`);
   return (data ?? []) as unknown as (FunnelRow & FunnelAreaRow)[];
 }
+
+/**
+ * How far back the live page reads visit_presence.
+ *
+ * Wider than the 2-minute window that decides "active now"
+ * (lib/calculations/presence.ts): the extra minutes are what let the table
+ * show somebody trailing off - "seen 6 minutes ago" - rather than the row
+ * vanishing the instant they cross the active threshold.
+ */
+const LIVE_PRESENCE_WINDOW_MINUTES = 15;
+
+export interface LivePresenceRow {
+  visit_id: string;
+  last_seen_at: string;
+  last_event: string | null;
+  submission_id: string | null;
+  area_id: string | null;
+  areas: { name: string } | null;
+  submissions: { reference_number: string } | null;
+}
+
+export interface LivePresenceResult {
+  /**
+   * The instant this query ran, handed back rather than left for the page to
+   * find on its own - a React Server Component reading Date.now() itself
+   * reads as an impure render to the compiler's rules, and this is the one
+   * legitimate place for that clock read to live.
+   */
+  now: number;
+  rows: LivePresenceRow[];
+}
+
+export async function getLivePresence(
+  windowMinutes = LIVE_PRESENCE_WINDOW_MINUTES,
+): Promise<LivePresenceResult> {
+  const supabase = await createServerSupabaseClient();
+  const now = Date.now();
+  const since = new Date(now - windowMinutes * 60_000).toISOString();
+
+  const { data, error } = await supabase
+    .from("visit_presence")
+    .select(
+      "visit_id, last_seen_at, last_event, submission_id, area_id, areas(name), submissions(reference_number)",
+    )
+    .gte("last_seen_at", since)
+    .order("last_seen_at", { ascending: false });
+
+  if (error) throw new Error(`Could not load live visits: ${error.message}`);
+  return { now, rows: (data ?? []) as unknown as LivePresenceRow[] };
+}
+
+export interface RecentActivityRow {
+  id: number;
+  created_at: string;
+  event: string;
+  visit_id: string;
+  areas: { name: string } | null;
+}
+
+/** The last handful of funnel steps, newest first - a feed, not a count. */
+export async function getRecentActivity(limit = 25): Promise<RecentActivityRow[]> {
+  const supabase = await createServerSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("funnel_events")
+    .select("id, created_at, event, visit_id, areas(name)")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(`Could not load recent activity: ${error.message}`);
+  return (data ?? []) as unknown as RecentActivityRow[];
+}
