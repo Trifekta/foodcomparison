@@ -24,7 +24,7 @@ const STEPS = [
     icon: Search,
     tint: "bg-chip-red-bg text-chip-red-fg",
     title: "We compare it",
-    body: "We rebuild the same basket on another app.",
+    body: "We check the same basket on Keeta.",
   },
   {
     icon: PiggyBank,
@@ -85,8 +85,8 @@ export default function LandingPage() {
         </h1>
 
         <p className="mt-3 text-[1.02rem] leading-relaxed text-slate-600">
-          Upload your food cart and we&apos;ll check whether the same order may cost less on
-          another delivery app.
+          Upload your cart from Talabat, Careem, Deliveroo, or Noon Food and we&apos;ll check if
+          it&apos;s cheaper on Keeta.
         </p>
 
         <Link
