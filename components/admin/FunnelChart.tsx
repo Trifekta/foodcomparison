@@ -10,7 +10,14 @@ import type { FunnelStepCount } from "@/lib/analytics/funnel";
  * people who reach it is the thing to fix, whether it is the second or the
  * sixth.
  */
-export function FunnelChart({ steps }: { steps: FunnelStepCount[] }) {
+export function FunnelChart({
+  steps,
+  rangeLabel,
+}: {
+  steps: FunnelStepCount[];
+  /** What window this actually is - "Last 30 days" only when that is true. */
+  rangeLabel: string;
+}) {
   const started = steps[0]?.count ?? 0;
 
   if (started === 0) {
@@ -18,7 +25,8 @@ export function FunnelChart({ steps }: { steps: FunnelStepCount[] }) {
       <section className="rounded-2xl border border-ink-200 bg-white p-5">
         <h2 className="text-base font-semibold text-ink-900">Customer funnel</h2>
         <p className="mt-1.5 text-sm text-ink-500">
-          Nothing recorded yet. Steps appear here as soon as somebody opens the wizard.
+          Nothing recorded in this range yet. Steps appear here as soon as somebody opens the
+          wizard.
         </p>
       </section>
     );
@@ -28,7 +36,7 @@ export function FunnelChart({ steps }: { steps: FunnelStepCount[] }) {
     <section className="rounded-2xl border border-ink-200 bg-white p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-semibold text-ink-900">Customer funnel</h2>
-        <p className="text-sm text-ink-500">Last 30 days · counted by visit</p>
+        <p className="text-sm text-ink-500">{rangeLabel} · counted by visit</p>
       </div>
 
       <ol className="mt-4 space-y-1">
