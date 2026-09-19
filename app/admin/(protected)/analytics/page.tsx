@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { getAnalyticsRows, getFunnelRows } from "@/lib/admin/queries";
+import { describeDateRange, getAnalyticsRows, getFunnelRows } from "@/lib/admin/queries";
 import { computeAreaFunnel, computeFunnel } from "@/lib/analytics/funnel";
 import { FunnelChart } from "@/components/admin/FunnelChart";
 import { AreaFunnelTable } from "@/components/admin/AreaFunnelTable";
@@ -175,7 +175,7 @@ export default async function AdminAnalyticsPage({
         </ul>
       </section>
 
-      <FunnelChart steps={funnel} />
+      <FunnelChart steps={funnel} rangeLabel={describeDateRange(range)} />
 
       <AreaFunnelTable areas={areaFunnel} />
 

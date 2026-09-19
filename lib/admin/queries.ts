@@ -265,6 +265,35 @@ export function rangeToInstants(range: DateRange): { since?: string; until?: str
   };
 }
 
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/** "D Mon YYYY" straight from the digits, so a display label can never land on
+ * the wrong side of a timezone the way parsing "YYYY-MM-DD" with `Date` can. */
+function formatIsoDateLabel(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  return `${day} ${MONTH_LABELS[month - 1]} ${year}`;
+}
+
+/**
+ * What to call a range on screen.
+ *
+ * getFunnelRows defaults to the last 30 days when no range is given, so that
+ * is the only case this says "Last 30 days" - the moment somebody picks a
+ * preset or a custom range, the label has to say what it actually is, or the
+ * screen keeps claiming a window it is no longer showing.
+ */
+export function describeDateRange(range: DateRange): string {
+  if (!range.from && !range.to) return "Last 30 days";
+  if (range.from && range.to) {
+    return range.from === range.to
+      ? formatIsoDateLabel(range.from)
+      : `${formatIsoDateLabel(range.from)} – ${formatIsoDateLabel(range.to)}`;
+  }
+  return range.from ? `Since ${formatIsoDateLabel(range.from)}` : `Until ${formatIsoDateLabel(range.to!)}`;
+}
+
 export async function getAnalyticsRows(
   limit = 5000,
   range: DateRange = {},
