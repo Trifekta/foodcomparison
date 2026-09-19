@@ -155,7 +155,16 @@ export function StepUpload({
           ? "Your screenshot shows the total already — you're set. Add the checkout screen only if you want to."
           : cartConfirmedShort
             ? "Your cart screenshot doesn't show a total — add the checkout screen below for an exact comparison."
-            : "Upload your cart screenshot. If your app keeps the total on a separate screen, add that one too."}
+            : (
+                // Bold on purpose: a real customer uploaded a screenshot of Keeta
+                // itself, believing that was the point - nothing before this line
+                // ever named the app being compared against, so the one sentence
+                // that fixes that needs to be impossible to skim past.
+                <strong className="font-bold text-ink-900">
+                  Upload your cart from Talabat, Careem, Deliveroo, or Noon Food — we&apos;ll
+                  check if it&apos;s cheaper on Keeta.
+                </strong>
+              )}
       </p>
 
       {/* Repeated from the landing page on purpose. This is the screen where
