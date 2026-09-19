@@ -11,6 +11,14 @@ import { createServerClient } from "@supabase/ssr";
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  // A manifest is public metadata - the icon, name and start_url a browser
+  // reads to build a home-screen shortcut - and the OS can refetch it on its
+  // own, independent of whether the admin who added it still has a live
+  // session. It must never bounce to login: that would either break the
+  // shortcut or, worse, silently fall back to some cached, possibly stale
+  // copy of it.
+  if (request.nextUrl.pathname === "/admin/manifest.webmanifest") return response;
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
