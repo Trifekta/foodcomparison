@@ -117,10 +117,34 @@ export function totalVisits(summaries: VisitSummary[]): VisitTotals {
   };
 }
 
-/** Keeps only the visits that got at least as far as the given step. */
-export function filterByStep(summaries: VisitSummary[], event: string | null): VisitSummary[] {
+/**
+ * The two questions a step filter can be asked, which are not the same one.
+ *
+ * "reached" is funnel volume: how many got this far, wherever they ended up.
+ * "stopped" is where people die: the visits whose furthest point IS this step
+ * and went no further. Picking "Opened the wizard" under "reached" correctly
+ * returns somebody who went on to send an order, which reads as a broken
+ * filter unless the page says which question it is answering - so the control
+ * is explicit rather than implied by a label nobody reads.
+ */
+export type StepMatch = "reached" | "stopped";
+
+export const STEP_MATCHES: StepMatch[] = ["reached", "stopped"];
+
+export function isStepMatch(value: string | null): value is StepMatch {
+  return value === "reached" || value === "stopped";
+}
+
+/** Keeps the visits that reached the given step, or that stopped on it. */
+export function filterByStep(
+  summaries: VisitSummary[],
+  event: string | null,
+  match: StepMatch = "reached",
+): VisitSummary[] {
   if (!event) return summaries;
   const index = ORDER.get(event);
   if (index === undefined) return summaries;
-  return summaries.filter((visit) => visit.furthestIndex >= index);
+  return match === "stopped"
+    ? summaries.filter((visit) => visit.furthestIndex === index)
+    : summaries.filter((visit) => visit.furthestIndex >= index);
 }
