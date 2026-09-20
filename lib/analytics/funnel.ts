@@ -50,6 +50,16 @@ export function isFunnelEvent(value: string): value is FunnelEvent {
  */
 export const SIDE_EVENTS = [
   { event: "app_opened", label: "Went to a food app" },
+  // How far down the upload screen they got, one per visit. Buckets rather
+  // than a number because this table stores event names and nothing else, and
+  // a quarter of a screen is as fine a reading as the question needs: the
+  // question is "did anybody see the card below the fold", not "by how many
+  // pixels did they miss it".
+  { event: "scroll_0", label: "Saw the top only" },
+  { event: "scroll_25", label: "Scrolled a quarter" },
+  { event: "scroll_50", label: "Scrolled halfway" },
+  { event: "scroll_75", label: "Scrolled three quarters" },
+  { event: "scroll_100", label: "Reached the bottom" },
 ] as const;
 
 export type SideEvent = (typeof SIDE_EVENTS)[number]["event"];

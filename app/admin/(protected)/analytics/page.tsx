@@ -7,6 +7,7 @@ import { AreaFunnelTable } from "@/components/admin/AreaFunnelTable";
 import { ReportRange } from "@/components/admin/ReportRange";
 import { parseDateRange } from "@/lib/admin/filters";
 import { computeValidationMetrics, type CountByLabel } from "@/lib/calculations/analytics";
+import { scrollDepthDistribution } from "@/lib/calculations/scroll-depth";
 import { formatMinorAsCurrency } from "@/lib/calculations/money";
 
 export const metadata: Metadata = {
@@ -28,16 +29,19 @@ function Metric({ label, value, hint }: { label: string; value: string; hint?: s
 
 function BreakdownList({
   title,
+  hint,
   items,
   total,
 }: {
   title: string;
+  hint?: string;
   items: CountByLabel[];
   total: number;
 }) {
   return (
     <section className="rounded-2xl border border-ink-200 bg-white p-5">
       <h2 className="text-base font-semibold text-ink-900">{title}</h2>
+      {hint ? <p className="mt-1 text-sm text-ink-500">{hint}</p> : null}
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-ink-500">Nothing to show yet.</p>
       ) : (
@@ -85,6 +89,9 @@ export default async function AdminAnalyticsPage({
   const metrics = computeValidationMetrics(rows);
   const funnel = computeFunnel(funnelRows);
   const areaFunnel = computeAreaFunnel(funnelRows);
+  // Off the rows the funnel already has - scroll marks share its table - so
+  // this costs no second query.
+  const scrollDepth = scrollDepthDistribution(funnelRows);
 
   const savingTotal = metrics.savingDistribution.reduce((sum, bucket) => sum + bucket.count, 0);
 
@@ -178,6 +185,19 @@ export default async function AdminAnalyticsPage({
       <FunnelChart steps={funnel} rangeLabel={describeDateRange(range)} />
 
       <AreaFunnelTable areas={areaFunnel} />
+
+      {/* The ceiling on the upload screen itself. Everything the funnel says
+          about people who opened the wizard and left assumes they read it; if
+          most of them never scrolled past the first card, the screen is losing
+          them somewhere they never saw. */}
+      {scrollDepth.visits > 0 ? (
+        <BreakdownList
+          title="How far down the upload screen"
+          hint={`One reading per visit, taken when they left the screen. The "No screenshot yet?" card sits a little under halfway, so the share at halfway or deeper is the share who could have seen it. ${scrollDepth.visits} visits measured.`}
+          items={scrollDepth.items}
+          total={scrollDepth.visits}
+        />
+      ) : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <BreakdownList

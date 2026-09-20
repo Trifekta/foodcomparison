@@ -8,6 +8,7 @@ import { ImageUpload } from "@/components/forms/ImageUpload";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
 import { LastOrderBanner } from "@/components/customer/LastOrderBanner";
+import { ScrollDepth } from "@/components/customer/ScrollDepth";
 import { FoodAppLinks } from "./FoodAppLinks";
 import { track } from "@/lib/analytics/track";
 import { captureAttribution } from "@/lib/analytics/attribution";
@@ -130,6 +131,12 @@ export function StepUpload({
 
   return (
     <>
+      {/* Mounted on this step alone, so its reading means "how far down the
+          upload screen", not "how far down whichever step they were on". It
+          sends when this unmounts, which is what advancing past it looks
+          like. */}
+      <ScrollDepth />
+
       {/* Hero banner. The spread bleeds past the top edge, as in the reference. */}
       <div className="relative rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4">
         <div className="relative z-10 max-w-[44%]">
