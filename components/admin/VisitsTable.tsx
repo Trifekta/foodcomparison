@@ -35,6 +35,16 @@ function Screenshots({ count }: { count: number }) {
   );
 }
 
+/**
+ * How many rows reach the page.
+ *
+ * The totals above the table are computed over everything, so a cap here
+ * changes what is listed and never what is counted. It exists because this
+ * table is re-rendered every fifteen seconds by the page it sits on, and an
+ * uncapped range is an unbounded amount of HTML built four times a minute.
+ */
+const MAX_ROWS = 200;
+
 export function VisitsTable({
   visits,
   totals,
@@ -42,6 +52,9 @@ export function VisitsTable({
   visits: VisitSummary[];
   totals: VisitTotals;
 }) {
+  const shown = visits.slice(0, MAX_ROWS);
+  const hidden = visits.length - shown.length;
+
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-ink-200 bg-white px-4 py-3">
@@ -79,7 +92,7 @@ export function VisitsTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-100">
-              {visits.map((visit) => (
+              {shown.map((visit) => (
                 <tr key={visit.visitId} className={visit.completed ? "bg-emerald-50/40" : undefined}>
                   <td className="px-4 py-2.5">
                     <VisitId id={visit.visitId} />
@@ -116,6 +129,13 @@ export function VisitsTable({
           </table>
         </div>
       )}
+
+      {hidden > 0 ? (
+        <p className="text-xs font-medium text-ink-600">
+          Showing the {MAX_ROWS} most recent of {visits.length} visits. The totals above count all
+          of them — narrow the dates to list the rest.
+        </p>
+      ) : null}
 
       <p className="text-xs text-ink-500">
         A visit is one browser session, not one person — the same phone coming back tomorrow is two

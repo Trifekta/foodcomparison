@@ -166,3 +166,21 @@ describe("isStepMatch", () => {
     expect(isStepMatch(null)).toBe(false);
   });
 });
+
+describe("VisitsTable row cap", () => {
+  /**
+   * Not a rendering test - a statement about the contract the cap relies on.
+   * The table slices the list it is given; the totals are computed before that
+   * slice, so capping what is listed must never change what is counted.
+   */
+  it("totals are computed over every visit, not the listed ones", () => {
+    const rows: VisitEventRow[] = [];
+    for (let i = 0; i < 250; i += 1) {
+      rows.push(row({ visit_id: `v${i}`, event: "cart_uploaded", created_at: at(i) }));
+    }
+    const summaries = summarizeVisits(rows);
+    expect(summaries).toHaveLength(250);
+    expect(totalVisits(summaries).screenshots).toBe(250);
+    expect(totalVisits(summaries.slice(0, 200)).screenshots).toBe(200);
+  });
+});

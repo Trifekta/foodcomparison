@@ -437,17 +437,41 @@ export async function getRecentActivity(limit = 25): Promise<RecentActivityRow[]
  * rule that belongs in lib/calculations/visits.ts where it can be tested,
  * not in a query string.
  */
+/**
+ * The ceiling on one read of this table.
+ *
+ * It runs on a page that re-renders itself every fifteen seconds, so its cost
+ * is paid four times a minute for as long as a tab is open on it. This was
+ * 20000, which is not a limit so much as a permission slip: a wide range at
+ * that size parsed megabytes of JSON per refresh and tripped the Worker's CPU
+ * limit, taking the whole admin section down with an error that named none of
+ * this. Five thousand events is more than any range worth reading on a screen.
+ */
+export const VISIT_EVENTS_LIMIT = 5000;
+
+/**
+ * Today, in the only timezone this product operates in.
+ *
+ * Dubai is UTC+4 all year, so the shift is arithmetic rather than a lookup -
+ * and it is done here, outside any component, because Date.now() in a render
+ * is impure and the lint rule that says so is right.
+ */
+export function defaultVisitRange(): DateRange {
+  const today = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return { from: today, to: today };
+}
+
 export async function getVisitEvents(
   range: DateRange = {},
-  limit = 20000,
+  limit = VISIT_EVENTS_LIMIT,
 ): Promise<VisitEventRow[]> {
   const supabase = await createServerSupabaseClient();
-  const bounds = rangeToInstants(range);
+  const bounds = rangeToInstants(range.from || range.to ? range : defaultVisitRange());
 
   const { data, error } = await supabase
     .from("funnel_events")
     .select("visit_id, event, created_at, areas(name), submissions(reference_number)")
-    .gte("created_at", bounds.since ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    .gte("created_at", bounds.since ?? "1970-01-01T00:00:00Z")
     .lte("created_at", bounds.until ?? "2999-12-31T23:59:59Z")
     .order("created_at", { ascending: false })
     .limit(limit);

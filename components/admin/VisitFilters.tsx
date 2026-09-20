@@ -151,7 +151,7 @@ export function VisitFilters() {
             Clear
           </button>
         ) : (
-          <p className="min-h-10 self-end pb-2.5 text-sm text-ink-500">Last 30 days</p>
+          <p className="min-h-10 self-end pb-2.5 text-sm text-ink-500">Today</p>
         )}
       </div>
     </div>
