@@ -39,7 +39,7 @@ export function VisitFilters() {
   const match = isStepMatch(rawMatch) ? rawMatch : "reached";
 
   const push = (next: URLSearchParams) => {
-    router.push(next.toString() ? `/admin/live?${next.toString()}` : "/admin/live");
+    router.push(next.toString() ? `/admin/live/visits?${next.toString()}` : "/admin/live/visits");
   };
 
   const setParam = (key: string, value: string) => {
@@ -145,7 +145,7 @@ export function VisitFilters() {
         {from || to || step ? (
           <button
             type="button"
-            onClick={() => router.push("/admin/live")}
+            onClick={() => router.push("/admin/live/visits")}
             className="min-h-10 rounded-lg px-2 text-sm font-medium text-ink-600 hover:bg-ink-50"
           >
             Clear
