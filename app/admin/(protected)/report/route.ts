@@ -1,5 +1,10 @@
 import { requireAdmin } from "@/lib/supabase/auth";
-import { getAnalyticsRows, getFunnelRows, type DateRange } from "@/lib/admin/queries";
+import {
+  FUNNEL_EVENTS_LIMIT,
+  getAnalyticsRows,
+  getFunnelRows,
+  type DateRange,
+} from "@/lib/admin/queries";
 import { computeValidationMetrics } from "@/lib/calculations/analytics";
 import { computeAreaFunnel, computeFunnel } from "@/lib/analytics/funnel";
 import { buildReportCsv, reportCsvFilename } from "@/lib/admin/export";
@@ -30,7 +35,7 @@ export async function GET(request: Request) {
   // does: a missing table should cost the funnel section, not the whole report.
   const [rows, funnelRows] = await Promise.all([
     getAnalyticsRows(5000, range),
-    getFunnelRows(30, 20000, range).catch(() => []),
+    getFunnelRows(30, FUNNEL_EVENTS_LIMIT, range).catch(() => []),
   ]);
 
   const csv = buildReportCsv(

@@ -2,7 +2,7 @@ import "server-only";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { SIGNED_URL_TTL_SECONDS, STORAGE_BUCKET } from "@/lib/constants";
-import type { AnalyticsRow } from "@/lib/calculations/analytics";
+import type { AnalyticsRow, SavingSummaryRow } from "@/lib/calculations/analytics";
 import type { FunnelAreaRow, FunnelRow } from "@/lib/analytics/funnel";
 import type { VisitEventRow } from "@/lib/calculations/visits";
 import { withAmountStrings } from "@/lib/calculations/money";
@@ -322,6 +322,38 @@ export async function getAnalyticsRows(
 }
 
 /**
+ * The same submissions, narrowed to the columns the dashboard strip counts.
+ *
+ * The dashboard is the first screen of every admin session and it re-renders on
+ * every filter change, so what it costs is paid constantly. It used to call
+ * getAnalyticsRows, which reads eight columns and joins areas for up to five
+ * thousand rows - hundreds of kilobytes of JSON parsed in the Worker so that
+ * four numbers could be shown and the rest thrown away. The full shape is still
+ * there for /admin/analytics, which is asked for deliberately and once.
+ */
+export async function getSavingSummaryRows(
+  limit = 5000,
+  range: DateRange = {},
+): Promise<SavingSummaryRow[]> {
+  const supabase = await createServerSupabaseClient();
+  const { since, until } = rangeToInstants(range);
+
+  // Archived rows are excluded for the same reason as in getAnalyticsRows:
+  // archiving is how somebody says "this one was not real".
+  const { data, error } = await supabase
+    .from("submissions")
+    .select("status, current_total, comparison_total")
+    .is("archived_at", null)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+    .gte("created_at", since ?? "1970-01-01T00:00:00Z")
+    .lte("created_at", until ?? "2999-12-31T23:59:59Z");
+
+  if (error) throw new Error(`Could not load the saving summary: ${error.message}`);
+  return ((data ?? []) as unknown as SavingSummaryRow[]).map(withAmountStrings);
+}
+
+/**
  * The funnel rows, for the dashboard to count.
  *
  * Counted in JS rather than in SQL because the honest measure is distinct
@@ -329,9 +361,20 @@ export async function getAnalyticsRows(
  * rows is nothing. The window keeps it that way: a funnel is a question about
  * now, and a run from three months ago answers nothing about this week's ad.
  */
+/**
+ * The ceiling on one read of the funnel.
+ *
+ * Same reasoning as VISIT_EVENTS_LIMIT below, and the same number: twenty
+ * thousand events, two joins wide, is megabytes of JSON parsed and turned into
+ * Sets inside a Worker that is allowed 128 MB and a slice of a CPU. Both of the
+ * pages that count the funnel now stop at five thousand, which is more than any
+ * range worth reading on a screen.
+ */
+export const FUNNEL_EVENTS_LIMIT = 5000;
+
 export async function getFunnelRows(
   days = 30,
-  limit = 20000,
+  limit = FUNNEL_EVENTS_LIMIT,
   range: DateRange = {},
 ): Promise<(FunnelRow & FunnelAreaRow)[]> {
   const supabase = await createServerSupabaseClient();

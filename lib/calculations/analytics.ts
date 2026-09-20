@@ -25,16 +25,7 @@ export interface CountByLabel {
   count: number;
 }
 
-export interface ValidationMetrics {
-  totalSubmissions: number;
-  completedComparisons: number;
-  savingFoundCount: number;
-  /** Share of completed comparisons where a saving was found, 0-100. */
-  savingFoundPercentage: number;
-  noSavingPercentage: number;
-  /** Averages across the comparisons where a saving was found, in fils. */
-  averageSavingMinor: number;
-  averageSavingPercentage: number;
+export interface ValidationMetrics extends SavingSummary {
   savingDistribution: Array<{ key: SavingBucketKey; label: string; count: number }>;
   byArea: CountByLabel[];
   bySourceApp: CountByLabel[];
@@ -61,15 +52,42 @@ const UNAVAILABLE_REASON_LABELS: Record<string, string> = {
   other: "Something else",
 };
 
+/**
+ * The three columns the saving numbers are made of.
+ *
+ * Named separately from AnalyticsRow because the dashboard strip needs only
+ * these, and asking the database for the rest - the area join above all - is
+ * megabytes of JSON per page load that nothing on that screen reads.
+ */
+export type SavingSummaryRow = Pick<
+  AnalyticsRow,
+  "status" | "current_total" | "comparison_total"
+>;
+
+export interface SavingSummary {
+  totalSubmissions: number;
+  completedComparisons: number;
+  savingFoundCount: number;
+  /** Share of completed comparisons where a saving was found, 0-100. */
+  savingFoundPercentage: number;
+  noSavingPercentage: number;
+  /** Averages across the comparisons where a saving was found, in fils. */
+  averageSavingMinor: number;
+  averageSavingPercentage: number;
+}
+
 /** A comparison counts as complete once an admin has entered a competitor total. */
-function isCompleted(row: AnalyticsRow): boolean {
+function isCompleted(row: SavingSummaryRow): boolean {
   return row.comparison_total !== null && row.comparison_total !== "";
 }
 
-export function computeValidationMetrics(rows: AnalyticsRow[]): ValidationMetrics {
-  const completed = rows.filter(isCompleted);
-  const unavailable = rows.filter((row) => row.status === "unavailable");
-
+/**
+ * The saving numbers, and the bucket counts that go with them.
+ *
+ * One pass, shared by the compact summary and the full metrics, so the two
+ * screens can never disagree about what "saving found" means.
+ */
+function tallySavings(completed: SavingSummaryRow[]) {
   let savingFoundCount = 0;
   let savingTotalMinor = 0;
   let savingPercentageTotal = 0;
@@ -94,6 +112,20 @@ export function computeValidationMetrics(rows: AnalyticsRow[]): ValidationMetric
     distribution.set(bucket, (distribution.get(bucket) ?? 0) + 1);
   }
 
+  return { savingFoundCount, savingTotalMinor, savingPercentageTotal, distribution };
+}
+
+/**
+ * The four numbers on the dashboard strip, off the slim row shape.
+ *
+ * The strip used to be computed by running computeValidationMetrics over every
+ * column of every submission - area names, restaurant names, reasons - and
+ * throwing all but four numbers away.
+ */
+export function computeSavingSummary(rows: SavingSummaryRow[]): SavingSummary {
+  const completed = rows.filter(isCompleted);
+  const { savingFoundCount, savingTotalMinor, savingPercentageTotal } = tallySavings(completed);
+
   const savingFoundPercentage =
     completed.length > 0 ? (savingFoundCount / completed.length) * 100 : 0;
 
@@ -104,8 +136,16 @@ export function computeValidationMetrics(rows: AnalyticsRow[]): ValidationMetric
     savingFoundPercentage,
     noSavingPercentage: completed.length > 0 ? 100 - savingFoundPercentage : 0,
     averageSavingMinor: savingFoundCount > 0 ? Math.round(savingTotalMinor / savingFoundCount) : 0,
-    averageSavingPercentage:
-      savingFoundCount > 0 ? savingPercentageTotal / savingFoundCount : 0,
+    averageSavingPercentage: savingFoundCount > 0 ? savingPercentageTotal / savingFoundCount : 0,
+  };
+}
+
+export function computeValidationMetrics(rows: AnalyticsRow[]): ValidationMetrics {
+  const unavailable = rows.filter((row) => row.status === "unavailable");
+  const { distribution } = tallySavings(rows.filter(isCompleted));
+
+  return {
+    ...computeSavingSummary(rows),
     savingDistribution: SAVING_BUCKETS.map((bucket) => ({
       key: bucket.key,
       label: bucket.label,

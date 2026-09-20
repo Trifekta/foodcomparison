@@ -8,13 +8,13 @@ import { SubmissionFilters } from "@/components/admin/SubmissionFilters";
 import { SubmissionsTable } from "@/components/admin/SubmissionsTable";
 import { ValidationStrip } from "@/components/admin/ValidationStrip";
 import {
-  getAnalyticsRows,
   getDashboardCounts,
+  getSavingSummaryRows,
   listAreas,
   listSubmissions,
 } from "@/lib/admin/queries";
 import { filtersToQueryString, parseSubmissionFilters } from "@/lib/admin/filters";
-import { computeValidationMetrics } from "@/lib/calculations/analytics";
+import { computeSavingSummary } from "@/lib/calculations/analytics";
 import { alertChannels } from "@/lib/notifications/admin-alert";
 import { getWebPushPublicKey } from "@/lib/env";
 import { findMissingMigrations } from "@/lib/admin/schema-check";
@@ -41,18 +41,18 @@ export default async function AdminDashboardPage({
   const filters = parseSubmissionFilters(params);
   const exportQuery = filtersToQueryString(filters);
 
-  // Analytics is allowed to fail here. It is the query that names the newest
-  // columns, so on a database that is behind it throws - and if that took the
-  // whole dashboard with it, the warning explaining why would never render.
-  const [counts, rows, areas, analyticsRows, gaps] = await Promise.all([
+  // The summary is allowed to fail here. It names columns a database that is
+  // behind may not have, so it throws - and if that took the whole dashboard
+  // with it, the warning explaining why would never render.
+  const [counts, rows, areas, summaryRows, gaps] = await Promise.all([
     getDashboardCounts(),
     listSubmissions(filters),
     listAreas(false),
-    getAnalyticsRows().catch(() => []),
+    getSavingSummaryRows().catch(() => []),
     findMissingMigrations(),
   ]);
 
-  const metrics = computeValidationMetrics(analyticsRows);
+  const summary = computeSavingSummary(summaryRows);
 
   return (
     <div className="space-y-5">
@@ -75,7 +75,7 @@ export default async function AdminDashboardPage({
       <SchemaWarning gaps={gaps} />
       <AlertStatus channels={alertChannels()} pushPublicKey={getWebPushPublicKey()} />
       <SummaryCards counts={counts} />
-      <ValidationStrip metrics={metrics} />
+      <ValidationStrip summary={summary} />
 
       <Suspense fallback={<div className="h-20 rounded-2xl border border-ink-200 bg-white" />}>
         <SubmissionFilters areas={areas.map(toPublicArea)} />

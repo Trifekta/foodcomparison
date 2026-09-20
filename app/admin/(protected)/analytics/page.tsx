@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { describeDateRange, getAnalyticsRows, getFunnelRows } from "@/lib/admin/queries";
+import {
+  describeDateRange,
+  FUNNEL_EVENTS_LIMIT,
+  getAnalyticsRows,
+  getFunnelRows,
+} from "@/lib/admin/queries";
 import { computeAreaFunnel, computeFunnel } from "@/lib/analytics/funnel";
 import { FunnelChart } from "@/components/admin/FunnelChart";
 import { AreaFunnelTable } from "@/components/admin/AreaFunnelTable";
@@ -84,7 +89,7 @@ export default async function AdminAnalyticsPage({
     getAnalyticsRows(5000, range),
     // The funnel is new; a database that has not run 0009 must not take the
     // whole page down over it.
-    getFunnelRows(30, 20000, range).catch(() => []),
+    getFunnelRows(30, FUNNEL_EVENTS_LIMIT, range).catch(() => []),
   ]);
   const metrics = computeValidationMetrics(rows);
   const funnel = computeFunnel(funnelRows);
