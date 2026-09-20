@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Download } from "lucide-react";
 import { Suspense } from "react";
 import { getLivePresence, getRecentActivity, getVisitEvents } from "@/lib/admin/queries";
 import { summarizeLivePresence } from "@/lib/calculations/presence";
@@ -42,6 +43,15 @@ export default async function LivePage({ searchParams }: { searchParams: SearchP
   const rawMatch = typeof params.match === "string" ? params.match : null;
   const match = isStepMatch(rawMatch) ? rawMatch : "reached";
 
+  // The same filters the table is showing, so the download is what is on
+  // screen rather than whatever the route would default to on its own.
+  const exportParams = new URLSearchParams();
+  if (range.from) exportParams.set("from", range.from);
+  if (range.to) exportParams.set("to", range.to);
+  if (step) exportParams.set("step", step);
+  if (match !== "reached") exportParams.set("match", match);
+  const exportQuery = exportParams.toString();
+
   const [{ now, rows: presenceRows }, activityRows, visitEvents] = await Promise.all([
     getLivePresence(),
     // Ten, not twenty-five: this is the "what is happening right now" feed,
@@ -73,7 +83,18 @@ export default async function LivePage({ searchParams }: { searchParams: SearchP
       </div>
 
       <div className="space-y-3 border-t border-ink-200 pt-5">
-        <h2 className="text-sm font-semibold text-ink-700">Every visit</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-ink-700">Every visit</h2>
+          {/* A plain link, not a button: the response is a file, so the browser
+              should do what it does with files and nothing should re-render. */}
+          <a
+            href={exportQuery ? `/admin/visits-export?${exportQuery}` : "/admin/visits-export"}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 text-sm font-medium text-ink-700 hover:bg-ink-50"
+          >
+            <Download aria-hidden="true" className="h-3.5 w-3.5" />
+            Download for Excel
+          </a>
+        </div>
         <Suspense fallback={<div className="h-28 rounded-2xl border border-ink-200 bg-white" />}>
           <VisitFilters />
         </Suspense>
