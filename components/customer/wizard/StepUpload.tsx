@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { StepActions } from "./StepActions";
 import { ImageUpload } from "@/components/forms/ImageUpload";
@@ -27,6 +28,12 @@ interface StepUploadProps {
    * only ever appears for somebody it is actually true of.
    */
   returnedFromApp: boolean;
+  /**
+   * That return brought typed fields back with it. False for the visit this
+   * flow is built around - an advert click who leaves from an empty step one -
+   * where there was nothing to keep and saying otherwise is noise.
+   */
+  restoredProgress: boolean;
   /** `original` is the untouched file, before it was compressed for upload. */
   onCartChange: (file: File | null, original?: File | null) => void;
   onCheckoutChange: (file: File | null, original?: File | null) => void;
@@ -82,6 +89,7 @@ export function StepUpload({
   cartSettlesTheBill,
   cartConfirmedShort,
   returnedFromApp,
+  restoredProgress,
   onCartChange,
   onCheckoutChange,
   onCartPicked,
@@ -156,9 +164,11 @@ export function StepUpload({
           <p className="text-[0.95rem] font-bold text-emerald-900">
             Welcome back — upload your screenshot
           </p>
-          <p className="mt-0.5 text-[0.82rem] leading-snug text-emerald-800">
-            Everything you had entered is still here.
-          </p>
+          {restoredProgress ? (
+            <p className="mt-0.5 text-[0.82rem] leading-snug text-emerald-800">
+              Everything you had entered is still here.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -199,10 +209,21 @@ export function StepUpload({
         Your result, usually {RESULT_PROMISE}
       </p>
 
-      <div className="mt-4 space-y-3">
+      {/* The fork, asked out loud. Everything below answers one of two states,
+          and a first-timer from an advert is in the second one - which nothing
+          on this screen used to acknowledge until they had scrolled past both
+          upload slots. Withdrawn once a screenshot exists, because by then
+          they have answered it. */}
+      {cartFile ? null : (
+        <h2 className="mt-5 text-[1.05rem] font-extrabold leading-tight text-ink-900">
+          Already have your cart screenshot?
+        </h2>
+      )}
+
+      <div className={cartFile ? "mt-4 space-y-3" : "mt-2.5 space-y-3"}>
         <ImageUpload
           step={1}
-          label="Order details"
+          label="Cart screenshot"
           hint="Restaurant and selected items"
           helper="Make sure your restaurant name and ordered items are visible."
           requirement="required"
@@ -218,6 +239,17 @@ export function StepUpload({
           error={error}
         />
 
+        {/* Between the two slots, not under them.
+
+            This is the "no" branch of the question above, so it belongs beside
+            the "yes" branch rather than below the whole form - under both
+            upload cards it began 1163px down, which is a screen and a half
+            past where somebody without a screenshot gives up. Hidden the
+            moment one is picked: they have answered the question, and an exit
+            to another app in front of somebody one tap from finishing is a way
+            to lose them. */}
+        {cartFile ? null : <FoodAppLinks />}
+
         {/* Withdrawn, not just quieted, once the first screenshot settles the
             bill - the slot stays on the screen but stops being asked for.
             Confirmed short, the pill still says Recommended; only the
@@ -227,7 +259,7 @@ export function StepUpload({
             knowing that earns a stronger look, not a stronger rule. */}
         <ImageUpload
           step={2}
-          label="Final checkout total"
+          label="Checkout total"
           hint={
             cartSettlesTheBill
               ? "Already covered by your first screenshot"
@@ -258,16 +290,6 @@ export function StepUpload({
         />
       </div>
 
-      {/* Only while there is nothing to upload. Somebody who has already picked
-          a screenshot has answered the question this card asks, and leaving it
-          on screen invites them back out of a flow they are one tap from
-          finishing. */}
-      {cartFile ? null : (
-        <div className="mt-5">
-          <FoodAppLinks />
-        </div>
-      )}
-
       <StepActions>
         <Button onClick={onContinue} disabled={!cartFile} arrow>
           Continue
@@ -278,6 +300,22 @@ export function StepUpload({
           </p>
         ) : null}
       </StepActions>
+
+      {/* The way back to an order this browser did not send - a different
+          phone, or one that cleared its storage. It used to sit above the
+          headline, where it was a third path competing for the attention of
+          somebody who did not yet know what this page was; LastOrderBanner
+          still takes the top slot when there IS an order to resume, which is
+          the one case worth interrupting for. */}
+      <p className="mt-4 text-center text-[0.85rem] text-slate-500">
+        Sent us an order already?{" "}
+        <Link
+          href="/find"
+          className="inline-flex min-h-11 items-center px-1.5 font-bold text-ink-800 underline underline-offset-2"
+        >
+          Find it with your reference
+        </Link>
+      </p>
     </>
   );
 }

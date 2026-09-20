@@ -14,8 +14,13 @@ import { readLastOrder } from "@/lib/utils/last-order";
  * which - a result waiting is a very different message from one still being
  * worked out.
  *
- * Typing a reference is the fallback underneath, for a different phone or a
- * browser that forgot.
+ * Nothing at all when there is not. This used to fall back to a "find it with
+ * your reference" line in the same high slot, which meant a first-time visitor
+ * from an advert met a link to somebody else's finished order above the
+ * headline explaining what the page was - a third path offered before the
+ * first one had been read. That fallback now sits at the foot of the upload
+ * step, where a different phone or a cleared browser will still find it, and
+ * this slot is reserved for the one case worth interrupting for.
  */
 export function LastOrderBanner() {
   const [order, setOrder] = useState<{ reference: string; path: string } | null>(null);
@@ -40,19 +45,7 @@ export function LastOrderBanner() {
       .catch(() => {});
   }, []);
 
-  if (!order) {
-    return (
-      <p className="mt-3 text-center text-[0.85rem] text-slate-500">
-        Sent us an order already?{" "}
-        <Link
-          href="/find"
-          className="inline-flex min-h-11 items-center px-1.5 font-bold text-ink-800 underline underline-offset-2"
-        >
-          Find it with your reference
-        </Link>
-      </p>
-    );
-  }
+  if (!order) return null;
 
   return (
     <Link
