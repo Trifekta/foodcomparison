@@ -7,6 +7,7 @@ import { ImageUpload } from "@/components/forms/ImageUpload";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
 import { LastOrderBanner } from "@/components/customer/LastOrderBanner";
+import { UploadInstructions } from "./UploadInstructions";
 import { track } from "@/lib/analytics/track";
 import { captureAttribution } from "@/lib/analytics/attribution";
 import { RESULT_PROMISE } from "@/lib/constants";
@@ -174,6 +175,11 @@ export function StepUpload({
       <p className="mt-2.5 inline-block rounded-full bg-brand-100 px-3.5 py-1.5 text-[0.85rem] font-bold text-ink-800">
         Your result, usually {RESULT_PROMISE}
       </p>
+
+      {/* Instructions and quick-open buttons for food apps */}
+      <div className="mt-5">
+        <UploadInstructions />
+      </div>
 
       <div className="mt-4 space-y-3">
         <ImageUpload
