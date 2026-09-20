@@ -1,0 +1,133 @@
+import { describe, expect, it } from "vitest";
+import {
+  filterByStep,
+  summarizeVisits,
+  totalVisits,
+  type VisitEventRow,
+} from "@/lib/calculations/visits";
+
+const at = (minutesAgo: number) =>
+  new Date(Date.parse("2026-09-20T12:00:00Z") - minutesAgo * 60_000).toISOString();
+
+const row = (overrides: Partial<VisitEventRow> & Pick<VisitEventRow, "visit_id" | "event">): VisitEventRow => ({
+  created_at: at(0),
+  areas: null,
+  submissions: null,
+  ...overrides,
+});
+
+describe("summarizeVisits", () => {
+  it("collapses a visit's events into one row", () => {
+    const visits = summarizeVisits([
+      row({ visit_id: "a", event: "landing_viewed", created_at: at(10) }),
+      row({ visit_id: "a", event: "wizard_started", created_at: at(9) }),
+      row({ visit_id: "a", event: "cart_uploaded", created_at: at(8) }),
+    ]);
+
+    expect(visits).toHaveLength(1);
+    expect(visits[0].visitId).toBe("a");
+    expect(visits[0].firstSeen).toBe(at(10));
+    expect(visits[0].lastSeen).toBe(at(8));
+  });
+
+  /** The question this file exists for: retries are the friction signal. */
+  it("counts every screenshot a visit picked, retries included", () => {
+    const visits = summarizeVisits([
+      row({ visit_id: "a", event: "cart_uploaded", created_at: at(9) }),
+      row({ visit_id: "a", event: "cart_uploaded", created_at: at(8) }),
+      row({ visit_id: "a", event: "cart_uploaded", created_at: at(7) }),
+    ]);
+    expect(visits[0].screenshots).toBe(3);
+  });
+
+  it("reports the furthest step by funnel order, not by arrival order", () => {
+    // Recorded out of order on purpose - a later row that is an earlier step
+    // must not drag the furthest point backwards.
+    const visits = summarizeVisits([
+      row({ visit_id: "a", event: "step_review", created_at: at(9) }),
+      row({ visit_id: "a", event: "wizard_started", created_at: at(1) }),
+    ]);
+    expect(visits[0].furthestEvent).toBe("step_review");
+    expect(visits[0].furthestLabel).toBe("Gave area and total");
+  });
+
+  it("marks a visit completed only once it sent the order", () => {
+    const stopped = summarizeVisits([row({ visit_id: "a", event: "step_review" })]);
+    expect(stopped[0].completed).toBe(false);
+
+    const sent = summarizeVisits([
+      row({ visit_id: "b", event: "step_review", created_at: at(2) }),
+      row({ visit_id: "b", event: "submitted", created_at: at(1) }),
+    ]);
+    expect(sent[0].completed).toBe(true);
+  });
+
+  it("resolves the area and reference from whichever event carries one", () => {
+    const visits = summarizeVisits([
+      row({ visit_id: "a", event: "wizard_started", created_at: at(9) }),
+      row({ visit_id: "a", event: "step_review", created_at: at(8), areas: { name: "Al Karama" } }),
+      row({
+        visit_id: "a",
+        event: "submitted",
+        created_at: at(7),
+        submissions: { reference_number: "K4M2PQ" },
+      }),
+    ]);
+    expect(visits[0].areaName).toBe("Al Karama");
+    expect(visits[0].reference).toBe("K4M2PQ");
+  });
+
+  it("keeps visits apart and puts the most recent first", () => {
+    const visits = summarizeVisits([
+      row({ visit_id: "old", event: "wizard_started", created_at: at(30) }),
+      row({ visit_id: "new", event: "wizard_started", created_at: at(2) }),
+    ]);
+    expect(visits.map((visit) => visit.visitId)).toEqual(["new", "old"]);
+  });
+
+  it("survives an event name the funnel does not know", () => {
+    const visits = summarizeVisits([row({ visit_id: "a", event: "something_else" })]);
+    expect(visits[0].furthestIndex).toBe(-1);
+    expect(visits[0].furthestLabel).toBe("—");
+    expect(visits[0].completed).toBe(false);
+  });
+});
+
+describe("totalVisits", () => {
+  it("counts visits, uploaders, completions and total screenshots separately", () => {
+    const totals = totalVisits(
+      summarizeVisits([
+        row({ visit_id: "a", event: "cart_uploaded", created_at: at(9) }),
+        row({ visit_id: "a", event: "cart_uploaded", created_at: at(8) }),
+        row({ visit_id: "a", event: "submitted", created_at: at(7) }),
+        row({ visit_id: "b", event: "cart_uploaded", created_at: at(6) }),
+        row({ visit_id: "c", event: "landing_viewed", created_at: at(5) }),
+      ]),
+    );
+
+    expect(totals).toEqual({ visits: 3, uploaded: 2, completed: 1, screenshots: 3 });
+  });
+});
+
+describe("filterByStep", () => {
+  const visits = summarizeVisits([
+    row({ visit_id: "landed", event: "landing_viewed" }),
+    row({ visit_id: "uploaded", event: "cart_uploaded" }),
+    row({ visit_id: "sent", event: "submitted" }),
+  ]);
+
+  it("keeps everything when no step is chosen", () => {
+    expect(filterByStep(visits, null)).toHaveLength(3);
+  });
+
+  it("keeps the visits that got at least that far", () => {
+    const reached = filterByStep(visits, "cart_uploaded").map((visit) => visit.visitId);
+    expect(reached).toContain("uploaded");
+    expect(reached).toContain("sent");
+    expect(reached).not.toContain("landed");
+  });
+
+  it("ignores a step it does not recognise rather than emptying the table", () => {
+    expect(filterByStep(visits, "not_a_step")).toHaveLength(3);
+  });
+});

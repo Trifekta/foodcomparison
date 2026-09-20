@@ -17,9 +17,14 @@ export const FUNNEL_STEPS = [
   // walks away is what step_basket alone can never tell apart from a visit
   // that never uploaded at all.
   { event: "cart_uploaded", label: "Uploaded a screenshot" },
-  { event: "step_basket", label: "Confirmed their basket" },
-  { event: "step_where", label: "Gave area and total" },
-  { event: "step_review", label: "Reached review" },
+  // Each of these fires on ARRIVAL at a screen, so the honest label is the
+  // thing the customer just finished, not the screen they are now looking at.
+  // They used to be named one step ahead of themselves - "Gave area and total"
+  // sat on the event that fires the moment somebody *reaches* the area screen,
+  // having given nothing - which read as a far warmer funnel than the real one.
+  { event: "step_basket", label: "Reached the basket screen" },
+  { event: "step_where", label: "Confirmed their basket" },
+  { event: "step_review", label: "Gave area and total" },
   { event: "submitted", label: "Sent the order" },
   { event: "result_viewed", label: "Opened their result" },
   { event: "keeta_opened", label: "Tapped through to Keeta" },

@@ -55,7 +55,7 @@ describe("summarizeLivePresence", () => {
     expect(summary.activeCount).toBe(3);
     expect(summary.arrivedCount).toBe(0);
     expect(summary.byStep).toEqual([
-      { event: "step_where", label: "Gave area and total", count: 2 },
+      { event: "step_where", label: "Confirmed their basket", count: 2 },
       { event: "submitted", label: "Sent the order", count: 1 },
     ]);
   });

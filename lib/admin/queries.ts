@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { SIGNED_URL_TTL_SECONDS, STORAGE_BUCKET } from "@/lib/constants";
 import type { AnalyticsRow } from "@/lib/calculations/analytics";
 import type { FunnelAreaRow, FunnelRow } from "@/lib/analytics/funnel";
+import type { VisitEventRow } from "@/lib/calculations/visits";
 import { withAmountStrings } from "@/lib/calculations/money";
 import type {
   AreaRow,
@@ -421,4 +422,36 @@ export async function getRecentActivity(limit = 25): Promise<RecentActivityRow[]
 
   if (error) throw new Error(`Could not load recent activity: ${error.message}`);
   return (data ?? []) as unknown as RecentActivityRow[];
+}
+
+/**
+ * Every event in a window, for the per-visit table.
+ *
+ * funnel_events rather than visit_presence: presence is overwritten in place
+ * and holds only what a visit is doing now, so it cannot answer "what did this
+ * person do today" or "how many screenshots did they pick" - both of which
+ * need the history, not the latest state.
+ *
+ * Rows rather than an aggregate, because the aggregation worth doing here -
+ * furthest step by funnel order, uploads counted with their retries - is a
+ * rule that belongs in lib/calculations/visits.ts where it can be tested,
+ * not in a query string.
+ */
+export async function getVisitEvents(
+  range: DateRange = {},
+  limit = 20000,
+): Promise<VisitEventRow[]> {
+  const supabase = await createServerSupabaseClient();
+  const bounds = rangeToInstants(range);
+
+  const { data, error } = await supabase
+    .from("funnel_events")
+    .select("visit_id, event, created_at, areas(name), submissions(reference_number)")
+    .gte("created_at", bounds.since ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    .lte("created_at", bounds.until ?? "2999-12-31T23:59:59Z")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(`Could not load visits: ${error.message}`);
+  return (data ?? []) as unknown as VisitEventRow[];
 }

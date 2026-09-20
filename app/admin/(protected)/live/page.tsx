@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
-import { getLivePresence, getRecentActivity } from "@/lib/admin/queries";
+import { Suspense } from "react";
+import { getLivePresence, getRecentActivity, getVisitEvents } from "@/lib/admin/queries";
 import { summarizeLivePresence } from "@/lib/calculations/presence";
+import { filterByStep, summarizeVisits, totalVisits } from "@/lib/calculations/visits";
+import { parseDateRange } from "@/lib/admin/filters";
 import { LiveNow } from "@/components/admin/LiveNow";
 import { LiveVisitsTable } from "@/components/admin/LiveVisitsTable";
 import { RecentActivityFeed } from "@/components/admin/RecentActivityFeed";
 import { LiveAutoRefresh } from "@/components/admin/LiveAutoRefresh";
+import { VisitFilters } from "@/components/admin/VisitFilters";
+import { VisitsTable } from "@/components/admin/VisitsTable";
 
 export const metadata: Metadata = {
   title: "Live",
@@ -13,22 +18,36 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
 /**
- * Who is on the site right now, and what they are doing.
+ * Two questions on one page, deliberately in this order.
  *
- * Built on the funnel's own tracking rather than anything new: visit_presence
- * is a heartbeat away from the same visit id the funnel already counts, so
- * "active now" and "reached step three today" are the same kind of number,
- * just read over a different window. See lib/calculations/presence.ts for the
- * two-minute rule that decides "active".
+ * The top half is "right now": who is on the site this minute, and what they
+ * are touching. The bottom half is "what happened": one row per visit over a
+ * window, which is the only view that can answer how many screenshots one
+ * person picked - the funnel counts distinct visits per step, so it flattens
+ * three uploads by one person into a single tick.
+ *
+ * Only the top half auto-refreshes in any meaningful sense; a date range from
+ * last week does not move, and refreshing it costs nothing.
  */
-export default async function LivePage() {
-  const [{ now, rows: presenceRows }, activityRows] = await Promise.all([
+export default async function LivePage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const range = parseDateRange(params);
+  const step = typeof params.step === "string" ? params.step : null;
+
+  const [{ now, rows: presenceRows }, activityRows, visitEvents] = await Promise.all([
     getLivePresence(),
     getRecentActivity(),
+    // Allowed to fail on a database that has not run 0021 yet: the live half
+    // of this page is still worth showing when the visit table cannot be built.
+    getVisitEvents(range).catch(() => []),
   ]);
 
   const summary = summarizeLivePresence(presenceRows, now);
+  const visits = filterByStep(summarizeVisits(visitEvents), step);
+  const totals = totalVisits(visits);
 
   return (
     <div className="space-y-5">
@@ -42,13 +61,21 @@ export default async function LivePage() {
       <LiveNow summary={summary} />
 
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-ink-700">Recent visits</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink-700">On the site now</h2>
         <LiveVisitsTable rows={presenceRows} now={now} />
       </div>
 
       <div>
         <h2 className="mb-2 text-sm font-semibold text-ink-700">Recent activity</h2>
         <RecentActivityFeed rows={activityRows} now={now} />
+      </div>
+
+      <div className="space-y-3 border-t border-ink-200 pt-5">
+        <h2 className="text-sm font-semibold text-ink-700">Every visit</h2>
+        <Suspense fallback={<div className="h-28 rounded-2xl border border-ink-200 bg-white" />}>
+          <VisitFilters />
+        </Suspense>
+        <VisitsTable visits={visits} totals={totals} />
       </div>
     </div>
   );
