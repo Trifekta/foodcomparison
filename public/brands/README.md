@@ -1,34 +1,35 @@
 # Food app icons
 
-Drop the four delivery apps' own square app icons in here and the tiles on the
-upload step start showing real logos. Nothing else has to change.
+The square app icons behind the four tiles on the upload step. They are
+rendered by `components/customer/wizard/FoodAppLinks.tsx`, and the paths live
+in `lib/customer/food-apps.ts`.
 
 | File | App | Falls back to |
 | --- | --- | --- |
-| `talabat.png` | Talabat | orange tile, `t` |
-| `careem.png` | Careem | green tile, `C` |
-| `deliveroo.png` | Deliveroo | teal tile, `D` |
-| `noon-food.png` | Noon Food | yellow tile, `n` |
+| `talabat.png` | Talabat | `#FB5802` tile, `t` |
+| `careem.png` | Careem | `#1EBB59` tile, `C` |
+| `deliveroo.png` | Deliveroo | `#02D7C8` tile, `D` |
+| `noon-food.png` | Noon Food | `#FBDF01` tile, `n` |
 
-The filenames are the `logo` paths in `lib/customer/food-apps.ts` — use a
-different name or format (an `.svg` is fine) and change that file to match.
+Nothing here is drawn by us. These are the brands' own marks, supplied by the
+owner of this product, who is responsible for the right to use them — linking
+to a shop is usually nominative use, but that is a decision for a person, not
+a default. The letter fallbacks stay in the code for the same reason they
+existed before any artwork arrived: an approximation of somebody else's
+trademark would be worse than a tile that plainly is not one.
 
-## What the file has to be
+## Replacing one
 
 - **Square**, and the icon as the store shows it: the tile crops with
   `object-cover`, so a wordmark on a wide canvas loses its ends.
-- **96×96 or larger.** It renders at 24 CSS px, so 96 covers a 4× screen.
-- **PNG or SVG.** Transparent PNGs are fine; the brand colour stays painted
-  underneath.
-- **Small.** These are 24px tiles — a few KB each, not the megabyte PNGs in
-  `/public/food`.
+- **192×192**, which is 8× the 24 CSS px it renders at. Crop to the mark
+  itself: no white margin, and a transparent field outside the rounded
+  corners so the tile colour shows through rather than a white sliver.
+- **A palette PNG.** These are two-colour marks, so 32 colours is lossless to
+  the eye and keeps each file under 6 KB. An `.svg` is fine too — change the
+  path in `lib/customer/food-apps.ts` to match.
+- **Re-sample `tile`** in that file from the new icon's own background, since
+  that colour is what shows in the corners.
 
-## Where they come from
-
-Nobody should draw these. Take them from the brand's own press or partner kit,
-and only if this product has the right to use them — a link to a shop is
-usually nominative use, but that is a decision for a person, not a default.
-Until such a file is in hand, the letter tiles are deliberate: an approximation
-of somebody else's trademark is worse than a tile that plainly is not one.
-
-That is why this folder ships with no artwork, and why every tile works anyway.
+`tests/food-apps.test.ts` checks that every app still points at a file that
+exists here.

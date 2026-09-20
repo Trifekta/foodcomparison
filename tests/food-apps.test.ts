@@ -1,3 +1,5 @@
+import { statSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { FOOD_APPS } from "@/lib/customer/food-apps";
 
@@ -8,8 +10,8 @@ import { FOOD_APPS } from "@/lib/customer/food-apps";
  * on it, which is the shape of a phishing tile; and every entry is also the
  * only route out of an empty upload step. So the two things worth holding are
  * that the destinations stay https and stay the brands' own, and that a tile
- * can never come out blank - the logo file is allowed to be missing, the
- * letter behind it is not.
+ * can never come out blank - every app keeps a letter to fall back to, and
+ * every logo path resolves to a file that is really in /public/brands.
  */
 
 describe("the apps a cart can come from", () => {
@@ -41,6 +43,16 @@ describe("the apps a cart can come from", () => {
     expect(new Set(logos).size).toBe(logos.length);
     for (const logo of logos) {
       expect(logo).toMatch(/^\/brands\/[a-z0-9-]+\.(png|svg|webp)$/);
+    }
+  });
+
+  it("ships the icon each app asks for", () => {
+    // A rename that misses one of these is invisible in development - the
+    // letter quietly takes over and the tile still looks deliberate - so the
+    // suite is the only place it gets caught.
+    for (const app of FOOD_APPS) {
+      const file = path.join(process.cwd(), "public", app.logo);
+      expect(statSync(file).size, `${app.name}: ${app.logo}`).toBeGreaterThan(0);
     }
   });
 });

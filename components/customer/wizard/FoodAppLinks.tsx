@@ -27,12 +27,15 @@ const STEPS = [
 /**
  * One app's square mark: its real icon, or the letter that stands in.
  *
- * The swap is driven by the browser, not by a build-time check of the public
- * folder, because that is the only thing that knows the truth on the device in
- * hand - a file that is missing, still uploading, or blocked all arrive here
- * the same way, as onError, and all deserve the same answer. The brand colour
- * is painted underneath either way, so the fallback needs no layout of its own
- * and a transparent icon still lands on the colour it was drawn for.
+ * The icons are committed, so the fallback is not a placeholder waiting to be
+ * replaced - it is what the tile does when the request for a 2 KB file does
+ * not come back. Blocked by a network, missed by a rename, dropped on a bad
+ * connection: all three arrive here as onError, and all three deserve a tile
+ * that still says which app it opens.
+ *
+ * The brand colour is painted underneath either way. That is what shows
+ * through the icon's transparent corners, which is why it is sampled from the
+ * icon itself rather than from a brand guideline.
  */
 function AppMark({ app }: { app: FoodApp }) {
   const [missing, setMissing] = useState(false);
