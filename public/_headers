@@ -10,6 +10,11 @@
 /art/*
   Cache-Control: public, max-age=2592000, immutable
 
+# Food app icons. Not fingerprinted, and a brand can redraw its own mark, so a
+# month rather than forever - same bargain as /icons below.
+/brands/*
+  Cache-Control: public, max-age=2592000
+
 # App icons. Not fingerprinted, so a month rather than forever - long enough
 # that nobody refetches them, short enough that changing the mark reaches
 # everybody without a new filename.
