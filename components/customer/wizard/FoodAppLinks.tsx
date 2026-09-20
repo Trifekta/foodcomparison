@@ -1,31 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Smartphone } from "lucide-react";
 import { track } from "@/lib/analytics/track";
+import { FOOD_APPS, type FoodApp } from "@/lib/customer/food-apps";
 import { markLeavingForApp } from "@/lib/customer/wizard-session";
-
-/**
- * The four apps a cart can come from, and how to get to one.
- *
- * Plain https links, opened in a new tab. That is not a fallback for deep
- * linking - on a phone it IS the deep link: Android App Links and iOS Universal
- * Links hand a verified https URL straight to the installed app, and the web
- * page is what happens when the app is not installed. A talabat:// scheme would
- * only add a way to fail on desktop and in every browser that blocks unknown
- * schemes.
- *
- * The marks are typeset, not drawn. There are no brand logo files in this
- * repository, and inventing approximations of somebody else's trademark is
- * worse than a tile that plainly is not one; the colours are theirs, the letter
- * is ours, and the whole thing is swapped for real artwork by dropping files in
- * and changing `mark` below.
- */
-const FOOD_APPS = [
-  { name: "Talabat", href: "https://www.talabat.com/uae", mark: "t", tile: "bg-[#FF5A00]", ink: "text-white" },
-  { name: "Careem", href: "https://www.careem.com/en-AE/food/", mark: "C", tile: "bg-[#3EB55B]", ink: "text-white" },
-  { name: "Deliveroo", href: "https://deliveroo.onelink.me/9Aoc/NewHomepageCardAEEN", mark: "D", tile: "bg-[#00CCBC]", ink: "text-white" },
-  { name: "Noon Food", href: "https://food.noon.com/uae-en/", mark: "n", tile: "bg-[#FEEE00]", ink: "text-ink-900" },
-] as const;
 
 /**
  * Four steps, kept as four.
@@ -44,6 +23,47 @@ const STEPS = [
   "Take a screenshot of your cart",
   "Come back here — your progress is saved",
 ] as const;
+
+/**
+ * One app's square mark: its real icon, or the letter that stands in.
+ *
+ * The icons are committed, so the fallback is not a placeholder waiting to be
+ * replaced - it is what the tile does when the request for a 2 KB file does
+ * not come back. Blocked by a network, missed by a rename, dropped on a bad
+ * connection: all three arrive here as onError, and all three deserve a tile
+ * that still says which app it opens.
+ *
+ * The brand colour is painted underneath either way. That is what shows
+ * through the icon's transparent corners, which is why it is sampled from the
+ * icon itself rather than from a brand guideline.
+ */
+function AppMark({ app }: { app: FoodApp }) {
+  const [missing, setMissing] = useState(false);
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-lg text-[0.95rem] font-black ${app.tile} ${app.ink}`}
+    >
+      {missing ? (
+        app.mark
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={app.logo}
+          alt=""
+          width={24}
+          height={24}
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          onError={() => setMissing(true)}
+          className="h-full w-full object-cover"
+        />
+      )}
+    </span>
+  );
+}
 
 /**
  * Leaving, made part of the plan.
@@ -97,12 +117,7 @@ export function FoodAppLinks() {
             }}
             className="flex min-h-12 items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-2 py-2 text-left text-[0.8rem] font-semibold text-ink-900 hover:bg-ink-50"
           >
-            <span
-              aria-hidden="true"
-              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[0.95rem] font-black ${app.tile} ${app.ink}`}
-            >
-              {app.mark}
-            </span>
+            <AppMark app={app} />
             {/* One line each. Wrapping put the four labels on four different
                 break points and the grid read as unfinished; the chevron the
                 design had here is what paid for the width - "Open Noon Food"
