@@ -1,4 +1,5 @@
 import type { SubmissionListRow, DateRange } from "./queries";
+import type { VisitSummary } from "@/lib/calculations/visits";
 import type { ValidationMetrics } from "@/lib/calculations/analytics";
 import {
   AREA_FUNNEL_STEPS,
@@ -226,4 +227,56 @@ export function reportCsvFilename(range: DateRange, now = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   const stamp = `${dubai.getUTCFullYear()}-${pad(dubai.getUTCMonth() + 1)}-${pad(dubai.getUTCDate())}`;
   return `snipsavor-report-all-time-${stamp}.csv`;
+}
+
+
+/**
+ * The per-visit table as a spreadsheet.
+ *
+ * Same shape as what is on screen, with two deliberate differences. The visit
+ * id is written in full rather than the eight characters the table shows - the
+ * short form is there to keep a phone column narrow, and an export is the one
+ * place somebody might need to match a row against a raw event. And
+ * "Completed" becomes its own Yes/No column, because a spreadsheet can filter
+ * on that and cannot filter on the green row the table uses to say it.
+ */
+const VISIT_HEADERS = [
+  "Visit",
+  "Started (Dubai)",
+  "Last seen (Dubai)",
+  "Screenshots",
+  "Got as far as",
+  "Area",
+  "Order",
+  "Completed",
+] as const;
+
+export function buildVisitsCsv(visits: VisitSummary[]): string {
+  const lines = [VISIT_HEADERS.map(field).join(",")];
+
+  for (const visit of visits) {
+    lines.push(
+      [
+        field(visit.visitId),
+        field(formatDubaiTimestamp(visit.firstSeen)),
+        field(formatDubaiTimestamp(visit.lastSeen)),
+        // Unquoted would be tidier, but a count that arrives as text is a
+        // column somebody cannot sum. field() quotes it; Excel still reads a
+        // quoted integer as a number.
+        field(String(visit.screenshots)),
+        field(visit.furthestLabel === "—" ? "" : visit.furthestLabel),
+        field(visit.areaName ?? ""),
+        field(visit.reference ?? ""),
+        field(visit.completed ? "Yes" : "No"),
+      ].join(","),
+    );
+  }
+
+  return `﻿${lines.join("\r\n")}\r\n`;
+}
+
+/** Names the file by the range and step it covers, so downloads do not collide. */
+export function visitsCsvFilename(range: DateRange, step?: string | null): string {
+  const window = range.from || range.to ? `${range.from ?? "start"}-to-${range.to ?? "today"}` : "today";
+  return `snipsavor-visits-${window}${step ? `-${step}` : ""}.csv`;
 }
