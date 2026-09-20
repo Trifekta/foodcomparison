@@ -100,15 +100,15 @@ export default function LandingPage() {
         </h1>
 
         <p className="mt-3 text-[1.02rem] leading-relaxed text-slate-600">
-          Upload your cart from Talabat, Careem, Deliveroo, or Noon Food and we&apos;ll check if
-          it&apos;s cheaper on Keeta.
+          Upload your cart from Talabat, Careem, Deliveroo or Noon Food. We&apos;ll check the same
+          basket on Keeta.
         </p>
 
         <Link
           href="/compare"
           className="relative mt-5 inline-flex min-h-14 w-full items-center justify-center rounded-full bg-brand-400 px-6 text-base font-bold text-ink-900 shadow-sm transition-colors hover:bg-brand-300 active:bg-brand-500"
         >
-          Check my order
+          Get started
           <ArrowRight aria-hidden="true" className="absolute right-6 h-5 w-5" />
         </Link>
 
