@@ -38,9 +38,36 @@ export function isFunnelEvent(value: string): value is FunnelEvent {
   return EVENTS.has(value);
 }
 
+/**
+ * Things worth recording that are not steps.
+ *
+ * Deliberately outside FUNNEL_STEPS. Leaving for a food app is a detour, not a
+ * rung: most visits never do it, so slotting it into the ladder would divide
+ * cart_uploaded by a near-empty step and report a drop that did not happen -
+ * computeFunnel measures each step against the one above it. Kept here instead,
+ * these are stored and shown by name in the live view, and every calculation
+ * that walks FUNNEL_STEPS steps straight past them.
+ */
+export const SIDE_EVENTS = [
+  { event: "app_opened", label: "Went to a food app" },
+] as const;
+
+export type SideEvent = (typeof SIDE_EVENTS)[number]["event"];
+
+const SIDE = new Set<string>(SIDE_EVENTS.map((side) => side.event));
+
+export function isSideEvent(value: string): value is SideEvent {
+  return SIDE.has(value);
+}
+
+/** Anything the browser may record: a funnel step, or one of the detours above. */
+export function isTrackedEvent(value: string): value is FunnelEvent | SideEvent {
+  return EVENTS.has(value) || SIDE.has(value);
+}
+
 /** A step's label, for anywhere that only has the event name - the live view included. */
 export const FUNNEL_STEP_LABELS: Record<string, string> = Object.fromEntries(
-  FUNNEL_STEPS.map((step) => [step.event, step.label]),
+  [...FUNNEL_STEPS, ...SIDE_EVENTS].map((step) => [step.event, step.label]),
 );
 
 /** Matches the database's own check, so a bad id is refused before the query. */
