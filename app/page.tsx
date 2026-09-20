@@ -5,7 +5,6 @@ import { Disclaimer } from "@/components/customer/Disclaimer";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import {
   BrandTagline,
-  ScriptBubble,
   ScriptNote,
   SkylineFooter,
   Sparks,
@@ -18,7 +17,10 @@ const STEPS = [
     icon: Camera,
     tint: "bg-brand-200 text-brand-800",
     title: "Upload your cart",
-    body: "One screenshot is all we need.",
+    // Deliberately not "one screenshot" again - the line under the button
+    // already says that, and this is the place to answer the question it
+    // leaves behind: which screen?
+    body: "The screen with your items and total.",
   },
   {
     icon: Search,
@@ -30,7 +32,10 @@ const STEPS = [
     icon: PiggyBank,
     tint: "bg-chip-green-bg text-chip-green-fg",
     title: "See what you could save",
-    body: "We send you the difference.",
+    // The 5-minute promise lives here now, not in the trust line under the
+    // button, where "usually under 5 minutes" read as a demand on their time
+    // rather than a promise about ours.
+    body: `We message you the difference, usually ${RESULT_PROMISE}.`,
   },
 ];
 
@@ -52,29 +57,39 @@ export default function LandingPage() {
 
       <main className="flex flex-1 flex-col">
         {/* Hero banner */}
-        <div className="relative mt-3 rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4">
-          <div className="relative z-10 max-w-[44%]">
-            <ScriptNote className="text-[1.35rem] text-ink-900">
-              Good Food
-              <br />
-              Smarter Choices
-            </ScriptNote>
-            <p className="mt-2 text-[0.85rem] font-semibold leading-snug text-slate-600">
-              Same great food.
-              <br />A better deal.
-            </p>
-            <span aria-hidden="true" className="mt-1.5 block h-[3px] w-14 rounded-full bg-brand-400" />
+        {/* MOCKUP - numbers must come from a real comparison before shipping. */}
+        <div className="relative mt-3 overflow-hidden rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-3.5">
+          <p className="text-[0.68rem] font-bold uppercase tracking-[0.08em] text-ink-500">
+            A real order we checked
+          </p>
+
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-2">
+                <span className="w-[4.2rem] shrink-0 text-[0.82rem] text-slate-500">Talabat</span>
+                <span className="whitespace-nowrap text-[1rem] font-semibold tabular-nums text-slate-500 line-through decoration-slate-400">
+                  AED 82.00
+                </span>
+              </div>
+              <div className="mt-0.5 flex items-baseline gap-2">
+                <span className="w-[4.2rem] shrink-0 text-[0.82rem] font-semibold text-ink-900">
+                  Keeta
+                </span>
+                <span className="whitespace-nowrap text-[1.45rem] font-extrabold tabular-nums leading-tight text-ink-900">
+                  AED 68.00
+                </span>
+              </div>
+              <p className="mt-2 inline-block rounded-full bg-chip-green-bg px-3 py-1 text-[0.85rem] font-extrabold text-chip-green-fg">
+                Saved AED 14.00
+              </p>
+            </div>
+
+            <FoodPhoto
+              name="spread"
+              eager
+              className="pointer-events-none w-[38%] shrink-0 select-none"
+            />
           </div>
-          <FoodPhoto
-            name="spread"
-            eager
-            className="pointer-events-none absolute right-0 top-1/2 w-[62%] -translate-y-1/2 select-none"
-          />
-          <ScriptBubble className="absolute -right-1 -top-2 z-10 text-[0.64rem] leading-tight">
-            Save
-            <br />
-            more
-          </ScriptBubble>
         </div>
 
         <h1 className="relative mt-5 text-[2.1rem] font-extrabold leading-[1.12] text-ink-900">
@@ -98,7 +113,7 @@ export default function LandingPage() {
         </Link>
 
         <p className="mt-3 text-center text-[0.95rem] font-semibold text-slate-500">
-          Free to check · No account needed · Usually {RESULT_PROMISE}
+          Free · No account needed · One screenshot, about a minute
         </p>
 
         <ol className="mt-5 space-y-2.5">
