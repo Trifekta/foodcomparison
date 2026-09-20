@@ -5,6 +5,7 @@ import { PRODUCT_NAME, PRODUCT_DESCRIPTION } from "@/lib/constants";
 import { socialCard } from "@/lib/metadata";
 import { absoluteUrl } from "@/lib/env";
 import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
+import { MetaPixel } from "@/components/MetaPixel";
 
 // Self-hosted at build time by next/font, so there is no runtime request to
 // Google and no layout shift.
@@ -103,6 +104,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${jakarta.variable} ${caveat.variable}`}>
       <body className="min-h-dvh antialiased">
         <PresenceHeartbeat />
+        <MetaPixel />
         {children}
       </body>
     </html>
