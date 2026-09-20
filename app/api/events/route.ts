@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isFunnelEvent, isValidVisitId } from "@/lib/analytics/funnel";
+import { isTrackedEvent, isValidVisitId } from "@/lib/analytics/funnel";
 import { isValidResultToken } from "@/lib/utils/reference";
 import { checkRateLimit, clientKeyFromHeaders } from "@/lib/utils/rate-limit";
 import { RATE_LIMIT_WINDOW_MS } from "@/lib/constants";
@@ -77,7 +77,11 @@ export async function POST(request: Request) {
       return new NextResponse(null, { status: 204 });
     }
 
-    if (!isFunnelEvent(event)) {
+    // Funnel steps and the side events beside them (see SIDE_EVENTS) are stored
+    // the same way and told apart by the readers: computeFunnel and
+    // summarizeVisits both walk FUNNEL_STEPS, so a side event lands in the table
+    // and is stepped over by every calculation that ranks progress.
+    if (!isTrackedEvent(event)) {
       return new NextResponse(null, { status: 204 });
     }
 

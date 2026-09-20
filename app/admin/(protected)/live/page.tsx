@@ -13,16 +13,20 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
 /**
- * Real-time view of who is on the site right now, plus recent events.
+ * Who is on the site this minute, and the events of the last few.
  *
- * This auto-refreshes every 15 seconds. The historical per-visit table
- * was split onto its own route (/admin/live/visits) so this refresh never
- * touches historical data.
+ * Both halves are cheap and genuinely move between ticks, which is what earns
+ * the fifteen-second refresh. The per-visit table used to sit below this and
+ * be re-queried on every one of those ticks - a date range that does not move,
+ * rebuilt four times a minute - and now lives at /admin/live/visits, where it
+ * is fetched when somebody asks for it and not before.
+ *
+ * It takes no search params for that reason: the filters belong to the table,
+ * and leaving them here would invite a filtered URL that this page silently
+ * ignores.
  */
-export default async function LivePage({ searchParams }: { searchParams: SearchParams }) {
+export default async function LivePage() {
   const [{ now, rows: presenceRows }, activityRows] = await Promise.all([
     getLivePresence(),
     // Ten, not twenty-five: this is the "what is happening right now" feed.

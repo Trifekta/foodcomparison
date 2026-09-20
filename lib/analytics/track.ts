@@ -1,6 +1,6 @@
 "use client";
 
-import type { FunnelEvent } from "./funnel";
+import type { FunnelEvent, SideEvent } from "./funnel";
 
 /**
  * Recording a step, from the customer's browser.
@@ -65,7 +65,11 @@ function send(body: string): void {
  *   they volunteered from a fixed list of Dubai districts - coarse enough to
  *   identify nobody, specific enough to say which areas stop converting.
  */
-export function track(event: FunnelEvent, token?: string, areaId?: string | null): void {
+export function track(
+  event: FunnelEvent | SideEvent,
+  token?: string,
+  areaId?: string | null,
+): void {
   if (typeof window === "undefined") return;
 
   try {

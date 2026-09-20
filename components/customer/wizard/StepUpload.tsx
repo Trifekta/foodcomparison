@@ -7,7 +7,7 @@ import { ImageUpload } from "@/components/forms/ImageUpload";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
 import { LastOrderBanner } from "@/components/customer/LastOrderBanner";
-import { UploadInstructions } from "./UploadInstructions";
+import { FoodAppLinks } from "./FoodAppLinks";
 import { track } from "@/lib/analytics/track";
 import { captureAttribution } from "@/lib/analytics/attribution";
 import { RESULT_PROMISE } from "@/lib/constants";
@@ -21,6 +21,12 @@ interface StepUploadProps {
   cartSettlesTheBill: boolean;
   /** It was read in full and came back without one - now we know, not guess. */
   cartConfirmedShort: boolean;
+  /**
+   * They tapped one of the food-app links and have just come back. Set only by
+   * that round trip - never by an ordinary tab switch - so the greeting below
+   * only ever appears for somebody it is actually true of.
+   */
+  returnedFromApp: boolean;
   /** `original` is the untouched file, before it was compressed for upload. */
   onCartChange: (file: File | null, original?: File | null) => void;
   onCheckoutChange: (file: File | null, original?: File | null) => void;
@@ -75,6 +81,7 @@ export function StepUpload({
   cartReading,
   cartSettlesTheBill,
   cartConfirmedShort,
+  returnedFromApp,
   onCartChange,
   onCheckoutChange,
   onCartPicked,
@@ -141,11 +148,27 @@ export function StepUpload({
         </ScriptBubble>
       </div>
 
+      {/* Back from a food app, screenshot in hand. Stays put until they pick
+          one rather than fading on a timer: it is not a notification, it is
+          the answer to "am I in the right place and did I lose anything". */}
+      {returnedFromApp && !uploadStarted ? (
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <p className="text-[0.95rem] font-bold text-emerald-900">
+            Welcome back — upload your screenshot
+          </p>
+          <p className="mt-0.5 text-[0.82rem] leading-snug text-emerald-800">
+            Everything you had entered is still here.
+          </p>
+        </div>
+      ) : null}
+
       {/* Above everything, because somebody who already has an order in flight
           is not here to start another one - until they pick a screenshot,
           which says the opposite: whatever this banner is offering to resume,
-          they have just demonstrated they are not resuming it. */}
-      {uploadStarted ? null : <LastOrderBanner />}
+          they have just demonstrated they are not resuming it. Suppressed on
+          the way back from a food app: that round trip is a statement of intent
+          about this order, so offering to reopen an older one is noise. */}
+      {uploadStarted || returnedFromApp ? null : <LastOrderBanner />}
 
       <h1 className="relative mt-4 inline-flex items-start text-[1.9rem] font-extrabold leading-tight text-ink-900">
         Upload your order
@@ -175,11 +198,6 @@ export function StepUpload({
       <p className="mt-2.5 inline-block rounded-full bg-brand-100 px-3.5 py-1.5 text-[0.85rem] font-bold text-ink-800">
         Your result, usually {RESULT_PROMISE}
       </p>
-
-      {/* Instructions and quick-open buttons for food apps */}
-      <div className="mt-5">
-        <UploadInstructions />
-      </div>
 
       <div className="mt-4 space-y-3">
         <ImageUpload
@@ -239,6 +257,16 @@ export function StepUpload({
           }}
         />
       </div>
+
+      {/* Only while there is nothing to upload. Somebody who has already picked
+          a screenshot has answered the question this card asks, and leaving it
+          on screen invites them back out of a flow they are one tap from
+          finishing. */}
+      {cartFile ? null : (
+        <div className="mt-5">
+          <FoodAppLinks />
+        </div>
+      )}
 
       <StepActions>
         <Button onClick={onContinue} disabled={!cartFile} arrow>

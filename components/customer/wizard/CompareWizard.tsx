@@ -19,6 +19,13 @@ import { attributionFormFields, currentAttribution } from "@/lib/analytics/attri
 import { compressForUpload } from "@/lib/images/compress";
 import { itemTitle } from "@/lib/extraction/normalise";
 import type { FunnelEvent } from "@/lib/analytics/funnel";
+import {
+  clearWizardSession,
+  consumeReturnFromApp,
+  loadWizardSession,
+  restoredStep,
+  saveWizardSession,
+} from "@/lib/customer/wizard-session";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
 import { StepBasket } from "./StepBasket";
@@ -110,6 +117,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     setError,
     clearErrors,
     getValues,
+    reset,
     formState: { errors },
   } = useForm<WizardValues>({ defaultValues: WIZARD_DEFAULTS, mode: "onSubmit" });
 
@@ -136,6 +144,81 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   const [submitting, setSubmitting] = useState(false);
   // Guards against a double tap firing two submissions before state settles.
   const submitLock = useRef(false);
+  // They tapped through to a food app and have come back. Drives the greeting
+  // on the upload screen, and nothing else.
+  const [returnedFromApp, setReturnedFromApp] = useState(false);
+  /**
+   * Whether the restore below has finished.
+   *
+   * State, not a ref, and the distinction is the whole of a bug this had: a ref
+   * set at the end of the restore effect is already true when the save effect
+   * runs immediately after it in the same commit - but `values` and `items` in
+   * that pass are still the pre-restore ones, because the setState calls have
+   * not re-rendered yet. The save then wrote WIZARD_DEFAULTS straight over the
+   * session it had just read, and everything the customer had typed before
+   * leaving for a food app was gone by the time they came back.
+   *
+   * As state it flips on a later render, by which point the restored values are
+   * the ones being saved.
+   */
+  const [restored, setRestored] = useState(false);
+
+  /**
+   * Picking up where a discarded tab left off.
+   *
+   * This flow sends people to another app on purpose, and a backgrounded tab on
+   * a phone is routinely discarded and reloaded on return - so "come back here"
+   * has to survive the page being rebuilt from nothing. What was typed comes
+   * back; the screenshots cannot (see lib/customer/wizard-session.ts), which is
+   * why restoredStep puts anyone who was further along back on the upload
+   * screen rather than on a step that assumes an image exists.
+   */
+  useEffect(() => {
+    // After mount, deliberately: sessionStorage does not exist while this
+    // renders on the server, so the first paint has to be the empty wizard and
+    // what was stored can only be applied once the browser has it. Same shape
+    // as LastOrderBanner, and the rule is silenced for the same reason.
+    /* eslint-disable react-hooks/set-state-in-effect -- see above */
+    const saved = loadWizardSession();
+    if (saved) {
+      reset(saved.values);
+      setItems(saved.items);
+      // A reload is the only way this branch is reached, and no File survives
+      // one - so the answer to "do they still have a screenshot" is always no.
+      setStep(restoredStep(saved.step, false, STEP_UPLOAD));
+    }
+    if (consumeReturnFromApp()) {
+      setStep(STEP_UPLOAD);
+      setReturnedFromApp(true);
+    }
+    setRestored(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [reset]);
+
+  /**
+   * The same return, on a tab that was never discarded.
+   *
+   * The lucky case: React state is untouched, so there is nothing to restore
+   * and the only work is putting them on the screen that wants their
+   * screenshot. Armed exclusively by tapping a food-app link, so an ordinary
+   * tab switch cannot pull somebody off the step they were working on.
+   */
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.hidden || !consumeReturnFromApp()) return;
+      setStep(STEP_UPLOAD);
+      setReturnedFromApp(true);
+      window.scrollTo({ top: 0 });
+    };
+
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  useEffect(() => {
+    if (!restored) return;
+    saveWizardSession({ step, values, items });
+  }, [restored, step, values, items]);
 
   const setStatus = (slot: ReadSlot, status: ExtractionStatus) => {
     if (slot === "cart") setCartStatus(status);
@@ -480,6 +563,10 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       }
       track("submitted", undefined, parsed.data.areaId);
 
+      // The order is in. Anything still held for a half-finished wizard would
+      // only reopen it behind them if they came back to /compare later.
+      clearWizardSession();
+
       // Straight to their own result page, which starts out saying we are
       // checking and turns into the answer without them doing anything.
       router.replace(payload.resultPath);
@@ -509,6 +596,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           cartReading={cartReading}
           cartSettlesTheBill={cartSettled}
           cartConfirmedShort={cartIsConfirmedShort}
+          returnedFromApp={returnedFromApp}
           onCartChange={(file: File | null) => {
             setFiles((current) => ({ ...current, cart: file }));
             setCartError(null);
@@ -523,7 +611,11 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           // not the compressed upload: JPEG artifacts on small text cost far
           // more accuracy than the extra pixels cost time, and that copy is
           // not even ready yet at this point.
-          onCartPicked={(file) => startRead(file, "cart")}
+          onCartPicked={(file) => {
+            // The greeting has done its job the moment they act on it.
+            setReturnedFromApp(false);
+            startRead(file, "cart");
+          }}
           onCheckoutPicked={(file) => startRead(file, "checkout")}
           error={cartError}
           onContinue={handleUploadContinue}

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   FUNNEL_STEPS,
+  FUNNEL_STEP_LABELS,
   computeAreaFunnel,
   computeFunnel,
   isFunnelEvent,
+  isSideEvent,
+  isTrackedEvent,
   isValidVisitId,
 } from "@/lib/analytics/funnel";
 
@@ -209,5 +212,56 @@ describe("computeAreaFunnel", () => {
       row("step_where", "c", "Busy Area"),
     ]);
     expect(areas.map((entry) => entry.area)).toEqual(["Busy Area", "Quiet Area"]);
+  });
+});
+
+/**
+ * Side events are stored, counted by nobody, and named everywhere.
+ *
+ * "Went to a food app" is a detour, not a rung on the ladder. Most visits never
+ * take it, so putting it in FUNNEL_STEPS would make computeFunnel divide
+ * cart_uploaded by a near-empty step and report a collapse that never happened
+ * - every share is measured against the step above it. These tests exist to
+ * keep it out of that chain while it stays legible in the live view.
+ */
+describe("events that are recorded but are not steps", () => {
+  it("accepts them for storage alongside the funnel steps", () => {
+    expect(isTrackedEvent("app_opened")).toBe(true);
+    expect(isTrackedEvent("cart_uploaded")).toBe(true);
+    expect(isTrackedEvent("not_a_real_event")).toBe(false);
+  });
+
+  // FUNNEL_STEPS itself is not asserted against here: it is `as const`, so
+  // TypeScript already refuses the comparison as impossible, which is a
+  // stronger guarantee than a passing expectation.
+  it("keeps them out of the funnel itself", () => {
+    expect(isFunnelEvent("app_opened")).toBe(false);
+    expect(isSideEvent("app_opened")).toBe(true);
+  });
+
+  it("still gives them a label, so the live view is not showing a raw event name", () => {
+    expect(FUNNEL_STEP_LABELS.app_opened).toBe("Went to a food app");
+  });
+
+  /**
+   * The regression this whole arrangement exists to prevent. Three visits open
+   * the wizard, one detours to a food app, all three upload. If the detour were
+   * a step, cart_uploaded would be measured against that one visit and report
+   * 300% of the step above it.
+   */
+  it("does not distort the step below it", () => {
+    const rows = [
+      ...visits("wizard_started", ["a", "b", "c"]),
+      ...visits("app_opened", ["a"]),
+      ...visits("cart_uploaded", ["a", "b", "c"]),
+    ];
+
+    const funnel = computeFunnel(rows);
+    const uploaded = funnel.find((step) => step.event === "cart_uploaded");
+
+    expect(uploaded?.count).toBe(3);
+    expect(uploaded?.shareOfPrevious).toBe(100);
+    expect(uploaded?.dropFromPrevious).toBe(0);
+    expect(funnel.map((step) => String(step.event))).not.toContain("app_opened");
   });
 });
