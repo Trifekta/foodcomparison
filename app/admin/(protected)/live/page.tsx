@@ -23,14 +23,15 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 /**
  * Two questions on one page, deliberately in this order.
  *
- * The top half is "right now": who is on the site this minute, and what they
- * are touching. The bottom half is "what happened": one row per visit over a
- * window, which is the only view that can answer how many screenshots one
- * person picked - the funnel counts distinct visits per step, so it flattens
- * three uploads by one person into a single tick.
+ * Who is on the site this minute, then one row per visit over a window, then
+ * the raw event feed. The per-visit table is the reason this page gets opened
+ * - it is the only view that can answer how many screenshots one person
+ * picked, because the funnel counts distinct visits per step and so flattens
+ * three uploads by one person into a single tick - so it sits above the feed
+ * rather than below twenty-five rows of it, where nobody scrolled to find it.
  *
- * Only the top half auto-refreshes in any meaningful sense; a date range from
- * last week does not move, and refreshing it costs nothing.
+ * Only the live sections auto-refresh in any meaningful sense; a date range
+ * from last week does not move, and refreshing it costs nothing.
  */
 export default async function LivePage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
@@ -39,7 +40,9 @@ export default async function LivePage({ searchParams }: { searchParams: SearchP
 
   const [{ now, rows: presenceRows }, activityRows, visitEvents] = await Promise.all([
     getLivePresence(),
-    getRecentActivity(),
+    // Ten, not twenty-five: this is the "what is happening right now" feed,
+    // and a long one pushed the per-visit table below the fold on a laptop.
+    getRecentActivity(10),
     // Allowed to fail on a database that has not run 0021 yet: the live half
     // of this page is still worth showing when the visit table cannot be built.
     getVisitEvents(range).catch(() => []),
@@ -65,17 +68,17 @@ export default async function LivePage({ searchParams }: { searchParams: SearchP
         <LiveVisitsTable rows={presenceRows} now={now} />
       </div>
 
-      <div>
-        <h2 className="mb-2 text-sm font-semibold text-ink-700">Recent activity</h2>
-        <RecentActivityFeed rows={activityRows} now={now} />
-      </div>
-
       <div className="space-y-3 border-t border-ink-200 pt-5">
         <h2 className="text-sm font-semibold text-ink-700">Every visit</h2>
         <Suspense fallback={<div className="h-28 rounded-2xl border border-ink-200 bg-white" />}>
           <VisitFilters />
         </Suspense>
         <VisitsTable visits={visits} totals={totals} />
+      </div>
+
+      <div className="border-t border-ink-200 pt-5">
+        <h2 className="mb-2 text-sm font-semibold text-ink-700">Recent activity</h2>
+        <RecentActivityFeed rows={activityRows} now={now} />
       </div>
     </div>
   );
