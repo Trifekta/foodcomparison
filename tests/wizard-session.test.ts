@@ -37,6 +37,7 @@ function stubStorage() {
 const {
   clearWizardSession,
   consumeReturnFromApp,
+  hasProgress,
   loadWizardSession,
   markLeavingForApp,
   restoredStep,
@@ -163,5 +164,41 @@ describe("the flag that says they went shopping", () => {
 
     expect(loadWizardSession()).toBeNull();
     expect(consumeReturnFromApp()).toBe(false);
+  });
+});
+
+/**
+ * Whether the greeting may claim their work survived.
+ *
+ * The visit this whole flow exists for is an advert click who taps through to
+ * Talabat from an empty step one. Telling them everything they entered is safe
+ * when they entered nothing is a system talking to itself.
+ */
+describe("whether a restored session carries anything", () => {
+  it("is false for a session that only holds the defaults", () => {
+    expect(hasProgress({ step: 1, values: WIZARD_DEFAULTS, items: [] })).toBe(false);
+  });
+
+  it("is false when the untouched dial code is the only non-empty field", () => {
+    // "+971" is there because nobody chose it, so it is not progress.
+    expect(
+      hasProgress({ step: 1, values: { ...WIZARD_DEFAULTS, dialCode: "+971" }, items: [] }),
+    ).toBe(false);
+  });
+
+  it("is true once they have typed a field", () => {
+    expect(
+      hasProgress({ step: 2, values: { ...WIZARD_DEFAULTS, restaurantName: "Zaroob" }, items: [] }),
+    ).toBe(true);
+  });
+
+  it("is true when only the item list survived", () => {
+    expect(
+      hasProgress({
+        step: 2,
+        values: WIZARD_DEFAULTS,
+        items: [{ key: "a", name: "Shawarma", quantity: 1, linePrice: null, proposed: null }],
+      }),
+    ).toBe(true);
   });
 });

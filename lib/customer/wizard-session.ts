@@ -51,6 +51,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * Whether a restored session actually carries anything they typed.
+ *
+ * The welcome-back greeting offers to reassure people that their work
+ * survived, and for the visit this whole flow is built around - an advert
+ * click who taps straight through to Talabat from an empty step one - there is
+ * no work yet, so the reassurance is about nothing. Promising the safety of
+ * something the customer never entered reads as a system talking to itself.
+ *
+ * Compared against the defaults rather than emptiness, so a dial code nobody
+ * chose does not count as progress.
+ */
+export function hasProgress(session: SavedWizardSession): boolean {
+  if (session.items.length > 0) return true;
+  return (Object.keys(WIZARD_DEFAULTS) as (keyof WizardValues)[]).some(
+    (key) => session.values[key] !== WIZARD_DEFAULTS[key],
+  );
+}
+
+/**
  * Reads back what was stored, or null.
  *
  * Shape-checked field by field rather than trusted. Nobody but this tab can

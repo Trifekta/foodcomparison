@@ -22,6 +22,7 @@ import type { FunnelEvent } from "@/lib/analytics/funnel";
 import {
   clearWizardSession,
   consumeReturnFromApp,
+  hasProgress,
   loadWizardSession,
   restoredStep,
   saveWizardSession,
@@ -147,6 +148,9 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   // They tapped through to a food app and have come back. Drives the greeting
   // on the upload screen, and nothing else.
   const [returnedFromApp, setReturnedFromApp] = useState(false);
+  // Whether that return brought anything back with it, which decides whether
+  // the greeting claims it did.
+  const [restoredProgress, setRestoredProgress] = useState(false);
   /**
    * Whether the restore below has finished.
    *
@@ -183,6 +187,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     if (saved) {
       reset(saved.values);
       setItems(saved.items);
+      setRestoredProgress(hasProgress(saved));
       // A reload is the only way this branch is reached, and no File survives
       // one - so the answer to "do they still have a screenshot" is always no.
       setStep(restoredStep(saved.step, false, STEP_UPLOAD));
@@ -597,6 +602,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           cartSettlesTheBill={cartSettled}
           cartConfirmedShort={cartIsConfirmedShort}
           returnedFromApp={returnedFromApp}
+          restoredProgress={restoredProgress}
           onCartChange={(file: File | null) => {
             setFiles((current) => ({ ...current, cart: file }));
             setCartError(null);
