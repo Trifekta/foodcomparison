@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeValidationMetrics, type AnalyticsRow } from "@/lib/calculations/analytics";
+import {
+  computeSavingSummary,
+  computeValidationMetrics,
+  type AnalyticsRow,
+} from "@/lib/calculations/analytics";
 
 function row(overrides: Partial<AnalyticsRow>): AnalyticsRow {
   return {
@@ -138,5 +142,55 @@ describe("baskets nobody could price", () => {
       row({ status: "unavailable", comparison_total: null, unavailable_reason: null }),
     ]);
     expect(metrics.unavailableByReason).toEqual([{ label: "Not recorded", count: 1 }]);
+  });
+});
+
+/**
+ * The dashboard strip reads three columns; /admin/analytics reads eight. They
+ * are two queries now, so the only thing keeping their numbers honest is that
+ * both go through the same tally - which is what this pins.
+ */
+describe("computeSavingSummary", () => {
+  const rows = [
+    row({}),
+    row({ current_total: "50.00", comparison_total: "50.00", saving_amount: null }),
+    row({ comparison_total: null, saving_amount: null, status: "new" }),
+    row({ status: "unavailable", comparison_total: null, saving_amount: null }),
+    row({ current_total: "120.00", comparison_total: "90.00", saving_amount: "30.00" }),
+  ];
+
+  it("agrees with the full metrics on every number both of them report", () => {
+    const summary = computeSavingSummary(rows);
+    const metrics = computeValidationMetrics(rows);
+
+    expect(summary).toEqual({
+      totalSubmissions: metrics.totalSubmissions,
+      completedComparisons: metrics.completedComparisons,
+      savingFoundCount: metrics.savingFoundCount,
+      savingFoundPercentage: metrics.savingFoundPercentage,
+      noSavingPercentage: metrics.noSavingPercentage,
+      averageSavingMinor: metrics.averageSavingMinor,
+      averageSavingPercentage: metrics.averageSavingPercentage,
+    });
+  });
+
+  it("needs only the three columns the dashboard now asks the database for", () => {
+    const summary = computeSavingSummary([
+      { status: "result_ready", current_total: "82.00", comparison_total: "63.00" },
+      { status: "new", current_total: "40.00", comparison_total: null },
+    ]);
+
+    expect(summary.totalSubmissions).toBe(2);
+    expect(summary.completedComparisons).toBe(1);
+    expect(summary.savingFoundCount).toBe(1);
+    expect(summary.averageSavingMinor).toBe(1900);
+  });
+
+  it("returns zeroes for an empty dataset without dividing by zero", () => {
+    expect(computeSavingSummary([])).toMatchObject({
+      totalSubmissions: 0,
+      savingFoundPercentage: 0,
+      averageSavingMinor: 0,
+    });
   });
 });

@@ -1,24 +1,24 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import type { ValidationMetrics } from "@/lib/calculations/analytics";
+import type { SavingSummary } from "@/lib/calculations/analytics";
 import { formatMinorAsCurrency } from "@/lib/calculations/money";
 
 /** Compact "is this business working?" strip. Full breakdowns live in /admin/analytics. */
-export function ValidationStrip({ metrics }: { metrics: ValidationMetrics }) {
+export function ValidationStrip({ summary }: { summary: SavingSummary }) {
   const items = [
-    { label: "Submissions", value: String(metrics.totalSubmissions) },
-    { label: "Compared", value: String(metrics.completedComparisons) },
+    { label: "Submissions", value: String(summary.totalSubmissions) },
+    { label: "Compared", value: String(summary.completedComparisons) },
     {
       label: "Saving found",
       value:
-        metrics.completedComparisons > 0
-          ? `${metrics.savingFoundPercentage.toFixed(0)}%`
+        summary.completedComparisons > 0
+          ? `${summary.savingFoundPercentage.toFixed(0)}%`
           : "—",
     },
     {
       label: "Avg saving",
       value:
-        metrics.savingFoundCount > 0 ? formatMinorAsCurrency(metrics.averageSavingMinor) : "—",
+        summary.savingFoundCount > 0 ? formatMinorAsCurrency(summary.averageSavingMinor) : "—",
     },
   ];
 
