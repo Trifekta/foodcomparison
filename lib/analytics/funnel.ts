@@ -12,6 +12,11 @@ export const FUNNEL_STEPS = [
   // without starting.
   { event: "landing_viewed", label: "Landed from the advert" },
   { event: "wizard_started", label: "Opened the wizard" },
+  // Fires the instant a cart screenshot is picked, not when its read
+  // finishes or when they continue past it - a visit that uploads and then
+  // walks away is what step_basket alone can never tell apart from a visit
+  // that never uploaded at all.
+  { event: "cart_uploaded", label: "Uploaded a screenshot" },
   { event: "step_basket", label: "Confirmed their basket" },
   { event: "step_where", label: "Gave area and total" },
   { event: "step_review", label: "Reached review" },
