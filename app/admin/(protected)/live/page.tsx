@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getLivePresence, getRecentActivity, getVisitEvents } from "@/lib/admin/queries";
 import { summarizeLivePresence } from "@/lib/calculations/presence";
-import { filterByStep, summarizeVisits, totalVisits } from "@/lib/calculations/visits";
+import { filterByStep, isStepMatch, summarizeVisits, totalVisits } from "@/lib/calculations/visits";
 import { parseDateRange } from "@/lib/admin/filters";
 import { LiveNow } from "@/components/admin/LiveNow";
 import { LiveVisitsTable } from "@/components/admin/LiveVisitsTable";
@@ -37,6 +37,10 @@ export default async function LivePage({ searchParams }: { searchParams: SearchP
   const params = await searchParams;
   const range = parseDateRange(params);
   const step = typeof params.step === "string" ? params.step : null;
+  // "reached" is the funnel question, "stopped" is the where-they-died one.
+  // Anything unrecognised falls back to reached rather than emptying the table.
+  const rawMatch = typeof params.match === "string" ? params.match : null;
+  const match = isStepMatch(rawMatch) ? rawMatch : "reached";
 
   const [{ now, rows: presenceRows }, activityRows, visitEvents] = await Promise.all([
     getLivePresence(),
@@ -49,7 +53,7 @@ export default async function LivePage({ searchParams }: { searchParams: SearchP
   ]);
 
   const summary = summarizeLivePresence(presenceRows, now);
-  const visits = filterByStep(summarizeVisits(visitEvents), step);
+  const visits = filterByStep(summarizeVisits(visitEvents), step, match);
   const totals = totalVisits(visits);
 
   return (

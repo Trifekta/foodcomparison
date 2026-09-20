@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { FUNNEL_STEPS } from "@/lib/analytics/funnel";
+import { isStepMatch } from "@/lib/calculations/visits";
 
 /**
  * Which day, and how far they got.
@@ -34,6 +35,8 @@ export function VisitFilters() {
   const from = params.get("from") ?? "";
   const to = params.get("to") ?? "";
   const step = params.get("step") ?? "";
+  const rawMatch = params.get("match");
+  const match = isStepMatch(rawMatch) ? rawMatch : "reached";
 
   const push = (next: URLSearchParams) => {
     router.push(next.toString() ? `/admin/live?${next.toString()}` : "/admin/live");
@@ -106,8 +109,23 @@ export function VisitFilters() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="visits-step" className="text-xs font-semibold text-ink-500">
-            Got at least as far as
+          <label htmlFor="visits-match" className="text-xs font-semibold text-ink-500">
+            Show visits that
+          </label>
+          <select
+            id="visits-match"
+            value={match}
+            onChange={(event) => setParam("match", event.target.value)}
+            className={fieldClass}
+          >
+            <option value="reached">got at least as far as</option>
+            <option value="stopped">stopped at</option>
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="visits-step" className="sr-only">
+            Step
           </label>
           <select
             id="visits-step"

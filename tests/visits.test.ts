@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterByStep,
+  isStepMatch,
   summarizeVisits,
   totalVisits,
   type VisitEventRow,
@@ -129,5 +130,39 @@ describe("filterByStep", () => {
 
   it("ignores a step it does not recognise rather than emptying the table", () => {
     expect(filterByStep(visits, "not_a_step")).toHaveLength(3);
+  });
+
+  /**
+   * The reason this mode exists: asking for "got at least as far as the
+   * wizard" and being shown somebody who went on to send an order is correct
+   * and reads as a bug, so the other question had to become askable.
+   */
+  it("keeps only the visits that stopped on that exact step", () => {
+    const stopped = filterByStep(visits, "cart_uploaded", "stopped").map((v) => v.visitId);
+    expect(stopped).toEqual(["uploaded"]);
+  });
+
+  it("asks a different question from reached, on the same step", () => {
+    expect(filterByStep(visits, "landing_viewed", "reached")).toHaveLength(3);
+    expect(filterByStep(visits, "landing_viewed", "stopped")).toHaveLength(1);
+  });
+
+  it("defaults to reached when no mode is given", () => {
+    expect(filterByStep(visits, "cart_uploaded")).toHaveLength(
+      filterByStep(visits, "cart_uploaded", "reached").length,
+    );
+  });
+
+  it("still ignores an unknown step under stopped", () => {
+    expect(filterByStep(visits, "not_a_step", "stopped")).toHaveLength(3);
+  });
+});
+
+describe("isStepMatch", () => {
+  it("accepts the two modes and refuses anything else", () => {
+    expect(isStepMatch("reached")).toBe(true);
+    expect(isStepMatch("stopped")).toBe(true);
+    expect(isStepMatch("everything")).toBe(false);
+    expect(isStepMatch(null)).toBe(false);
   });
 });
