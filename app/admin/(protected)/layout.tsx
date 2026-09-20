@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/supabase/auth";
 import { AdminNav } from "@/components/admin/AdminNav";
+import { NewVisitChime } from "@/components/admin/NewVisitChime";
 
 /**
  * Server-side guard for every admin page.
@@ -17,6 +18,7 @@ export default async function ProtectedAdminLayout({
 
   return (
     <div className="min-h-dvh bg-ink-50">
+      <NewVisitChime />
       <AdminNav displayName={profile.display_name ?? user.email ?? "Admin"} />
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">{children}</div>
     </div>
