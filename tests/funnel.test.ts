@@ -45,6 +45,11 @@ describe("computeFunnel", () => {
   it("says what each screen costs, which is the number to act on", () => {
     const rows = [
       ...visits("wizard_started", ["a", "b", "c", "d"]),
+      // All four picked a screenshot; only three carried on past it. A visit
+      // cannot reach step_basket without having uploaded first, so a scenario
+      // that skipped this step would be measuring a drop against a screen
+      // nobody could have been standing on.
+      ...visits("cart_uploaded", ["a", "b", "c", "d"]),
       ...visits("step_basket", ["a", "b", "c"]),
       ...visits("step_where", ["a"]),
     ];
@@ -53,6 +58,29 @@ describe("computeFunnel", () => {
     expect(step(funnel, "step_basket").dropFromPrevious).toBe(25);
     // Two of the three who confirmed a basket stopped at the next screen.
     expect(step(funnel, "step_where").dropFromPrevious).toBeCloseTo(66.67, 1);
+  });
+
+  /**
+   * The gap this step was added for.
+   *
+   * Before it, uploading a screenshot and then walking away was recorded as
+   * nothing at all - indistinguishable, in the funnel, from opening the wizard
+   * and never touching the upload button.
+   */
+  it("separates uploading a screenshot from carrying on past it", () => {
+    const rows = [
+      ...visits("wizard_started", ["a", "b", "c"]),
+      ...visits("cart_uploaded", ["a", "b"]),
+      ...visits("step_basket", ["a"]),
+    ];
+    const funnel = computeFunnel(rows);
+
+    // One of the three who opened the wizard never picked a screenshot.
+    expect(step(funnel, "cart_uploaded").count).toBe(2);
+    expect(step(funnel, "cart_uploaded").dropFromPrevious).toBeCloseTo(33.33, 1);
+    // And one of the two who did upload stopped there rather than continuing.
+    expect(step(funnel, "step_basket").count).toBe(1);
+    expect(step(funnel, "step_basket").dropFromPrevious).toBe(50);
   });
 
   /**

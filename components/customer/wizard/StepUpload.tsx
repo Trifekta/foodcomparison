@@ -188,6 +188,7 @@ export function StepUpload({
           onChange={onCartChange}
           onFilePicked={(file) => {
             setUploadStarted(true);
+            track("cart_uploaded");
             onCartPicked(file);
           }}
           error={error}
