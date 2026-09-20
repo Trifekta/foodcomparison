@@ -4,6 +4,7 @@ import { BrandHeader } from "@/components/customer/BrandHeader";
 import { Disclaimer } from "@/components/customer/Disclaimer";
 import { BRAND_NAME, SCREENSHOT_RETENTION_DAYS } from "@/lib/constants";
 import { isExtractionConfigured } from "@/lib/env";
+import { isMetaPixelConfigured } from "@/lib/analytics/meta-pixel";
 
 export const metadata: Metadata = {
   title: "Privacy",
@@ -28,6 +29,9 @@ export default function PrivacyPage() {
   // The disclosure below has to describe what this deployment actually does, so
   // it follows the configuration rather than being written in by hand.
   const readsScreenshots = isExtractionConfigured();
+
+  // Same reasoning: only disclose the pixel on a build that actually loads it.
+  const tracksAds = isMetaPixelConfigured();
 
   return (
     <div className="safe-bottom mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-5">
@@ -156,6 +160,24 @@ export default function PrivacyPage() {
             area and the app) so we can understand where switching apps genuinely saves people money.
           </p>
         </Section>
+
+        {tracksAds ? (
+          <Section title="Ads and measurement">
+            <p>
+              We run ads on Facebook and Instagram, and this site loads Meta&apos;s pixel so we can
+              see how many people who tapped one of those ads went on to send us a price check. It
+              tells us that a visit happened and which page it was on. We do not send it your
+              screenshots, your phone number, your basket or your result.
+            </p>
+            <p>
+              Meta sets its own cookies through it and may use what it collects for its own
+              purposes, as described in their privacy policy. Your browser&apos;s tracking
+              settings, or any content blocker, stop it — nothing on {BRAND_NAME} needs it to
+              work, and your comparison is carried out exactly the same way without it. It is not
+              loaded on our staff pages.
+            </p>
+          </Section>
+        ) : null}
 
         <Section title="Your choices">
           <p>
