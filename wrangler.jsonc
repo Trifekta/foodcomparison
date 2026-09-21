@@ -45,6 +45,22 @@
   // enough to be free.
   "triggers": {
     "crons": ["*/5 * * * *"]
+  },
+
+  // A ceiling well below the 30s this plan allows by default.
+  //
+  // Not a performance setting - a blast radius. A request that has stopped
+  // making progress bills for every millisecond it spends spinning, and without
+  // this it spins until Cloudflare's own limit catches it. Ten seconds is far
+  // more than any render here needs, so nothing legitimate should ever reach
+  // it; anything that does is a bug, and this turns it into a 1102 in the logs
+  // rather than a quiet line on the invoice.
+  //
+  // Applies to the cron invocation too. The chaser is well inside it: its work
+  // is Supabase queries and a handful of push sends, and waiting on the network
+  // costs no CPU time - only the P-256 encryption of each payload does.
+  "limits": {
+    "cpu_ms": 10000
   }
 
   // Deliberately no WORKER_SELF_REFERENCE service binding. OpenNext only needs
