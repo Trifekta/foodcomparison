@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import { Wordmark } from "@/components/customer/Wordmark";
 import { ScreenFooter } from "@/components/customer/Motifs";
 import { TOTAL_STEPS } from "./types";
@@ -11,10 +11,16 @@ interface WizardShellProps {
   /** Overrides "Step n of 4" where a screen is better named than numbered. */
   stepLabel?: string;
   onBack: (() => void) | null;
+  /**
+   * Set while a screen is handing over by itself, so the change is announced
+   * rather than sprung. A screen that swaps under a thumb reads as a glitch;
+   * one that says "got it" first reads as a consequence of what was just done.
+   */
+  handingOver?: boolean;
   children: React.ReactNode;
 }
 
-export function WizardShell({ step, stepLabel, onBack, children }: WizardShellProps) {
+export function WizardShell({ step, stepLabel, onBack, handingOver = false, children }: WizardShellProps) {
   const reached = Math.min(step, TOTAL_STEPS);
 
   return (
@@ -40,9 +46,13 @@ export function WizardShell({ step, stepLabel, onBack, children }: WizardShellPr
             </Link>
           )}
           <Wordmark size="sm" />
-          <span className="ml-auto text-sm font-semibold text-slate-500">
-            {stepLabel ?? `Step ${step} of ${TOTAL_STEPS}`}
-          </span>
+          {/* No "Step n of m". The bar below says how much is left, which is
+              the honest half of that sentence; the number was the half that
+              invited somebody to count screens rather than look at the one in
+              front of them. */}
+          {stepLabel ? (
+            <span className="ml-auto text-sm font-semibold text-slate-500">{stepLabel}</span>
+          ) : null}
         </div>
 
         {/* One segment per step, as in the designs. */}
@@ -64,6 +74,15 @@ export function WizardShell({ step, stepLabel, onBack, children }: WizardShellPr
           ))}
         </div>
       </header>
+
+      <div aria-live="polite" className="empty:hidden">
+        {handingOver ? (
+          <p className="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-chip-green-bg px-3.5 py-2.5 text-sm font-bold text-chip-green-fg">
+            <Check aria-hidden="true" className="h-4 w-4" strokeWidth={3} />
+            Got it — opening the next step
+          </p>
+        ) : null}
+      </div>
 
       <main className="flex flex-1 flex-col pt-4">{children}</main>
 
