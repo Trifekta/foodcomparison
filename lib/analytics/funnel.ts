@@ -62,6 +62,38 @@ export function isFunnelEvent(value: string): value is FunnelEvent {
  */
 export const SIDE_EVENTS = [
   { event: "app_opened", label: "Went to a food app" },
+  // The landing page's own four tiles, deliberately NOT app_opened.
+  //
+  // The same tap from two screens means two different things. In the wizard it
+  // is somebody who has already committed and is going to fetch what we asked
+  // for; on the landing page it is somebody who has committed to nothing yet,
+  // and whether they ever come back is the open question this whole change
+  // exists to answer. Folded into one name, the second group would be hidden
+  // inside a number the wizard already dominates.
+  { event: "landing_app_opened", label: "Went to a food app (landing page)" },
+  // The other half of the pair above, and the only event here that measures a
+  // return rather than a departure. Fired on the landing page becoming visible
+  // again after one of its own tiles was tapped - never on a bare tab switch,
+  // because the flag it reads is armed by the tap alone (see
+  // lib/customer/landing-session.ts).
+  //
+  // Together the two give the number nobody has today: of the people sent to a
+  // food app from the landing page, how many came back at all.
+  { event: "returned_from_app", label: "Came back from a food app" },
+  // The main call to action, recorded where it is TAPPED rather than where it
+  // lands.
+  //
+  // wizard_started already counts arrivals at /compare, and the gap between the
+  // two is real: a tap that never becomes an arrival is a customer lost to the
+  // navigation itself - a slow connection, a closed tab, a back gesture on the
+  // way. Without this the loss is invisible, because both ends of it look like
+  // a visit that simply never tapped.
+  { event: "cta_check_cart", label: "Tapped Check my cart" },
+  // The secondary call to action. It is the one addition to this screen that
+  // could plausibly cost conversions rather than win them - it stands beside
+  // the primary button and offers somewhere else to go - so it is measured
+  // separately from the moment it ships, not reconstructed afterwards.
+  { event: "cta_example", label: "Opened the example" },
   // How far down the upload screen they got, one per visit. Buckets rather
   // than a number because this table stores event names and nothing else, and
   // a quarter of a screen is as fine a reading as the question needs: the
