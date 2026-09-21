@@ -64,9 +64,14 @@ export interface ReadTotals {
  * and on one screen it sat below the fold behind the card that had just been
  * satisfied. Plenty of people never scrolled to it.
  *
- * So the screen that was doing two jobs now does one each, and each hands over
- * by itself once its screenshot has been read (see autoAdvanceTarget). The
- * count went up; the work per screen went down, and nothing is scrolled past.
+ * So the screen that was doing two jobs now does one each. The count went up;
+ * the work per screen went down, and nothing is scrolled past.
+ *
+ * Each one waits for Continue. They briefly handed over by themselves, once
+ * their screenshot had been read, and it was withdrawn: the handover moved the
+ * page in ways that were hard to get right on a real phone, and the flow is
+ * carrying live advertising traffic. Moving somebody without a tap has to be
+ * better than the tap it replaces, and it was not. The screens stay.
  *
  * No "Step n of m" anywhere - the bar carries it. Naming a number invites the
  * comparison this change would lose, and the honest thing to show is how much
@@ -288,49 +293,6 @@ export function readTotalOffer(totals: ReadTotals | null): TotalOffer {
   if (totals.finalTotal !== "") return { value: totals.finalTotal, kind: "subtotal" };
   if (totals.subtotal !== "") return { value: totals.subtotal, kind: "subtotal" };
   return { value: "", kind: "none" };
-}
-
-/**
- * Where a screen hands over to, once its screenshot has been read.
- *
- * Null means stay put. The rule is small and the consequences are not, so it
- * is here with a test rather than inline in an effect:
- *
- *  - nothing read yet, or still reading, and nobody is moved. A screen that
- *    changes under a thumb is how a mis-tap happens.
- *  - from the cart screen, a bill that is already settled skips the total
- *    screen entirely. There is nothing left to ask for: the fees and the
- *    total were on the screenshot they already sent, and putting a screen in
- *    front of them to say so is the friction this whole flow is against.
- *  - the total screen NEVER hands over, and that is the point of it. Its read
- *    finishing is the moment it finally has something to say - here is what
- *    you paid - and moving then is moving at exactly the wrong time: the
- *    number appears and the screen carrying it leaves in the same breath. A
- *    customer who uploads a payment summary and never sees their own total
- *    has been shown nothing. It fills the field, rolls it into view, and
- *    waits for Continue. The same holds when the read finds nothing, for the
- *    mirror reason: that screen is where they type the number themselves.
- *  - a screen hands over once and never again, and Back switches it off for
- *    the screen it lands on. Otherwise Back is a button that throws you
- *    forward, which is worse than no Back.
- */
-export function autoAdvanceTarget(input: {
-  /** Which screen the customer is on now. */
-  step: number;
-  /** How the read for THIS screen's screenshot is going. */
-  status: ExtractionStatus;
-  /** Whether that screenshot has been chosen at all. */
-  hasFile: boolean;
-  /** Whether the cart screenshot carried the fees and the total. */
-  cartSettled: boolean;
-  /** This screen has already handed over once. */
-  alreadyAdvanced: boolean;
-}): number | null {
-  if (input.alreadyAdvanced || !input.hasFile) return null;
-  if (input.status === "reading" || input.status === "idle") return null;
-  if (input.step === 1) return input.cartSettled ? 3 : 2;
-  // Everything past the cart screen holds. See the note above.
-  return null;
 }
 
 /**

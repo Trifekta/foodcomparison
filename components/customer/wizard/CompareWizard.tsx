@@ -12,7 +12,6 @@ import {
   submissionFieldsSchema,
 } from "@/lib/validation/submission";
 import { rememberLastOrder } from "@/lib/utils/last-order";
-import { scrollBehavior } from "@/lib/utils/motion";
 import { track } from "@/lib/analytics/track";
 import { attributionFormFields, currentAttribution } from "@/lib/analytics/attribution";
 import { compressForUpload } from "@/lib/images/compress";
@@ -34,7 +33,6 @@ import {
   cartConfirmedShort as isCartConfirmedShort,
   combineStatus,
   hasAnyTotal,
-  autoAdvanceTarget,
   mergeReadTotals,
   readTotalOffer,
   shouldAutofillTotal,
@@ -53,16 +51,6 @@ const STEP_UPLOAD = 1;
 const STEP_TOTAL = 2;
 const STEP_CONFIRM = 3;
 
-/**
- * How long the handover cue sits on screen before the next one opens.
- *
- * Long enough to be read and to feel caused - "got it, moving on" - and short
- * enough that nobody waits for it. Immediate was the alternative and it is
- * worse in two ways: a screen that changes under a thumb is how a mis-tap
- * happens, and a read can land while somebody is still looking at the card
- * they have just filled.
- */
-const HANDOVER_MS = 1100;
 
 /**
  * How long the send button will wait for the screenshot read before giving up
@@ -178,16 +166,6 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
    * this says. All this decides is whether the customer is made to wait for it.
    */
   const [readWaitExpired, setReadWaitExpired] = useState(false);
-  /**
-   * The screens that have already handed over by themselves.
-   *
-   * Keyed by the screen being left. Without it, going Back lands on a screen
-   * whose read is still finished, which immediately throws the customer
-   * forward again - a Back button that does not go back is worse than none.
-   */
-  const [handedOver, setHandedOver] = useState<Record<number, boolean>>({});
-  /** The screen the cue is counting down to, or null while nothing is moving. */
-  const [handingOverTo, setHandingOverTo] = useState<number | null>(null);
   /**
    * The total this filled in by itself, if any.
    *
@@ -541,50 +519,8 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   const goTo = (next: number) => {
     setStep(next);
     if (next === STEP_CONFIRM) track("step_basket", undefined, getValues("areaId"));
-    // Rolled, not jumped. The screen is changing without a tap to explain it,
-    // and travel is what says "you have moved" rather than "something broke".
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: scrollBehavior() });
-    }
+    if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
-
-  /**
-   * Handing the customer on once the screenshot on this screen has been read.
-   *
-   * The decision itself is autoAdvanceTarget, which is pure and tested; this
-   * only runs the clock and can be called off. Cancelled whenever its inputs
-   * change - a second screenshot picked, a file removed, the customer tapping
-   * Back - so a cue is never left counting down to a screen that stopped being
-   * the right one.
-   */
-  useEffect(() => {
-    const onCart = step === STEP_UPLOAD;
-    const target = autoAdvanceTarget({
-      step,
-      status: onCart ? cartStatus : checkoutStatus,
-      hasFile: onCart ? files.cart !== null : files.checkout !== null,
-      cartSettled,
-      alreadyAdvanced: handedOver[step] === true,
-    });
-    if (target === null) return;
-
-    // Deliberate, and the one thing this effect is for: a read finishing is
-    // an external event, and the cue has to appear because of it. It settles
-    // immediately - the next pass sees handedOver and returns null.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
-    setHandingOverTo(target);
-    const timer = setTimeout(() => {
-      setHandedOver((current) => ({ ...current, [step]: true }));
-      setHandingOverTo(null);
-      goTo(target);
-    }, HANDOVER_MS);
-
-    return () => {
-      clearTimeout(timer);
-      setHandingOverTo(null);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- goTo is stable enough here; see the cancel above
-  }, [step, cartStatus, checkoutStatus, files.cart, files.checkout, cartSettled, handedOver]);
 
   /**
    * Puts the customer on the first thing that needs them.
@@ -620,9 +556,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     }
     setCartError(null);
 
-    // Tapping Continue is also a way to refuse the wait, so the screen it
-    // would have handed over to is the screen it goes to.
-    goTo(cartSettled ? STEP_CONFIRM : STEP_TOTAL);
+    goTo(STEP_TOTAL);
   };
 
   /**
@@ -771,23 +705,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   };
 
   return (
-    <WizardShell
-      step={step}
-      handingOver={handingOverTo !== null}
-      onBack={
-        step === STEP_UPLOAD
-          ? null
-          : () => {
-              // Back has to switch off the handover for the screen it lands
-              // on, not just move. That screen's read is still finished, so
-              // without this the cue starts again and throws them straight
-              // forward - a Back button that does not go back.
-              setHandingOverTo(null);
-              setHandedOver((current) => ({ ...current, [step - 1]: true }));
-              goTo(step - 1);
-            }
-      }
-    >
+    <WizardShell step={step} onBack={step === STEP_UPLOAD ? null : () => goTo(step - 1)}>
       {step === STEP_UPLOAD ? (
         <StepUpload
           cartFile={files.cart}
