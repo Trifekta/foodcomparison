@@ -7,7 +7,7 @@
  * to the text below, however small.
  */
 
-export const PROMPT_VERSION = "2026-09-17.1";
+export const PROMPT_VERSION = "2026-09-21.1";
 
 const SHARED_RULES = `You turn a food-delivery order into structured data. The apps involved are used in the UAE: Talabat, Careem Food, Deliveroo, Noon Food and similar.
 
@@ -16,7 +16,9 @@ Rules:
 - Every money field is a decimal STRING with no currency symbol and no thousands separator: "64.00", "8.5". Use "" for any amount the source does not state. Never write a number, never write "AED", never write "-" for a discount - a discount is stated as a positive amount, e.g. "10.00".
 - unit_price is the price of one unit, and only if the source states it separately. If the source shows one price for the whole row, put it in line_total and leave unit_price "".
 - Do not compute anything. Do not divide a row price by its quantity, do not add up a subtotal, do not derive a total. If it is not printed, it is "".
-- A basket or cart screen - one still offering a way toward checkout ("Checkout", "Go to checkout", "Continue", "Review order") rather than to complete the order ("Place order", "Confirm order", "Pay") - has not reached payment yet. A figure there labelled "Total" or "Order total" is the sum of the items, not what will actually be charged: delivery and service fees are still to come. Put that figure in subtotal, never final_total - UNLESS the same screen also states a delivery fee or a service fee (even "Free delivery"), which means those charges are already accounted for and the figure belongs in final_total after all.
+- Where a printed total belongs is decided by what else the screen states, NOT by which kind of screen it is. Ask this first, before anything about buttons or headings: does the screen state a delivery fee, a service fee, or a discount - counting "Free delivery", a struck-through fee, and a fee shown as 0? If YES, the charges are already accounted for and the printed total is what will actually be charged: it goes in final_total. This holds even when the screen is headed "Cart" or "Basket" and still offers a way onward ("Checkout", "Go to checkout", "Continue", "Review order"); many apps print the whole payment summary on the cart page.
+- Only if NO such fee or discount line appears anywhere on the screen does the other case apply: a figure labelled "Total" or "Order total" on a screen still offering a way toward checkout is the sum of the items, with delivery and service still to come. Put that one in subtotal, never final_total.
+- A screen can state both, and then they are two different figures: a line labelled "Subtotal" goes in subtotal, and the final line - "Total", "Total amount", "Order total", "To pay" - goes in final_total. Never overwrite one with the other, and never leave final_total empty because subtotal is already filled.
 - A savings or loyalty banner - "You're saving X", "Saving a total of X", a stamp or points promotion - states what the order saved overall, not a charge line in the bill. Never put it in discount. discount is a specific line printed in a payment summary, stated the way delivery_fee and service_fee are.
 - quantity is the number stated for that row. Where none is stated, use 1.
 - modifiers are the options printed with an item - "Extra garlic", "No pickles", "Large". An item with none gets an empty array.
