@@ -63,6 +63,34 @@ describe("summarizeVisits", () => {
     expect(sent[0].completed).toBe(true);
   });
 
+  /**
+   * The bug this guards: a customer opens the WhatsApp result link the next
+   * day. That is a new visit id whose only events are result_viewed (and maybe
+   * keeta_opened), both of which outrank "submitted" in FUNNEL_STEPS - so the
+   * day's Completed total counted yesterday's orders as today's.
+   */
+  it("does not count a visit that only came back to an earlier order", () => {
+    const visits = summarizeVisits([
+      row({ visit_id: "a", event: "result_viewed", created_at: at(9) }),
+      row({ visit_id: "a", event: "keeta_opened", created_at: at(8) }),
+    ]);
+
+    expect(visits[0].completed).toBe(false);
+    expect(visits[0].returning).toBe(true);
+    // It still reached what it reached - that part was never wrong.
+    expect(visits[0].furthestEvent).toBe("keeta_opened");
+  });
+
+  it("still counts a visit that sent the order and read its result in one go", () => {
+    const visits = summarizeVisits([
+      row({ visit_id: "a", event: "submitted", created_at: at(9) }),
+      row({ visit_id: "a", event: "result_viewed", created_at: at(8) }),
+    ]);
+
+    expect(visits[0].completed).toBe(true);
+    expect(visits[0].returning).toBe(false);
+  });
+
   it("resolves the area and reference from whichever event carries one", () => {
     const visits = summarizeVisits([
       row({ visit_id: "a", event: "wizard_started", created_at: at(9) }),
@@ -108,6 +136,18 @@ describe("totalVisits", () => {
 
     expect(totals).toEqual({ visits: 3, uploaded: 2, completed: 1, screenshots: 3 });
   });
+
+  it("counts a returning result-reader as a visit but not as a completion", () => {
+    const totals = totalVisits(
+      summarizeVisits([
+        row({ visit_id: "sent-today", event: "submitted", created_at: at(9) }),
+        row({ visit_id: "read-yesterdays", event: "result_viewed", created_at: at(5) }),
+      ]),
+    );
+
+    expect(totals.visits).toBe(2);
+    expect(totals.completed).toBe(1);
+  });
 });
 
 describe("filterByStep", () => {
@@ -126,6 +166,15 @@ describe("filterByStep", () => {
     expect(reached).toContain("uploaded");
     expect(reached).toContain("sent");
     expect(reached).not.toContain("landed");
+  });
+
+  it("leaves a returning result-reader out of the steps it never walked", () => {
+    const returning = summarizeVisits([row({ visit_id: "came-back", event: "result_viewed" })]);
+
+    expect(filterByStep(returning, "submitted", "reached")).toHaveLength(0);
+    expect(filterByStep(returning, "wizard_started", "reached")).toHaveLength(0);
+    // The one step it really did reach still finds it.
+    expect(filterByStep(returning, "result_viewed", "reached")).toHaveLength(1);
   });
 
   it("ignores a step it does not recognise rather than emptying the table", () => {

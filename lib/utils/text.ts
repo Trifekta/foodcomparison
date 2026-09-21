@@ -81,3 +81,34 @@ export function formatRelativeTime(value: string | Date, now: number = Date.now(
   const days = Math.round(hours / 24);
   return `${days}d ago`;
 }
+
+/**
+ * The calendar date an instant falls on in Dubai, as YYYY-MM-DD.
+ *
+ * Every date filter in the dashboard is read as a Dubai day by the server
+ * (see rangeToInstants), so anything that *produces* one of those dates has
+ * to agree - including the "Today" buttons, which ran off the admin's own
+ * device clock and so asked for a different day whenever that device was not
+ * on Dubai time.
+ */
+export function dubaiIsoDate(value: string | number | Date = Date.now()): string {
+  const date = value instanceof Date ? value : new Date(value);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Dubai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const part = (type: "year" | "month" | "day") =>
+    parts.find((candidate) => candidate.type === type)?.value ?? "";
+
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+/** The Dubai date some whole number of days before another one. Dubai has no
+ * daylight saving, so the shift is plain arithmetic rather than a lookup. */
+export function dubaiIsoDateDaysAgo(days: number, from: string | number | Date = Date.now()): string {
+  const base = from instanceof Date ? from.getTime() : new Date(from).getTime();
+  return dubaiIsoDate(base - days * 86_400_000);
+}

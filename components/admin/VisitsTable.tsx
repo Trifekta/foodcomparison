@@ -112,6 +112,14 @@ export function VisitsTable({
                     }`}
                   >
                     {visit.furthestLabel}
+                    {visit.returning ? (
+                      <span
+                        className="ml-1.5 whitespace-nowrap text-xs font-normal text-ink-500"
+                        title="Followed the link to an order sent earlier - this visit never sent one, so it is not counted as completed"
+                      >
+                        earlier order
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-4 py-2.5 text-ink-600">{visit.areaName ?? "—"}</td>
                   <td className="px-4 py-2.5">

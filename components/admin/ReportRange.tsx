@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Download } from "lucide-react";
+import { dubaiIsoDate } from "@/lib/utils/text";
 
 /**
  * The date range the Validation page is read over, and the download beside it.
@@ -14,27 +15,30 @@ import { Download } from "lucide-react";
  * can never be a different fortnight.
  */
 
-/** YYYY-MM-DD in whatever timezone the admin's own device is set to - the same
- * assumption the two plain date inputs below already make. */
-function isoDate(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-    date.getDate(),
-  ).padStart(2, "0")}`;
-}
-
 /** One-tap ranges for the two questions an admin actually asks: "today" and
- * "this/last month". The two date inputs below still cover anything else. */
+ * "this/last month". The two date inputs below still cover anything else.
+ *
+ * Built from the Dubai day rather than the device's: the server reads these
+ * two parameters as Dubai calendar days, so a preset off a phone on another
+ * clock asks for a range the page never claimed to show. */
 function presetRanges(): { label: string; from: string; to: string }[] {
-  const now = new Date();
-  const today = isoDate(now);
-  const startOfThisMonth = isoDate(new Date(now.getFullYear(), now.getMonth(), 1));
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-  const startOfLastMonth = new Date(endOfLastMonth.getFullYear(), endOfLastMonth.getMonth(), 1);
+  const today = dubaiIsoDate();
+  const [year, month] = today.split("-").map(Number);
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  const startOfThisMonth = `${year}-${pad(month)}-01`;
+  const lastMonthYear = month === 1 ? year - 1 : year;
+  const lastMonth = month === 1 ? 12 : month - 1;
+  const startOfLastMonth = `${lastMonthYear}-${pad(lastMonth)}-01`;
+  // Day zero of this month is the last day of the one before it.
+  const endOfLastMonth = `${lastMonthYear}-${pad(lastMonth)}-${pad(
+    new Date(Date.UTC(year, month - 1, 0)).getUTCDate(),
+  )}`;
 
   return [
     { label: "Today", from: today, to: today },
     { label: "This month", from: startOfThisMonth, to: today },
-    { label: "Last month", from: isoDate(startOfLastMonth), to: isoDate(endOfLastMonth) },
+    { label: "Last month", from: startOfLastMonth, to: endOfLastMonth },
   ];
 }
 
