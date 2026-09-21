@@ -26,7 +26,6 @@ import {
 } from "@/lib/customer/wizard-session";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
-import { StepTotal } from "./StepTotal";
 import { StepConfirm } from "./StepConfirm";
 import {
   WIZARD_DEFAULTS,
@@ -48,9 +47,7 @@ import {
 } from "./types";
 
 const STEP_UPLOAD = 1;
-const STEP_TOTAL = 2;
-const STEP_CONFIRM = 3;
-
+const STEP_CONFIRM = 2;
 
 /**
  * How long the send button will wait for the screenshot read before giving up
@@ -556,18 +553,10 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     }
     setCartError(null);
 
-    goTo(STEP_TOTAL);
-  };
-
-  /**
-   * Leaving the total screen.
-   *
-   * The total is not required to get past it - it is asked for again, and
-   * properly, on the confirm screen. But a number typed here that could never
-   * be valid is worth saying so about now, while they are still looking at the
-   * field, rather than after a screen has changed.
-   */
-  const handleTotalContinue = () => {
+    // The total is not required to leave this screen - it is asked for again,
+    // and properly, on the next one. But a number typed here that could never
+    // be valid is worth saying so about now, while they are still looking at
+    // the field, rather than after a screen transition.
     const typed = getValues("currentTotal");
     if (typed.trim() !== "") {
       const parsed = amountSchema.safeParse(typed);
@@ -580,6 +569,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       }
     }
     clearErrors("currentTotal");
+
     goTo(STEP_CONFIRM);
   };
 
@@ -709,6 +699,8 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       {step === STEP_UPLOAD ? (
         <StepUpload
           cartFile={files.cart}
+          checkoutFile={files.checkout}
+          cartReading={cartReading}
           cartSettlesTheBill={cartSettled}
           cartConfirmedShort={cartIsConfirmedShort}
           returnedFromApp={returnedFromApp}
@@ -717,6 +709,10 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
             setFiles((current) => ({ ...current, cart: file }));
             setCartError(null);
             if (!file) clearRead("cart");
+          }}
+          onCheckoutChange={(file: File | null) => {
+            setFiles((current) => ({ ...current, checkout: file }));
+            if (!file) clearRead("checkout");
           }}
           // Fired the instant a file is picked, ahead of the display copy's
           // downscale - see onFilePicked on ImageUpload. Reads the original,
@@ -728,29 +724,15 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
             setReturnedFromApp(false);
             startRead(file, "cart");
           }}
-          error={cartError}
-          onContinue={handleUploadContinue}
-        />
-      ) : null}
-
-      {step === STEP_TOTAL ? (
-        <StepTotal
-          checkoutFile={files.checkout}
-          cartReading={cartReading}
-          cartSettlesTheBill={cartSettled}
-          cartConfirmedShort={cartIsConfirmedShort}
-          checkoutStatus={checkoutStatus}
-          totalKind={offer.kind}
-          prefilledFromScreenshot={offer.value !== "" && values.currentTotal === offer.value}
+          onCheckoutPicked={(file) => startRead(file, "checkout")}
           manualTotal={values.currentTotal}
+          totalKind={offer.kind}
+          checkoutStatus={checkoutStatus}
+          prefilledFromScreenshot={offer.value !== "" && values.currentTotal === offer.value}
           onManualTotalChange={(value) => setField("currentTotal", value)}
           totalError={errors.currentTotal?.message}
-          onCheckoutChange={(file: File | null) => {
-            setFiles((current) => ({ ...current, checkout: file }));
-            if (!file) clearRead("checkout");
-          }}
-          onCheckoutPicked={(file) => startRead(file, "checkout")}
-          onContinue={handleTotalContinue}
+          error={cartError}
+          onContinue={handleUploadContinue}
         />
       ) : null}
 

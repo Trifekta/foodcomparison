@@ -55,29 +55,23 @@ export interface ReadTotals {
 }
 
 /**
- * Three screens: the cart, the total, then confirm and send.
+ * Two screens: upload, then confirm and send.
  *
- * It was four, then two, and is now three - which is not a retreat. The two
- * were upload and confirm, and "upload" quietly held three jobs: the cart
- * screenshot, the checkout screenshot, and a total typed by hand. The second
- * of those is what turns a subtotal into the number somebody actually paid,
- * and on one screen it sat below the fold behind the card that had just been
- * satisfied. Plenty of people never scrolled to it.
+ * It was four, then two, then briefly three, and is two again. The three put
+ * the checkout screenshot on a screen of its own, because on one screen it sat
+ * below the fold behind a card that had just been visibly satisfied and people
+ * missed it. That reasoning still holds and the split still went: it moved the
+ * total field onto a screen most customers never needed, and a flow carrying
+ * live advertising traffic is not the place to keep testing which is worse.
  *
- * So the screen that was doing two jobs now does one each. The count went up;
- * the work per screen went down, and nothing is scrolled past.
+ * So both screenshots and the total live together on the upload screen again,
+ * exactly as they did when this was last known good. The fold problem is real
+ * and unsolved; it wants a smaller answer than a whole screen.
  *
- * Each one waits for Continue. They briefly handed over by themselves, once
- * their screenshot had been read, and it was withdrawn: the handover moved the
- * page in ways that were hard to get right on a real phone, and the flow is
- * carrying live advertising traffic. Moving somebody without a tap has to be
- * better than the tap it replaces, and it was not. The screens stay.
- *
- * No "Step n of m" anywhere - the bar carries it. Naming a number invites the
- * comparison this change would lose, and the honest thing to show is how much
- * is left, which is what a bar is for.
+ * No "Step n of m" anywhere - the bar carries it. That part of the three-screen
+ * change was right and stays.
  */
-export const TOTAL_STEPS = 3;
+export const TOTAL_STEPS = 2;
 
 export const WIZARD_DEFAULTS: WizardValues = {
   restaurantName: "",
