@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { FUNNEL_STEPS } from "@/lib/analytics/funnel";
 import { isStepMatch } from "@/lib/calculations/visits";
+import { dubaiIsoDate, dubaiIsoDateDaysAgo } from "@/lib/utils/text";
 
 /**
  * Which day, and how far they got.
@@ -10,17 +11,21 @@ import { isStepMatch } from "@/lib/calculations/visits";
  * In the URL rather than in state, like every other filter here, so a view
  * worth acting on is a view worth sending to somebody.
  */
-function isoDate(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-    date.getDate(),
-  ).padStart(2, "0")}`;
-}
 
+/**
+ * Dubai days, not the device's.
+ *
+ * The server reads `from` and `to` as Dubai calendar days, so a "Today" built
+ * from the admin's own clock asks for somebody else's day whenever the phone
+ * is not on Dubai time - and, near midnight, for a day that has not started
+ * or has already ended here. Same dates on both sides, or the pill says Today
+ * and the table shows a slice of yesterday.
+ */
 function presets(): { label: string; from: string; to: string }[] {
-  const now = new Date();
-  const today = isoDate(now);
-  const yesterday = isoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
-  const weekAgo = isoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6));
+  const now = Date.now();
+  const today = dubaiIsoDate(now);
+  const yesterday = dubaiIsoDateDaysAgo(1, now);
+  const weekAgo = dubaiIsoDateDaysAgo(6, now);
   return [
     { label: "Today", from: today, to: today },
     { label: "Yesterday", from: yesterday, to: yesterday },

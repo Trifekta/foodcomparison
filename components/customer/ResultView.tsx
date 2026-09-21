@@ -348,9 +348,9 @@ function PriceRows({ result }: { result: PublicResult }) {
 /**
  * The outbound link, with this visit's id on it.
  *
- * Built in an effect rather than during render because sessionStorage does not
- * exist on the server, and reading it while rendering would make the two
- * disagree. Deferred by a tick for the same reason the rest of this codebase
+ * Built in an effect rather than during render because the visit id lives in
+ * storage the server cannot see, and reading it while rendering would make the
+ * two disagree. Deferred by a tick for the same reason the rest of this codebase
  * does it - setting state straight from an effect body is the pattern React now
  * warns about - and until it resolves the button already works: the href falls
  * back to the plain path, which redirects perfectly well and simply records the

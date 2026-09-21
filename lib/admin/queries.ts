@@ -6,6 +6,7 @@ import type { AnalyticsRow, SavingSummaryRow } from "@/lib/calculations/analytic
 import type { FunnelAreaRow, FunnelRow } from "@/lib/analytics/funnel";
 import type { VisitEventRow } from "@/lib/calculations/visits";
 import { withAmountStrings } from "@/lib/calculations/money";
+import { dubaiIsoDate } from "@/lib/utils/text";
 import type {
   AreaRow,
   SubmissionEventRow,
@@ -495,12 +496,12 @@ export const VISIT_EVENTS_LIMIT = 5000;
 /**
  * Today, in the only timezone this product operates in.
  *
- * Dubai is UTC+4 all year, so the shift is arithmetic rather than a lookup -
- * and it is done here, outside any component, because Date.now() in a render
- * is impure and the lint rule that says so is right.
+ * The same Dubai day the filter buttons produce, from the same helper - the
+ * default range and a tap on "Today" have to mean one thing, or clearing the
+ * filters quietly moves the window.
  */
 export function defaultVisitRange(): DateRange {
-  const today = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const today = dubaiIsoDate();
   return { from: today, to: today };
 }
 

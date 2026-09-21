@@ -31,6 +31,12 @@ export interface VisitSummary {
   furthestLabel: string;
   /** How far along the funnel that is, for filtering. -1 when unknown. */
   furthestIndex: number;
+  /**
+   * A visit that opened an order's result (or tapped through to Keeta) without
+   * ever sending one - somebody following the link from an order placed on an
+   * earlier day, which is a real visit today and not an order today.
+   */
+  returning: boolean;
   areaName: string | null;
   reference: string | null;
   /** Whether this visit ever sent an order. */
@@ -42,6 +48,17 @@ const LABELS = new Map<string, string>(FUNNEL_STEPS.map((step) => [step.event, s
 
 /** The step everything else is measured against - sending the order. */
 export const COMPLETED_EVENT = "submitted";
+
+/**
+ * Where the ladder stops being a ladder.
+ *
+ * Every step up to and including this one happens in the visit that makes the
+ * order. The two above it - opening the result, tapping through to Keeta -
+ * happen whenever the customer next reads their WhatsApp message, which is
+ * routinely the following day and always a new visit id. So for those two, and
+ * only those two, "furthest step reached" does not imply the steps below it.
+ */
+const COMPLETED_INDEX = ORDER.get(COMPLETED_EVENT) ?? Infinity;
 
 export function summarizeVisits(rows: VisitEventRow[]): VisitSummary[] {
   const byVisit = new Map<string, VisitEventRow[]>();
@@ -59,6 +76,7 @@ export function summarizeVisits(rows: VisitEventRow[]): VisitSummary[] {
     let screenshots = 0;
     let furthestIndex = -1;
     let furthestEvent: FunnelEvent | null = null;
+    let sentOrder = false;
     let areaName: string | null = null;
     let reference: string | null = null;
 
@@ -67,6 +85,7 @@ export function summarizeVisits(rows: VisitEventRow[]): VisitSummary[] {
       if (row.created_at > lastSeen) lastSeen = row.created_at;
 
       if (row.event === "cart_uploaded") screenshots += 1;
+      if (row.event === COMPLETED_EVENT) sentOrder = true;
 
       const index = ORDER.get(row.event);
       if (index !== undefined && index > furthestIndex) {
@@ -90,9 +109,14 @@ export function summarizeVisits(rows: VisitEventRow[]): VisitSummary[] {
       furthestEvent,
       furthestLabel: furthestEvent ? (LABELS.get(furthestEvent) ?? furthestEvent) : "—",
       furthestIndex,
+      // Read off the event itself rather than off the ladder position. A visit
+      // whose furthest step is "Opened their result" outranks "Sent the order"
+      // without having sent one, and counting it as a completion is what put
+      // yesterday's orders in today's total.
+      returning: !sentOrder && furthestIndex > COMPLETED_INDEX,
       areaName,
       reference,
-      completed: (ORDER.get(COMPLETED_EVENT) ?? Infinity) <= furthestIndex,
+      completed: sentOrder,
     });
   }
 
@@ -144,7 +168,14 @@ export function filterByStep(
   if (!event) return summaries;
   const index = ORDER.get(event);
   if (index === undefined) return summaries;
-  return match === "stopped"
-    ? summaries.filter((visit) => visit.furthestIndex === index)
-    : summaries.filter((visit) => visit.furthestIndex >= index);
+  if (match === "stopped") return summaries.filter((visit) => visit.furthestIndex === index);
+
+  // "At least as far as" credits a visit with the steps below the one it
+  // reached, because those are steps it must have walked through. That does
+  // not hold for a visit that only came back to an already-sent order: it
+  // reached the result without ever sending anything, so it answers "got as
+  // far as Opened their result" and not "got as far as Sent the order".
+  return summaries.filter(
+    (visit) => visit.furthestIndex >= index && !(visit.returning && index <= COMPLETED_INDEX),
+  );
 }
