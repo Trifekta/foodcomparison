@@ -30,6 +30,22 @@ export interface SavedWizardSession {
   step: number;
   values: WizardValues;
   items: CartItemDraft[];
+  /**
+   * The total the wizard last filled in by itself, if any.
+   *
+   * Stored because the autofill refuses to write over anything it did not put
+   * there - the customer's own reading of their own screen beats ours. That
+   * rule needs to know which of those two a value is, and the memory of it
+   * lived only in a ref, which a reload destroys while the value itself
+   * survives here.
+   *
+   * The result was a field frozen on its first reading. Come back from a food
+   * app - the round trip this whole module exists for - and the restore hands
+   * the form a total with no record of where it came from, so every later
+   * read is treated as an attempt to overwrite the customer and declined. A
+   * better screenshot could not fix it, and neither could a better model.
+   */
+  autofilled: string | null;
 }
 
 /**
@@ -108,7 +124,9 @@ export function loadWizardSession(): SavedWizardSession | null {
         )
       : [];
 
-    return { step: parsed.step, values, items };
+    const autofilled = typeof parsed.autofilled === "string" ? parsed.autofilled : null;
+
+    return { step: parsed.step, values, items, autofilled };
   } catch {
     // Private mode, storage switched off, or unparseable. Start clean.
     return null;

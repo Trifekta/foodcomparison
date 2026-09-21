@@ -44,7 +44,9 @@ const {
   saveWizardSession,
 } = await import("@/lib/customer/wizard-session");
 
-const { WIZARD_DEFAULTS } = await import("@/components/customer/wizard/types");
+const { WIZARD_DEFAULTS, shouldAutofillTotal } = await import(
+  "@/components/customer/wizard/types"
+);
 
 const STEP_UPLOAD = 1;
 
@@ -77,6 +79,7 @@ describe("what comes back", () => {
       step: 2,
       values: { ...WIZARD_DEFAULTS, restaurantName: "Al Safadi", currentTotal: "82.00" },
       items: [{ key: "a", name: "Mixed grill", quantity: 2, linePrice: "60.00", proposed: null }],
+      autofilled: null,
     });
 
     const loaded = loadWizardSession();
@@ -135,7 +138,7 @@ describe("what comes back", () => {
     expect(loadWizardSession()).toBeNull();
     // And none of the writers throw either - a private window must not take the
     // wizard down with it.
-    expect(() => saveWizardSession({ step: 1, values: WIZARD_DEFAULTS, items: [] })).not.toThrow();
+    expect(() => saveWizardSession({ step: 1, values: WIZARD_DEFAULTS, items: [], autofilled: null })).not.toThrow();
     expect(() => clearWizardSession()).not.toThrow();
     expect(() => markLeavingForApp()).not.toThrow();
     expect(consumeReturnFromApp()).toBe(false);
@@ -158,7 +161,7 @@ describe("the flag that says they went shopping", () => {
 
   it("is dropped along with the session when the order is sent", () => {
     markLeavingForApp();
-    saveWizardSession({ step: 2, values: WIZARD_DEFAULTS, items: [] });
+    saveWizardSession({ step: 2, values: WIZARD_DEFAULTS, items: [], autofilled: null });
     clearWizardSession();
 
     expect(loadWizardSession()).toBeNull();
@@ -175,19 +178,19 @@ describe("the flag that says they went shopping", () => {
  */
 describe("whether a restored session carries anything", () => {
   it("is false for a session that only holds the defaults", () => {
-    expect(hasProgress({ step: 1, values: WIZARD_DEFAULTS, items: [] })).toBe(false);
+    expect(hasProgress({ step: 1, values: WIZARD_DEFAULTS, items: [], autofilled: null })).toBe(false);
   });
 
   it("is false when the untouched dial code is the only non-empty field", () => {
     // "+971" is there because nobody chose it, so it is not progress.
     expect(
-      hasProgress({ step: 1, values: { ...WIZARD_DEFAULTS, dialCode: "+971" }, items: [] }),
+      hasProgress({ step: 1, values: { ...WIZARD_DEFAULTS, dialCode: "+971" }, items: [], autofilled: null }),
     ).toBe(false);
   });
 
   it("is true once they have typed a field", () => {
     expect(
-      hasProgress({ step: 2, values: { ...WIZARD_DEFAULTS, restaurantName: "Zaroob" }, items: [] }),
+      hasProgress({ step: 2, values: { ...WIZARD_DEFAULTS, restaurantName: "Zaroob" }, items: [], autofilled: null }),
     ).toBe(true);
   });
 
@@ -197,7 +200,95 @@ describe("whether a restored session carries anything", () => {
         step: 2,
         values: WIZARD_DEFAULTS,
         items: [{ key: "a", name: "Shawarma", quantity: 1, linePrice: null, proposed: null }],
+        autofilled: null,
       }),
     ).toBe(true);
+  });
+});
+
+/**
+ * The memory of which total the wizard filled in for itself.
+ *
+ * This is the bug it exists for, and it needed no bad screenshot and no bad
+ * model to happen. The autofill will not write over a figure the customer
+ * typed - their reading of their own screen beats ours - so it has to be able
+ * to tell its own value from theirs. That memory lived in a ref while the
+ * value itself lived in sessionStorage, and a reload destroys one and keeps
+ * the other.
+ *
+ * After which the form holds a number with no history, every later read is
+ * treated as an attempt to overwrite the customer, and the field is frozen on
+ * its first reading for the life of the tab. The round trip to a food app -
+ * the thing this whole module exists to survive - is exactly what triggers it,
+ * because coming back puts them on the upload step to send the screenshot
+ * again.
+ */
+describe("remembering which total was ours", () => {
+  it("stores it beside the value it explains", () => {
+    saveWizardSession({
+      step: 2,
+      values: { ...WIZARD_DEFAULTS, currentTotal: "63.50" },
+      items: [],
+      autofilled: "63.50",
+    });
+
+    expect(loadWizardSession()?.autofilled).toBe("63.50");
+  });
+
+  it("is null for a total the customer typed themselves", () => {
+    saveWizardSession({
+      step: 2,
+      values: { ...WIZARD_DEFAULTS, currentTotal: "80.00" },
+      items: [],
+      autofilled: null,
+    });
+
+    expect(loadWizardSession()?.autofilled).toBeNull();
+  });
+
+  it("defaults to null rather than trusting a stored shape of the wrong type", () => {
+    store.set(
+      "snipsavor.wizard",
+      JSON.stringify({ step: 1, values: {}, items: [], autofilled: 63.5 }),
+    );
+    expect(loadWizardSession()?.autofilled).toBeNull();
+  });
+
+  it("lets a later read replace a restored total that was ours", () => {
+    // The whole point. Without the stored memory this arrives as
+    // lastAutofilled: null and the read is refused.
+    saveWizardSession({
+      step: 1,
+      values: { ...WIZARD_DEFAULTS, currentTotal: "63.50" },
+      items: [],
+      autofilled: "63.50",
+    });
+    const restored = loadWizardSession();
+
+    expect(
+      shouldAutofillTotal({
+        readFinalTotal: "56.68",
+        typed: restored?.values.currentTotal ?? "",
+        lastAutofilled: restored?.autofilled ?? null,
+      }),
+    ).toBe(true);
+  });
+
+  it("still leaves a restored total the customer typed alone", () => {
+    saveWizardSession({
+      step: 1,
+      values: { ...WIZARD_DEFAULTS, currentTotal: "80.00" },
+      items: [],
+      autofilled: null,
+    });
+    const restored = loadWizardSession();
+
+    expect(
+      shouldAutofillTotal({
+        readFinalTotal: "56.68",
+        typed: restored?.values.currentTotal ?? "",
+        lastAutofilled: restored?.autofilled ?? null,
+      }),
+    ).toBe(false);
   });
 });
