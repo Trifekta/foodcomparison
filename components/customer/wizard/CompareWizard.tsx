@@ -163,6 +163,14 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
    * this says. All this decides is whether the customer is made to wait for it.
    */
   const [readWaitExpired, setReadWaitExpired] = useState(false);
+  /**
+   * The total this filled in by itself, if any.
+   *
+   * State rather than a ref because two effects now touch it - the restore
+   * seeds it, the autofill writes it - and because the save effect has to
+   * re-run when it changes, or the memory never reaches sessionStorage.
+   */
+  const [autofilled, setAutofilled] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Guards against a double tap firing two submissions before state settles.
   const submitLock = useRef(false);
@@ -208,6 +216,10 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     if (saved) {
       reset(saved.values);
       setItems(saved.items);
+      // Before anything can read a screenshot, so the first read after a
+      // restore knows whether the total already in the form is ours to
+      // replace or theirs to leave alone.
+      setAutofilled(saved.autofilled);
       setRestoredProgress(hasProgress(saved));
       // A reload is the only way this branch is reached, and no File survives
       // one - so the answer to "do they still have a screenshot" is always no.
@@ -243,8 +255,8 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
 
   useEffect(() => {
     if (!restored) return;
-    saveWizardSession({ step, values, items });
-  }, [restored, step, values, items]);
+    saveWizardSession({ step, values, items, autofilled });
+  }, [restored, step, values, items, autofilled]);
 
   const setStatus = (slot: ReadSlot, status: ExtractionStatus) => {
     if (slot === "cart") setCartStatus(status);
@@ -313,7 +325,6 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
    * field this entire product measures a saving against, in the same breath
    * the upload screen is telling the customer this slot still needs a look.
    */
-  const autofilled = useRef<string | null>(null);
 
   /**
    * Two figures, for two different jobs.
@@ -334,7 +345,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     const decision = shouldAutofillTotal({
       readFinalTotal: offer.value,
       typed: getValues("currentTotal"),
-      lastAutofilled: autofilled.current,
+      lastAutofilled: autofilled,
     });
     if (!decision) return;
 
@@ -344,8 +355,12 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     // themselves is not touched either time.
     setValue("currentTotal", offer.value);
     clearErrors("currentTotal");
-    autofilled.current = offer.value;
-  }, [offer.value, getValues, setValue, clearErrors]);
+    // Settles on the next pass rather than looping: the effect re-runs because
+    // this changed, and shouldAutofillTotal then sees the figure it has
+    // already filled and declines.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
+    setAutofilled(offer.value);
+  }, [offer.value, autofilled, getValues, setValue, clearErrors]);
 
   const setField = <K extends keyof WizardValues & string>(
     name: K,
