@@ -12,6 +12,7 @@ import {
   submissionFieldsSchema,
 } from "@/lib/validation/submission";
 import { rememberLastOrder } from "@/lib/utils/last-order";
+import { scrollBehavior } from "@/lib/utils/motion";
 import { track } from "@/lib/analytics/track";
 import { attributionFormFields, currentAttribution } from "@/lib/analytics/attribution";
 import { compressForUpload } from "@/lib/images/compress";
@@ -540,7 +541,11 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   const goTo = (next: number) => {
     setStep(next);
     if (next === STEP_CONFIRM) track("step_basket", undefined, getValues("areaId"));
-    if (typeof window !== "undefined") window.scrollTo({ top: 0 });
+    // Rolled, not jumped. The screen is changing without a tap to explain it,
+    // and travel is what says "you have moved" rather than "something broke".
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
+    }
   };
 
   /**
