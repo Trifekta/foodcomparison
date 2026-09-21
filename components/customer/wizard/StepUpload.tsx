@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { StepActions } from "./StepActions";
 import { ImageUpload } from "@/components/forms/ImageUpload";
+import { AmountInput } from "@/components/forms/AmountInput";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
 import { LastOrderBanner } from "@/components/customer/LastOrderBanner";
@@ -46,6 +47,17 @@ interface StepUploadProps {
    */
   onCartPicked: (file: File) => void;
   onCheckoutPicked: (file: File) => void;
+  /**
+   * The final payable amount, typed here rather than photographed.
+   *
+   * The same react-hook-form field the confirm step edits, which is the whole
+   * reason this can live on two screens at once for free - and why a number
+   * typed here is still there, and still changeable, one screen later.
+   */
+  manualTotal: string;
+  onManualTotalChange: (value: string) => void;
+  /** Only ever a format complaint: this field is optional on this screen. */
+  totalError?: string;
   error: string | null;
   onContinue: () => void;
 }
@@ -95,6 +107,9 @@ export function StepUpload({
   onCheckoutChange,
   onCartPicked,
   onCheckoutPicked,
+  manualTotal,
+  onManualTotalChange,
+  totalError,
   error,
   onContinue,
 }: StepUploadProps) {
@@ -295,6 +310,54 @@ export function StepUpload({
             onCheckoutPicked(file);
           }}
         />
+
+        {/* The way through for somebody who cannot produce that screenshot.
+            Deliberately not a peer of the slot above it - a toggle offering
+            "photograph it OR type it" is answered by almost everybody with the
+            two-second option, and the two are not equivalent. The screenshot
+            is read, and the number it prints is checked against what the
+            customer says they paid; that agreement is the whole of what lets
+            a result claim the fees were verified rather than taken on trust.
+            Typed alone, the figure is still perfectly usable - it is just
+            unverified, and the result says so.
+
+            So: a fallback, under an OR, in a quieter card, with the
+            recommendation restated beneath it. Everybody who can send the
+            screenshot still does; nobody who cannot is stopped. */}
+        <div className="relative py-0.5">
+          <span aria-hidden="true" className="absolute inset-x-0 top-1/2 h-px bg-ink-200" />
+          <span className="relative mx-auto block w-12 bg-canvas text-center text-[0.78rem] font-bold uppercase tracking-wide text-slate-500">
+            or
+          </span>
+        </div>
+
+        <div className="rounded-3xl bg-cream p-3.5 ring-1 ring-sand">
+          {/* The heading follows the slot above it. Once the first screenshot
+              has settled the bill that slot says so, and asking "don't have a
+              checkout screenshot?" beside it reads as a question nobody just
+              answered - the field is no longer a way round a missing
+              screenshot, it is the number we already read, offered for a
+              second look. */}
+          <h3 className="text-[1rem] font-extrabold text-ink-900">
+            {cartSettlesTheBill ? "Your final total" : "Don't have a checkout screenshot?"}
+          </h3>
+          <p className="mt-0.5 mb-3 text-[0.88rem] leading-snug text-slate-600">
+            {cartSettlesTheBill
+              ? "This is what we read off your cart screenshot — after discounts, fees and delivery."
+              : "Enter your final payable amount instead — after discounts, fees and delivery."}
+          </p>
+          <AmountInput
+            label="Your final total"
+            value={manualTotal}
+            onChange={(event) => onManualTotalChange(event.target.value)}
+            error={totalError}
+          />
+          <p className="mt-3 text-[0.82rem] leading-snug text-slate-500">
+            {cartSettlesTheBill
+              ? "We already read this off your first screenshot — change it only if it looks wrong."
+              : "A checkout screenshot gives the most accurate comparison, but either one works. You can change this on the next screen."}
+          </p>
+        </div>
       </div>
 
       <StepActions>

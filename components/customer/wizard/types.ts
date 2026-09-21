@@ -55,13 +55,19 @@ export interface ReadTotals {
 }
 
 /**
- * Four screens: upload, confirm the basket, where and how much, then review.
+ * Two screens: upload, then confirm and send.
  *
- * Review is a step rather than an epilogue because it is where the customer
- * says how to reach them - the last screen does real work, so it gets a real
- * number on the progress bar.
+ * It was four - upload, confirm the basket, where and how much, then review -
+ * and the last of those existed to show the customer what they had just typed.
+ * Everything a person actually answers now lives on the second screen, and the
+ * screen that only repeated those answers back is gone.
+ *
+ * What did NOT move is the checking. The basket read off the screenshot is
+ * still shown and still editable; it is folded behind a summary rather than
+ * spread over a screen of its own, and it opens itself whenever there is a
+ * reason to look (see itemsNeedAttention).
  */
-export const TOTAL_STEPS = 4;
+export const TOTAL_STEPS = 2;
 
 export const WIZARD_DEFAULTS: WizardValues = {
   restaurantName: "",
@@ -99,6 +105,38 @@ export function usableItems(items: CartItemDraft[]): CartItem[] {
       } as CartItem,
     ];
   });
+}
+
+/**
+ * Whether the item list should open itself rather than wait to be asked.
+ *
+ * Folding the items away is the point of the confirm screen: an extraction
+ * that got everything right does not need every row scrolled past, and most
+ * of them do. But "most" is the whole problem with hiding them unconditionally
+ * - the rows that need a human are precisely the ones a collapsed panel makes
+ * invisible, and the customer is the only person in this flow holding the
+ * phone the screenshot came off.
+ *
+ * So it opens on evidence, not on suspicion:
+ *
+ *  - a row whose price the read flagged. priceUncertain is only ever set where
+ *    there is something to see - a currency glyph welded onto a number, 39.00
+ *    read as 539.00 - and it renders a "check" badge that is worth nothing
+ *    inside a closed panel.
+ *  - nothing read at all. An empty list behind "View or edit items" is a dead
+ *    end for somebody whose screenshot could not be parsed; open, it is an
+ *    invitation to type what they ordered.
+ *
+ * Still reading keeps it shut. The list is about to change, and a panel that
+ * springs open and then fills itself is the worst version of both states.
+ */
+export function itemsNeedAttention(input: {
+  status: ExtractionStatus;
+  items: CartItemDraft[];
+}): boolean {
+  if (input.status === "reading") return false;
+  if (input.items.length === 0) return true;
+  return input.items.some((item) => item.priceUncertain === true);
 }
 
 /** Which screenshot a read belongs to. Both are read; each is believed about

@@ -58,12 +58,11 @@ describe("where a returning customer lands", () => {
   it("puts them on the upload step when the screenshot did not survive", () => {
     // The only case that reaches a restore: the tab was rebuilt, so every File
     // is gone however far along they were.
-    expect(restoredStep(4, false, STEP_UPLOAD)).toBe(STEP_UPLOAD);
     expect(restoredStep(2, false, STEP_UPLOAD)).toBe(STEP_UPLOAD);
   });
 
   it("leaves a later step alone when a screenshot is still in hand", () => {
-    expect(restoredStep(3, true, STEP_UPLOAD)).toBe(3);
+    expect(restoredStep(2, true, STEP_UPLOAD)).toBe(2);
   });
 
   it("never lands before the upload step", () => {
@@ -75,13 +74,13 @@ describe("where a returning customer lands", () => {
 describe("what comes back", () => {
   it("returns what was stored", () => {
     saveWizardSession({
-      step: 3,
+      step: 2,
       values: { ...WIZARD_DEFAULTS, restaurantName: "Al Safadi", currentTotal: "82.00" },
       items: [{ key: "a", name: "Mixed grill", quantity: 2, linePrice: "60.00", proposed: null }],
     });
 
     const loaded = loadWizardSession();
-    expect(loaded?.step).toBe(3);
+    expect(loaded?.step).toBe(2);
     expect(loaded?.values.restaurantName).toBe("Al Safadi");
     expect(loaded?.values.currentTotal).toBe("82.00");
     expect(loaded?.items).toHaveLength(1);
@@ -159,7 +158,7 @@ describe("the flag that says they went shopping", () => {
 
   it("is dropped along with the session when the order is sent", () => {
     markLeavingForApp();
-    saveWizardSession({ step: 4, values: WIZARD_DEFAULTS, items: [] });
+    saveWizardSession({ step: 2, values: WIZARD_DEFAULTS, items: [] });
     clearWizardSession();
 
     expect(loadWizardSession()).toBeNull();

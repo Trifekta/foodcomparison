@@ -3,22 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, type PathValue } from "react-hook-form";
-import type { z } from "zod";
 import type { PublicArea } from "@/types/database";
 import type { StructuredBasket } from "@/lib/extraction/schema";
 import {
   ERROR_MESSAGES,
-  basketStepSchema,
+  amountSchema,
   cartItemsSchema,
   submissionFieldsSchema,
-  whereStepSchema,
 } from "@/lib/validation/submission";
 import { rememberLastOrder } from "@/lib/utils/last-order";
 import { track } from "@/lib/analytics/track";
 import { attributionFormFields, currentAttribution } from "@/lib/analytics/attribution";
 import { compressForUpload } from "@/lib/images/compress";
 import { itemTitle } from "@/lib/extraction/normalise";
-import type { FunnelEvent } from "@/lib/analytics/funnel";
 import {
   clearWizardSession,
   consumeReturnFromApp,
@@ -29,9 +26,7 @@ import {
 } from "@/lib/customer/wizard-session";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
-import { StepBasket } from "./StepBasket";
-import { StepWhereAndTotal } from "./StepWhereAndTotal";
-import { StepReview } from "./StepReview";
+import { StepConfirm } from "./StepConfirm";
 import {
   WIZARD_DEFAULTS,
   cartConfirmedShort as isCartConfirmedShort,
@@ -51,9 +46,25 @@ import {
 } from "./types";
 
 const STEP_UPLOAD = 1;
-const STEP_BASKET = 2;
-const STEP_WHERE = 3;
-const STEP_REVIEW = 4;
+const STEP_CONFIRM = 2;
+
+/**
+ * How long the send button will wait for the screenshot read before giving up
+ * on it.
+ *
+ * The read has to finish for the confirm screen to be pre-filled, and on the
+ * four-screen flow two screens of walking paid for that latency by accident.
+ * With those screens gone the button has to hold the door instead - otherwise
+ * a quick customer sends a blank restaurant and no items while the read is
+ * still a second from landing.
+ *
+ * It is a deadline rather than a gate because the read can hang: the model
+ * call has no timeout of its own, and a request that never settles would
+ * otherwise leave the button disabled for good. The read is not cancelled when
+ * this expires - if it lands later it still fills everything in. Only the
+ * waiting stops.
+ */
+const READ_WAIT_MS = 20_000;
 
 /**
  * The customer wizard.
@@ -142,6 +153,15 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   const readRuns = useRef<Record<ReadSlot, number>>({ cart: 0, checkout: 0 });
   const [cartError, setCartError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  /**
+   * The send button has waited long enough for the cart read.
+   *
+   * Reset by each new cart screenshot (in startRead, from a tap) and set by the
+   * deadline below. Kept apart from the read's own status on purpose: a read
+   * that is still running is still allowed to land and fill the form, whatever
+   * this says. All this decides is whether the customer is made to wait for it.
+   */
+  const [readWaitExpired, setReadWaitExpired] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   // Guards against a double tap firing two submissions before state settles.
   const submitLock = useRef(false);
@@ -316,19 +336,6 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     clearErrors(name);
   };
 
-  /** Runs one step's schema and pushes any issues into the form error store. */
-  const validateStep = (schema: z.ZodType<unknown>, fields: Array<keyof WizardValues>): boolean => {
-    clearErrors(fields);
-    const result = schema.safeParse(getValues());
-    if (result.success) return true;
-
-    for (const issue of result.error.issues) {
-      const field = issue.path[0] as keyof WizardValues | undefined;
-      if (field) setError(field, { type: "manual", message: issue.message });
-    }
-    return false;
-  };
-
   /**
    * Reads a screenshot on the customer's own device while they walk to the
    * confirm step. No server, no API, no cost - tesseract.js in this browser,
@@ -349,6 +356,9 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
 
     setStatus(slot, "reading");
     setTotals(slot, null);
+    // A new screenshot earns a fresh wait. Cart only: the send button never
+    // waits on the checkout slot, which fills nothing the submission requires.
+    if (slot === "cart") setReadWaitExpired(false);
 
     void (async () => {
       try {
@@ -424,28 +434,82 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   };
 
   /**
-   * Which step is which, for counting.
+   * The funnel, now that three screens are one.
    *
-   * Recorded on arrival rather than on the tap that caused it, so a customer
-   * who goes back and comes forward again is not counted as having got further
-   * than they did - the dashboard counts distinct visits per step, and this
-   * only has to name the step honestly.
+   * The event names are unchanged - they are what every row already recorded
+   * and every dashboard query calls these steps - but what fires them is no
+   * longer "a screen opened". There is only one screen left to open, so each
+   * rung is the act it was always labelled as, recorded once per visit:
+   *
+   *   step_basket  reaching the confirm screen
+   *   step_where   choosing the delivery area
+   *   step_review  having area, total and the Keeta question all answered
+   *
+   * Refs rather than state, because nothing renders from them and a customer
+   * who edits a field twice is still one visit that reached that rung.
    */
-  const STEP_EVENTS: Record<number, FunnelEvent> = {
-    [STEP_BASKET]: "step_basket",
-    [STEP_WHERE]: "step_where",
-    [STEP_REVIEW]: "step_review",
-  };
+  const trackedWhere = useRef(false);
+  const trackedReview = useRef(false);
+
+  useEffect(() => {
+    if (step !== STEP_CONFIRM || !values.areaId) return;
+
+    // The first event that can carry an area, which is what keeps the area
+    // report alive: a visit's area is resolved from whichever of its events
+    // has one, and every rung below this inherits it from here.
+    if (!trackedWhere.current) {
+      trackedWhere.current = true;
+      track("step_where", undefined, values.areaId);
+    }
+
+    // Truthiness, not a comparison against "": the field's type is the pair of
+    // answers it can end on, while its default - deliberately outside that type
+    // - is blank (see WIZARD_DEFAULTS). Asking whether it equals "" is a
+    // question TypeScript believes it already knows the answer to.
+    if (!trackedReview.current && values.currentTotal !== "" && Boolean(values.newToKeeta)) {
+      trackedReview.current = true;
+      track("step_review", undefined, values.areaId);
+    }
+  }, [step, values.areaId, values.currentTotal, values.newToKeeta]);
+
+  /** Stops waiting on a read that is taking too long. See READ_WAIT_MS. */
+  useEffect(() => {
+    if (cartStatus !== "reading") return;
+    const timer = setTimeout(() => setReadWaitExpired(true), READ_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [cartStatus]);
 
   const goTo = (next: number) => {
     setStep(next);
-    const event = STEP_EVENTS[next];
-    // The area rides along from the moment it is known - which is leaving the
-    // area step, not arriving at it. Sent on every later step as well as the
-    // first, so a visit that stops at review is still attributable: the report
-    // resolves a visit's area from whichever of its events carries one.
-    if (event) track(event, undefined, getValues("areaId"));
+    if (next === STEP_CONFIRM) track("step_basket", undefined, getValues("areaId"));
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
+  };
+
+  /**
+   * Puts the customer on the first thing that needs them.
+   *
+   * With every field on one screen, a failed submit can set four errors at
+   * once and three of them can be off-screen - which is the one way merging
+   * the steps could be made worse than leaving them apart. Found in the DOM
+   * rather than tracked field by field: every field here already marks itself
+   * invalid for screen readers, so the same marking can be read back.
+   *
+   * Two frames, because the errors have only just been set: the first lets
+   * React commit them (which is also what opens the basket panel around a
+   * restaurant error), the second runs once that commit is on screen.
+   */
+  const focusFirstInvalid = () => {
+    if (typeof window === "undefined") return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const target = document.querySelector<HTMLElement>(
+          '[aria-invalid="true"], [data-invalid="true"]',
+        );
+        if (!target) return;
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        target.focus({ preventScroll: true });
+      });
+    });
   };
 
   const handleUploadContinue = () => {
@@ -454,15 +518,25 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       return;
     }
     setCartError(null);
-    goTo(STEP_BASKET);
-  };
 
-  const handleBasketContinue = () => {
-    if (validateStep(basketStepSchema, ["restaurantName"])) goTo(STEP_WHERE);
-  };
+    // The total is not required to leave this screen - it is asked for again,
+    // and properly, on the next one. But a number typed here that could never
+    // be valid is worth saying so about now, while they are still looking at
+    // the field, rather than after a screen transition.
+    const typed = getValues("currentTotal");
+    if (typed.trim() !== "") {
+      const parsed = amountSchema.safeParse(typed);
+      if (!parsed.success) {
+        setError("currentTotal", {
+          type: "manual",
+          message: parsed.error.issues[0]?.message ?? ERROR_MESSAGES.invalidTotal,
+        });
+        return;
+      }
+    }
+    clearErrors("currentTotal");
 
-  const handleWhereContinue = () => {
-    if (validateStep(whereStepSchema, ["areaId", "currentTotal", "newToKeeta"])) goTo(STEP_REVIEW);
+    goTo(STEP_CONFIRM);
   };
 
   const handleSubmit = async () => {
@@ -480,11 +554,10 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
         const field = issue.path[0] as keyof WizardValues | undefined;
         if (field) setError(field, { type: "manual", message: issue.message });
       }
-      // Send the customer back to the earliest step that still needs attention.
-      // Contact is asked on this screen, so a contact problem stays here.
-      const bad = parsed.error.issues[0]?.path[0];
-      if (bad === "restaurantName") goTo(STEP_BASKET);
-      else if (bad === "areaId" || bad === "currentTotal" || bad === "newToKeeta") goTo(STEP_WHERE);
+      // Everything this can complain about is on the screen they are already
+      // looking at, so there is nowhere to send them - only something to point
+      // at, which may well be below the fold.
+      focusFirstInvalid();
       return;
     }
 
@@ -587,13 +660,8 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     }
   };
 
-  const areaName = areas.find((area) => area.id === values.areaId)?.name ?? "";
-
   return (
-    <WizardShell
-      step={step}
-      onBack={step === STEP_UPLOAD ? null : () => goTo(step - 1)}
-    >
+    <WizardShell step={step} onBack={step === STEP_UPLOAD ? null : () => goTo(step - 1)}>
       {step === STEP_UPLOAD ? (
         <StepUpload
           cartFile={files.cart}
@@ -623,72 +691,53 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
             startRead(file, "cart");
           }}
           onCheckoutPicked={(file) => startRead(file, "checkout")}
+          manualTotal={values.currentTotal}
+          onManualTotalChange={(value) => setField("currentTotal", value)}
+          totalError={errors.currentTotal?.message}
           error={cartError}
           onContinue={handleUploadContinue}
         />
       ) : null}
 
-      {step === STEP_BASKET ? (
-        <StepBasket
-          restaurantName={values.restaurantName}
+      {step === STEP_CONFIRM ? (
+        <StepConfirm
+          values={values}
+          files={files}
           items={items}
-          restaurantError={errors.restaurantName?.message}
+          areas={areas}
           extractionStatus={extractionStatus}
           readTotals={readTotals}
           totalsFromCheckout={totalsFromCheckout}
-          onRestaurantNameChange={(value) => setField("restaurantName", value)}
-          onItemsChange={setItems}
-          onContinue={handleBasketContinue}
-        />
-      ) : null}
-
-      {step === STEP_WHERE ? (
-        <StepWhereAndTotal
-          areas={areas}
-          areaId={values.areaId}
-          currentTotal={values.currentTotal}
-          newToKeeta={values.newToKeeta}
-          errors={{
-            areaId: errors.areaId?.message,
-            currentTotal: errors.currentTotal?.message,
-            newToKeeta: errors.newToKeeta?.message,
-          }}
-          hasCheckoutScreenshot={files.checkout !== null}
-          // Both the hint chip and its "Use this" button offer a figure as
-          // something to trust, same as the silent autofill above - so both
-          // read from trustedTotal, not from whatever final_total happened to
-          // hold. An unsettled total stays visible on the basket-confirm step
-          // (StepBasket, further up, shows every field exactly as read), just
-          // never offered here as an answer.
+          // Both the hint and its "Use this" button offer a figure as something
+          // to trust, same as the silent autofill above - so both read from
+          // trustedTotal, not from whatever final_total happened to hold. An
+          // unsettled total still shows in the basket panel, which prints every
+          // field exactly as read, just never offered here as an answer.
           readTotal={trustedTotal || null}
           totalFromCheckout={totalsFromCheckout && checkoutTotals.finalTotal !== ""}
           prefilledFromScreenshot={trustedTotal !== "" && values.currentTotal === trustedTotal}
+          waitingOnRead={cartReading && !readWaitExpired}
+          submitting={submitting}
+          submitError={submitError}
+          errors={{
+            restaurantName: errors.restaurantName?.message,
+            areaId: errors.areaId?.message,
+            currentTotal: errors.currentTotal?.message,
+            newToKeeta: errors.newToKeeta?.message,
+            whatsappNumber: errors.whatsappNumber?.message,
+          }}
+          onRestaurantNameChange={(value) => setField("restaurantName", value)}
+          onItemsChange={setItems}
           onAreaChange={(areaId) => setField("areaId", areaId)}
           onCurrentTotalChange={(value) => setField("currentTotal", value)}
           onNewToKeetaChange={(value) => setField("newToKeeta", value)}
           onUseReadTotal={() => {
             if (trustedTotal) setField("currentTotal", trustedTotal);
           }}
-          onContinue={handleWhereContinue}
-        />
-      ) : null}
-
-      {step === STEP_REVIEW ? (
-        <StepReview
-          values={values}
-          files={files}
-          items={usableItems(items)}
-          areaName={areaName}
-          submitting={submitting}
-          submitError={submitError}
-          errors={{ whatsappNumber: errors.whatsappNumber?.message }}
-          onSubmit={() => void handleSubmit()}
-          onBack={() => goTo(STEP_WHERE)}
-          onEditBasket={() => goTo(STEP_BASKET)}
-          onEditArea={() => goTo(STEP_WHERE)}
           onDialCodeChange={(code) => setField("dialCode", code)}
           onWhatsappNumberChange={(value) => setField("whatsappNumber", value)}
           onMarketingConsentChange={(value) => setField("marketingConsent", value)}
+          onSubmit={() => void handleSubmit()}
         />
       ) : null}
     </WizardShell>
