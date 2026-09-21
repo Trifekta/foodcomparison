@@ -236,6 +236,56 @@ export function trustedFinalTotal(totals: ReadTotals | null): string {
 }
 
 /**
+ * What kind of figure the read is offering as the customer's own total.
+ *
+ * "settled" is a bill that is done adding itself up - a printed total with a
+ * fee or a discount beside it - and it is the only one that can be compared
+ * like for like against the price an admin finds on Keeta, which is always a
+ * grand total.
+ *
+ * "subtotal" is the food and nothing else: an item list whose screen never
+ * showed delivery or service. Perfectly real, and NOT the same number. Filling
+ * it in silently would understate every saving we quote, so everywhere it
+ * reaches the customer it has to be labelled for what it is - and it never
+ * satisfies the confirmation flag that suppresses the unverified-total note.
+ */
+export type TotalKind = "settled" | "subtotal" | "none";
+
+export interface TotalOffer {
+  value: string;
+  kind: TotalKind;
+}
+
+/**
+ * The best figure the screenshots actually printed, and what it is.
+ *
+ * The rule this replaces offered a settled bill or nothing at all, which left
+ * a Deliveroo customer staring at an empty required field with the number
+ * sitting right there on the screenshot they had just sent. Offering it is
+ * better - provided nobody is told it is something it is not.
+ *
+ * Three readings, in order of how complete they are:
+ *
+ *  - a total with fees beside it. Settled: this is what they paid.
+ *  - a total with NO fees beside it. This is the case the old rule threw away
+ *    wholesale, and it was right that the number cannot be trusted as a final
+ *    bill - a Keeta basket prints "Order total AED 71.95" with delivery still
+ *    to come. But it is a perfectly good pre-fees figure, so it is offered as
+ *    one rather than discarded.
+ *  - a subtotal line and nothing else. The Deliveroo shape.
+ *
+ * Fees and discounts alone, with no total of any kind, offer nothing: adding
+ * them up ourselves is exactly what the extraction prompt is forbidden to do.
+ */
+export function readTotalOffer(totals: ReadTotals | null): TotalOffer {
+  if (!totals) return { value: "", kind: "none" };
+  if (totalsAreSettled(totals)) return { value: totals.finalTotal, kind: "settled" };
+  if (totals.finalTotal !== "") return { value: totals.finalTotal, kind: "subtotal" };
+  if (totals.subtotal !== "") return { value: totals.subtotal, kind: "subtotal" };
+  return { value: "", kind: "none" };
+}
+
+/**
  * Whether the second upload slot should stop hedging and say so.
  *
  * Pulled out of the JSX that reads it for the same reason shouldAutofillTotal
@@ -268,7 +318,10 @@ export function cartConfirmedShort(input: {
  * caller keeps the memory - what it last filled in - and passes it back.
  */
 export function shouldAutofillTotal(input: {
-  /** The final total read off either screenshot, "" when there was none. */
+  /**
+   * The figure the read is offering - a settled bill or a pre-fees subtotal,
+   * whichever the screenshots actually printed. "" when they printed neither.
+   */
   readFinalTotal: string;
   /** What is in the field now. */
   typed: string;

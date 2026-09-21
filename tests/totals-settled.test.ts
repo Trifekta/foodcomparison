@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cartConfirmedShort,
   mergeReadTotals,
+  readTotalOffer,
   totalsAreSettled,
   trustedFinalTotal,
 } from "@/components/customer/wizard/types";
@@ -124,5 +125,79 @@ describe("trustedFinalTotal", () => {
 
   it("returns the total once a fee or discount confirms the bill is settled", () => {
     expect(trustedFinalTotal({ ...EMPTY, finalTotal: "45.90", discount: "7.65" })).toBe("45.90");
+  });
+});
+
+/**
+ * What the read offers the customer as their own total, and what it calls it.
+ *
+ * Two numbers come out of a screenshot and they are not interchangeable. A
+ * settled bill can be compared like for like against the price an admin finds
+ * on Keeta, which always includes that app's own fees. A subtotal cannot: put
+ * one in the same field unremarked and every saving we quote comes out smaller
+ * than the truth, every time, in the same direction.
+ *
+ * So the rule returns both the figure and its kind, and the kind is what the
+ * screens use to name it. Leaving the field empty - which is what this
+ * replaced - was safe for the arithmetic and quietly hostile to the customer,
+ * who could see the number on the screenshot they had just sent us.
+ */
+describe("what the read offers as a total", () => {
+  it("offers a settled bill as settled", () => {
+    const offer = readTotalOffer(totals({ finalTotal: "71.10", deliveryFee: "5.00" }));
+    expect(offer).toEqual({ value: "71.10", kind: "settled" });
+  });
+
+  it("offers a bare subtotal as a subtotal", () => {
+    // The Deliveroo shape: an item list, a subtotal, and the money settled on
+    // a screen the customer has not sent yet.
+    const offer = readTotalOffer(totals({ subtotal: "64.00" }));
+    expect(offer).toEqual({ value: "64.00", kind: "subtotal" });
+  });
+
+  it("treats a total printed with no fees beside it as a subtotal, not a bill", () => {
+    // The case the old rule threw away entirely. A Keeta basket prints "Order
+    // total AED 71.95" in the type a real payment summary uses, with delivery
+    // still to be added - so it is a pre-fees figure, and offering it as a
+    // final total is the mistake. Offering it as what it is, is not.
+    const offer = readTotalOffer(totals({ finalTotal: "71.95" }));
+    expect(offer).toEqual({ value: "71.95", kind: "subtotal" });
+  });
+
+  it("prefers the printed total over the subtotal line", () => {
+    const offer = readTotalOffer(totals({ subtotal: "64.00", finalTotal: "71.95" }));
+    expect(offer.value).toBe("71.95");
+  });
+
+  it("offers nothing when only fees were read", () => {
+    // Adding them up ourselves is precisely what the extraction is forbidden
+    // to do, and a figure nobody printed is not evidence of anything.
+    expect(readTotalOffer(totals({ deliveryFee: "5.00", serviceFee: "2.70" }))).toEqual({
+      value: "",
+      kind: "none",
+    });
+  });
+
+  it("offers nothing when there was no read at all", () => {
+    expect(readTotalOffer(null)).toEqual({ value: "", kind: "none" });
+    expect(readTotalOffer(EMPTY)).toEqual({ value: "", kind: "none" });
+  });
+
+  it("upgrades to the grand total once the checkout screen settles the bill", () => {
+    // The journey the customer actually takes: cart first, checkout second.
+    const cart = totals({ subtotal: "64.00" });
+    expect(readTotalOffer(cart).kind).toBe("subtotal");
+
+    const checkout = totals({ subtotal: "64.00", deliveryFee: "5.00", finalTotal: "71.10" });
+    const merged = mergeReadTotals(cart, checkout);
+    expect(readTotalOffer(merged)).toEqual({ value: "71.10", kind: "settled" });
+  });
+
+  it("never lets a subtotal claim the fees were verified", () => {
+    // trustedFinalTotal is the separate question - may we drop the caveat? - and
+    // a subtotal must always answer no, however useful it is in the field.
+    const subtotalOnly = totals({ subtotal: "64.00" });
+    expect(readTotalOffer(subtotalOnly).value).toBe("64.00");
+    expect(trustedFinalTotal(subtotalOnly)).toBe("");
   });
 });

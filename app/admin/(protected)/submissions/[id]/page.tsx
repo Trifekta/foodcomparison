@@ -175,11 +175,29 @@ export default async function SubmissionDetailPage({
                   </a>
                 }
               />
+              {/* Whether this figure is a whole bill or only the food.
+                  Load-bearing, not decoration: the saving is current_total
+                  minus the Keeta price entered below, and a Keeta price is
+                  always a grand total. Comparing it against a number that
+                  never included delivery understates every saving in a
+                  predictable direction - and until now the only person who
+                  could see which kind it was was the customer. */}
               <Row
                 label="Current total"
                 value={
-                  <span className="text-base">
-                    {formatDecimalStringAsCurrency(submission.current_total)}
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-base">
+                      {formatDecimalStringAsCurrency(submission.current_total)}
+                    </span>
+                    {submission.totals_confirmed ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-chip-green-bg px-2.5 py-0.5 text-xs font-bold text-chip-green-fg">
+                        Fees verified
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-flame-100 px-2.5 py-0.5 text-xs font-bold text-flame-700">
+                        Fees unverified — check the screenshots
+                      </span>
+                    )}
                   </span>
                 }
               />

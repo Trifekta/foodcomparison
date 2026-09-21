@@ -14,6 +14,7 @@ import { FoodAppLinks } from "./FoodAppLinks";
 import { track } from "@/lib/analytics/track";
 import { captureAttribution } from "@/lib/analytics/attribution";
 import { RESULT_PROMISE } from "@/lib/constants";
+import type { TotalKind } from "./types";
 
 interface StepUploadProps {
   cartFile: File | null;
@@ -55,6 +56,8 @@ interface StepUploadProps {
    * typed here is still there, and still changeable, one screen later.
    */
   manualTotal: string;
+  /** What the read offered, so this card never calls a subtotal a final total. */
+  totalKind: TotalKind;
   onManualTotalChange: (value: string) => void;
   /** Only ever a format complaint: this field is optional on this screen. */
   totalError?: string;
@@ -108,6 +111,7 @@ export function StepUpload({
   onCartPicked,
   onCheckoutPicked,
   manualTotal,
+  totalKind,
   onManualTotalChange,
   totalError,
   error,
@@ -119,6 +123,11 @@ export function StepUpload({
   // read's own latency fix (onFilePicked, ahead of that same downscale) exists
   // for. The banner should disappear on the same signal, not lag behind it.
   const [uploadStarted, setUploadStarted] = useState(false);
+
+  // The field is holding what we read, and what we read was the food without
+  // its fees. Only while that number is still the one in the field - the
+  // moment they type over it, it is their figure and not our reading.
+  const subtotalOnly = !cartSettlesTheBill && totalKind === "subtotal" && manualTotal !== "";
 
   // Start fetching the reading engine now, while they are in their gallery
   // choosing a photo. Waiting until they have chosen puts several megabytes
@@ -332,22 +341,30 @@ export function StepUpload({
         </div>
 
         <div className="rounded-3xl bg-cream p-3.5 ring-1 ring-sand">
-          {/* The heading follows the slot above it. Once the first screenshot
-              has settled the bill that slot says so, and asking "don't have a
-              checkout screenshot?" beside it reads as a question nobody just
-              answered - the field is no longer a way round a missing
-              screenshot, it is the number we already read, offered for a
-              second look. */}
+          {/* Three states, because the card answers a different question in
+              each. Once the first screenshot has settled the bill it holds the
+              number we already read. Once it has given us the food but no fees
+              it holds THAT, said out loud - a subtotal quietly presented as a
+              final total is how a saving gets understated. Before either, it
+              is the way through for somebody who cannot produce the checkout
+              screen at all. */}
           <h3 className="text-[1rem] font-extrabold text-ink-900">
-            {cartSettlesTheBill ? "Your final total" : "Don't have a checkout screenshot?"}
+            {cartSettlesTheBill
+              ? "Your final total"
+              : subtotalOnly
+                ? "Your order subtotal"
+                : "Don't have a checkout screenshot?"}
           </h3>
           <p className="mt-0.5 mb-3 text-[0.88rem] leading-snug text-slate-600">
             {cartSettlesTheBill
               ? "This is what we read off your cart screenshot — after discounts, fees and delivery."
-              : "Enter your final payable amount instead — after discounts, fees and delivery."}
+              : subtotalOnly
+                ? "We read this off your cart screenshot. It's the food only — the screen didn't show delivery or service fees."
+                : "Enter your final payable amount instead — after discounts, fees and delivery."}
           </p>
           <AmountInput
-            label="Your final total"
+            label={subtotalOnly ? "Your order subtotal" : "Your final total"}
+            hideLabel={subtotalOnly}
             value={manualTotal}
             onChange={(event) => onManualTotalChange(event.target.value)}
             error={totalError}
@@ -355,7 +372,9 @@ export function StepUpload({
           <p className="mt-3 text-[0.82rem] leading-snug text-slate-500">
             {cartSettlesTheBill
               ? "We already read this off your first screenshot — change it only if it looks wrong."
-              : "A checkout screenshot gives the most accurate comparison, but either one works. You can change this on the next screen."}
+              : subtotalOnly
+                ? "Add the checkout screenshot above and we'll read your real total — or type it here yourself."
+                : "A checkout screenshot gives the most accurate comparison, but either one works. You can change this on the next screen."}
           </p>
         </div>
       </div>
