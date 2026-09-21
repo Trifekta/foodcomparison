@@ -56,6 +56,21 @@ interface ImageUploadProps {
    * skipped the one screen the final total actually lives on.
    */
   requirement: "required" | "optional" | "recommended";
+  /**
+   * Once filled, shrink to a single confirmed row instead of the full card.
+   *
+   * A question that has been answered should not hold the space of a question
+   * that has not. Filled, this card runs to about 460px of a 844px phone - a
+   * green tick, a title, a pill, a hint, a 144px preview, two buttons and a
+   * line of helper text, all of it restating something the customer has just
+   * done - and it pushes the next question off the screen.
+   *
+   * What it keeps is the preview, moved into the row as a thumbnail that still
+   * opens full size. That is the only place anybody ever checks their
+   * screenshot did not cut off the total, and it is worth more than everything
+   * else on the card put together.
+   */
+  compact?: boolean;
   allowRemove?: boolean;
   /** Which supplied render fills the empty dropzone. */
   art?: "cartDoc" | "receipt";
@@ -89,6 +104,7 @@ export function ImageUpload({
   onFilePicked,
   error,
   requirement,
+  compact = false,
   allowRemove = false,
   art = "cartDoc",
   example,
@@ -138,6 +154,69 @@ export function ImageUpload({
   // the copy is what actually explains why, and a ring nobody reads past
   // would be emphasis on the wrong half of the card.
   const emphasize = emphasizeProp && !filled;
+
+  if (compact && filled) {
+    return (
+      <section className="rounded-3xl bg-white p-2.5 shadow-[0_2px_14px_rgba(23,23,28,0.05)] ring-1 ring-ink-100">
+        <input
+          ref={inputRef}
+          id={inputId}
+          type="file"
+          accept={ACCEPTED_IMAGE_TYPES.join(",")}
+          className="sr-only"
+          onChange={(event) => {
+            void accept(event.target.files?.[0]);
+            event.target.value = "";
+          }}
+        />
+        <div className="flex items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"
+          >
+            <Check className="h-3.5 w-3.5" strokeWidth={3} />
+          </span>
+
+          {/* Still the way to catch a screenshot that cut off the total, which
+              is the one thing on this card worth keeping at any size. */}
+          <button
+            type="button"
+            onClick={() => setZoomed(true)}
+            className="shrink-0 cursor-zoom-in"
+            aria-label={`View your ${label.toLowerCase()} full size`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl ?? ""}
+              alt={`Preview of your ${label.toLowerCase()}`}
+              className="h-10 w-10 rounded-lg bg-ink-50 object-cover object-top ring-1 ring-ink-100"
+            />
+          </button>
+
+          <p className="min-w-0 flex-1 truncate text-[0.95rem] font-bold text-ink-900">
+            {label} added
+          </p>
+
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-bold text-slate-600 hover:bg-ink-100"
+          >
+            <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
+            Change
+          </button>
+        </div>
+
+        <ImageLightbox
+          src={previewUrl}
+          alt={`Your ${label.toLowerCase()}, full size`}
+          open={zoomed}
+          onClose={() => setZoomed(false)}
+        />
+        <FieldError id={errorId} message={message} />
+      </section>
+    );
+  }
 
   return (
     <section

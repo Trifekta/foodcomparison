@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { StepActions } from "./StepActions";
@@ -15,6 +15,10 @@ import { track } from "@/lib/analytics/track";
 import { captureAttribution } from "@/lib/analytics/attribution";
 import { RESULT_PROMISE } from "@/lib/constants";
 import type { ExtractionStatus, TotalKind } from "./types";
+import { scrollBehavior } from "@/lib/utils/motion";
+
+/** Roughly the sticky app bar: wordmark, back arrow and the progress bar. */
+const HEADER_CLEARANCE = 104;
 
 interface StepUploadProps {
   cartFile: File | null;
@@ -157,6 +161,62 @@ export function StepUpload({
    * number it is holding, and then the field below must NOT repeat that name:
    * the heading has said it, one line up.
    */
+  /**
+   * The order still has no price on it.
+   *
+   * Everything below keys off this: whether to prompt, whether to scroll,
+   * what the button says. Deliberately NOT "have they uploaded a second
+   * screenshot" - a cart screen that carried its own payment summary has
+   * already answered this, and telling that customer to add a checkout screen
+   * would be asking for something we do not need.
+   */
+  const needsTotal = cartFile !== null && checkoutFile === null && manualTotal.trim() === "";
+
+  /**
+   * Bringing the next question to them, once there is one.
+   *
+   * Waits for the read rather than firing on the upload. For a second or two
+   * after a cart screenshot lands we do not yet know whether it settled the
+   * bill, and prompting for a checkout screen we are about to decide we do not
+   * need is worse than prompting a moment later.
+   *
+   * Once per cart screenshot, and never while they are typing: this moves the
+   * page, and the page should not move under somebody who is working.
+   */
+  /**
+   * Counted once, and only for a figure they typed.
+   *
+   * The field also fills itself from a screenshot, and counting that as
+   * "typed their total instead" would report the manual route as far more
+   * popular than it is - so the autofill's own value is excluded by way of
+   * prefilledFromScreenshot.
+   */
+  const countedManual = useRef(false);
+  useEffect(() => {
+    if (countedManual.current || prefilledFromScreenshot) return;
+    if (!/^\d{1,7}(\.\d{1,2})?$/.test(manualTotal.trim())) return;
+    countedManual.current = true;
+    track("manual_total_added");
+  }, [manualTotal, prefilledFromScreenshot]);
+
+  const checkoutCard = useRef<HTMLDivElement>(null);
+  const scrolledFor = useRef<File | null>(null);
+  useEffect(() => {
+    if (!cartFile || cartReading || !needsTotal) return;
+    if (scrolledFor.current === cartFile) return;
+    scrolledFor.current = cartFile;
+
+    // Positioned by hand rather than with scrollIntoView, for two reasons the
+    // measurements caught: the app bar is sticky, so aligning a card to the
+    // top of the viewport parks its title underneath the header; and the
+    // target has to include the "Next:" line, because scrolling past the
+    // sentence that explains the movement is worse than not moving.
+    const target = checkoutCard.current;
+    if (!target || typeof window === "undefined") return;
+    const top = target.getBoundingClientRect().top + window.scrollY - HEADER_CLEARANCE;
+    window.scrollTo({ top: Math.max(0, top), behavior: scrollBehavior() });
+  }, [cartFile, cartReading, needsTotal]);
+
   const askingForOne =
     !cartSettlesTheBill && !settledFill && !subtotalOnly && checkoutFile === null;
   const fieldLabel = subtotalOnly ? "Your order subtotal" : "Your final total";
@@ -193,7 +253,11 @@ export function StepUpload({
           like. */}
       <ScrollDepth />
 
-      {/* Hero banner. The spread bleeds past the top edge, as in the reference. */}
+      {/* Hero banner, until the cart screenshot lands. It sells the idea to
+          somebody deciding whether to start; once they have started it is
+          ~150px of a phone screen spent restating a decision they have made,
+          and it is pushing the unanswered question off the bottom. */}
+      {cartFile ? null : (
       <div className="relative rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4">
         <div className="relative z-10 max-w-[44%]">
           <ScriptNote underline className="text-[1.35rem] text-ink-900">
@@ -218,6 +282,7 @@ export function StepUpload({
           Deals Ahead <span aria-hidden="true">&hearts;</span>
         </ScriptBubble>
       </div>
+      )}
 
       {/* Back from a food app, screenshot in hand. Stays put until they pick
           one rather than fading on a timer: it is not a notification, it is
@@ -287,6 +352,7 @@ export function StepUpload({
         <ImageUpload
           step={1}
           label="Cart screenshot"
+          compact
           hint="Restaurant and selected items"
           helper="Make sure your restaurant name and ordered items are visible."
           requirement="required"
@@ -312,6 +378,23 @@ export function StepUpload({
             to another app in front of somebody one tap from finishing is a way
             to lose them. */}
         {cartFile ? null : <FoodAppLinks />}
+
+        {/* The next question, said out loud and in the place the eye lands
+            after the card above collapses. The green tick reads as "done";
+            without this the only thing suggesting otherwise is a card the
+            customer has to scroll to find. */}
+        <div ref={checkoutCard} className="space-y-3">
+        {needsTotal && !cartReading ? (
+          <div className="rounded-2xl bg-flame-50 px-4 py-3 ring-1 ring-flame-200">
+            <p className="text-[0.98rem] font-extrabold text-ink-900">
+              Next: add your checkout total
+            </p>
+            <p className="mt-0.5 text-[0.85rem] leading-snug text-ink-600">
+              Recommended for the most accurate comparison{" "}
+              <span aria-hidden="true">&darr;</span>
+            </p>
+          </div>
+        ) : null}
 
         {/* Withdrawn, not just quieted, once the first screenshot settles the
             bill - the slot stays on the screen but stops being asked for.
@@ -364,9 +447,12 @@ export function StepUpload({
           onChange={onCheckoutChange}
           onFilePicked={(file) => {
             setUploadStarted(true);
+            track("checkout_uploaded");
             onCheckoutPicked(file);
           }}
         />
+
+        </div>
 
         {/* The way through for somebody who cannot produce that screenshot.
             Deliberately not a peer of the slot above it - a toggle offering
@@ -430,8 +516,21 @@ export function StepUpload({
       </div>
 
       <StepActions>
-        <Button onClick={onContinue} disabled={!cartFile} arrow>
-          Continue
+        {/* Named for what it actually does. "Continue" beside an unanswered
+            question is an accidental skip: it says nothing is outstanding,
+            while the card above says something is. This does not block
+            anybody - the checkout screenshot is recommended, not required -
+            it just stops the skip being accidental. Back to plain Continue
+            the moment a total exists, from either route. */}
+        <Button
+          onClick={() => {
+            if (needsTotal) track("continued_without_total");
+            onContinue();
+          }}
+          disabled={!cartFile}
+          arrow
+        >
+          {needsTotal && !cartReading ? "Continue with cart only" : "Continue"}
         </Button>
         {!cartFile ? (
           <p className="mt-2.5 text-center text-sm text-slate-500">

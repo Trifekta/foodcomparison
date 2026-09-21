@@ -62,6 +62,22 @@ export function isFunnelEvent(value: string): value is FunnelEvent {
  */
 export const SIDE_EVENTS = [
   { event: "app_opened", label: "Went to a food app" },
+  /*
+   * What happens to the price, after a cart screenshot and before Continue.
+   *
+   * Three outcomes of one moment, all measured against cart_uploaded, which
+   * is their denominator and already counted above. The upload screen asks
+   * for a total in two ways and lets people past without one, and until now
+   * nothing recorded which of the three they chose - so whether the screen
+   * works was a question answered by screenshots and guesswork.
+   *
+   * The third is the one to watch. A comparison run against no total is run
+   * against a subtotal, and a saving measured that way comes out smaller than
+   * it really is, every time, in the same direction.
+   */
+  { event: "checkout_uploaded", label: "Added a checkout screenshot" },
+  { event: "manual_total_added", label: "Typed their total instead" },
+  { event: "continued_without_total", label: "Continued with no total" },
   // How far down the upload screen they got, one per visit. Buckets rather
   // than a number because this table stores event names and nothing else, and
   // a quarter of a screen is as fine a reading as the question needs: the
