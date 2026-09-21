@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { scrollBehavior } from "@/lib/utils/motion";
 import { Button } from "@/components/ui/Button";
 import { StepActions } from "./StepActions";
 import { ImageUpload } from "@/components/forms/ImageUpload";
@@ -79,6 +81,25 @@ export function StepTotal({
   const askingForOne =
     !cartSettlesTheBill && !settledFill && !subtotalOnly && checkoutFile === null;
   const fieldLabel = subtotalOnly ? "Your order subtotal" : "Your final total";
+
+  /**
+   * Bringing the number to them when it arrives.
+   *
+   * The screenshot card above this is tall - a thumbnail, a pill, two lines of
+   * helper text - so on a phone the total lands below the fold, filled in and
+   * unseen. Uploading a payment summary and being shown nothing is the
+   * complaint this answers: the read finishes, and the figure rolls up into
+   * view rather than waiting to be found.
+   *
+   * Only for a figure WE put there. Somebody typing their own total is already
+   * looking at the field, and yanking the page under an open keyboard is its
+   * own kind of rude.
+   */
+  const totalCard = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!prefilledFromScreenshot) return;
+    totalCard.current?.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+  }, [prefilledFromScreenshot]);
 
   return (
     <>
@@ -167,7 +188,7 @@ export function StepTotal({
         </span>
       </div>
 
-      <div className="rounded-3xl bg-cream p-3.5 ring-1 ring-sand">
+      <div ref={totalCard} className="rounded-3xl bg-cream p-3.5 ring-1 ring-sand">
         {/* Three states, because the card answers a different question in
             each. Once the first screenshot has settled the bill it holds the
             number we already read. Once it has given us the food but no fees

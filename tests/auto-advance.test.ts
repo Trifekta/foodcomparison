@@ -46,15 +46,21 @@ describe("when a screen hands over by itself", () => {
     expect(autoAdvanceTarget({ ...base, cartSettled: true })).toBe(3);
   });
 
-  it("moves from the total screen to confirm", () => {
-    expect(autoAdvanceTarget({ ...base, step: 2 })).toBe(3);
+  it("never moves off the total screen, whatever the read found", () => {
+    // The moment its read lands is the moment that screen finally has
+    // something to say - here is what you paid - so it is the worst possible
+    // moment to leave. Somebody who uploads a payment summary and never sees
+    // their own total has been shown nothing.
+    expect(autoAdvanceTarget({ ...base, step: 2 })).toBeNull();
+    // And the mirror case: nothing readable on it means the total screen is
+    // exactly where they type the number themselves.
+    expect(autoAdvanceTarget({ ...base, step: 2, status: "empty" })).toBeNull();
   });
 
   it("never hands over twice from the same screen", () => {
     // What makes Back usable. The read on the screen behind is still finished,
     // so without this the customer is thrown forward the moment they go back.
     expect(autoAdvanceTarget({ ...base, alreadyAdvanced: true })).toBeNull();
-    expect(autoAdvanceTarget({ ...base, step: 2, alreadyAdvanced: true })).toBeNull();
   });
 
   it("never hands over from the confirm screen", () => {

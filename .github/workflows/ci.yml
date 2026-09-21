@@ -1,0 +1,49 @@
+# The checks a contributor runs locally, run again where everyone can see them.
+#
+# Until this existed the repository had exactly one check - the Cloudflare
+# Workers build - and it failed on every pull request, so the only signal
+# anybody had was one that was always red. Nothing ran the tests.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [claude/findfoodae-mvp-build-rc77aj]
+
+# A new push makes the previous run pointless; let it go rather than queue.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Read from .node-version, so this and Cloudflare Workers Builds
+          # cannot drift onto different runtimes.
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      # Each one named, so a red tick says which gate failed without opening
+      # the log. They run in the order a person would: cheapest first.
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      # Last because it is the slowest, and because the three above catch most
+      # of what would break it.
+      - name: Build
+        run: npm run build

@@ -297,14 +297,22 @@ export function readTotalOffer(totals: ReadTotals | null): TotalOffer {
  * is here with a test rather than inline in an effect:
  *
  *  - nothing read yet, or still reading, and nobody is moved. A screen that
- *    changes while somebody is still looking at the card they just filled is
- *    how a mis-tap happens.
+ *    changes under a thumb is how a mis-tap happens.
  *  - from the cart screen, a bill that is already settled skips the total
  *    screen entirely. There is nothing left to ask for: the fees and the
  *    total were on the screenshot they already sent, and putting a screen in
  *    front of them to say so is the friction this whole flow is against.
- *  - once a screen has handed over, it never does so again. Otherwise Back is
- *    a button that throws you forward again, which is worse than no Back.
+ *  - the total screen NEVER hands over, and that is the point of it. Its read
+ *    finishing is the moment it finally has something to say - here is what
+ *    you paid - and moving then is moving at exactly the wrong time: the
+ *    number appears and the screen carrying it leaves in the same breath. A
+ *    customer who uploads a payment summary and never sees their own total
+ *    has been shown nothing. It fills the field, rolls it into view, and
+ *    waits for Continue. The same holds when the read finds nothing, for the
+ *    mirror reason: that screen is where they type the number themselves.
+ *  - a screen hands over once and never again, and Back switches it off for
+ *    the screen it lands on. Otherwise Back is a button that throws you
+ *    forward, which is worse than no Back.
  */
 export function autoAdvanceTarget(input: {
   /** Which screen the customer is on now. */
@@ -321,7 +329,7 @@ export function autoAdvanceTarget(input: {
   if (input.alreadyAdvanced || !input.hasFile) return null;
   if (input.status === "reading" || input.status === "idle") return null;
   if (input.step === 1) return input.cartSettled ? 3 : 2;
-  if (input.step === 2) return 3;
+  // Everything past the cart screen holds. See the note above.
   return null;
 }
 
