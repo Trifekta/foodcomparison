@@ -79,8 +79,9 @@ export function FunnelChart({
       </ol>
 
       <p className="mt-4 text-xs leading-relaxed text-ink-500">
-        A visit is one browser session, not one person - the same phone coming back tomorrow counts
-        twice. Nothing here identifies anybody.
+        A visit is one browser on one day - the same phone coming back tomorrow counts twice, and
+        the same phone opening the link twice this afternoon counts once. Nothing here identifies
+        anybody.
       </p>
     </section>
   );

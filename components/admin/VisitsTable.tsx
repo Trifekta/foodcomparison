@@ -20,7 +20,8 @@ function VisitId({ id }: { id: string }) {
   );
 }
 
-/** Retries are the signal: one upload is normal, four is somebody struggling. */
+/** Retries are the signal: one upload is normal, four is somebody struggling - or, now that a
+ * visit lasts the day, somebody who came back later to compare a second cart. */
 function Screenshots({ count }: { count: number }) {
   if (count === 0) return <span className="text-ink-400">—</span>;
   return (
@@ -28,7 +29,11 @@ function Screenshots({ count }: { count: number }) {
       className={
         count > 1 ? "font-bold tabular-nums text-amber-700" : "tabular-nums text-ink-800"
       }
-      title={count > 1 ? `${count} screenshots picked - a retry, or a replaced image` : undefined}
+      title={
+        count > 1
+          ? `${count} screenshots picked today - retries, a replaced image, or a second cart later in the day`
+          : undefined
+      }
     >
       {count}
     </span>
@@ -146,8 +151,9 @@ export function VisitsTable({
       ) : null}
 
       <p className="text-xs text-ink-500">
-        A visit is one browser session, not one person — the same phone coming back tomorrow is two
-        rows. Nothing here identifies anybody.{" "}
+        A visit is one browser on one day — the same phone coming back tomorrow is a second row,
+        and the same phone opening the link twice this afternoon is still one. Nothing here
+        identifies anybody.{" "}
         <Link href="/admin/analytics" className="underline underline-offset-2 hover:text-ink-800">
           The funnel view
         </Link>{" "}

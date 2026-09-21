@@ -121,7 +121,7 @@ export async function GET(
   const write = recordKeetaClick({
     submissionId: row.id,
     destinationUrl: destination.url,
-    // Sent by the button from sessionStorage. It is the funnel's own visit id,
+    // Sent by the button from the browser's own storage. It is the funnel's own visit id,
     // which is what separates unique switchers from total taps.
     visitId: cleanVisitId(url.searchParams.get("v")),
     restaurantName: row.restaurant_name,
