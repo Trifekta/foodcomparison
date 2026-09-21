@@ -332,11 +332,19 @@ export function StepUpload({
         </div>
 
         <div className="rounded-3xl bg-cream p-3.5 ring-1 ring-sand">
+          {/* The heading follows the slot above it. Once the first screenshot
+              has settled the bill that slot says so, and asking "don't have a
+              checkout screenshot?" beside it reads as a question nobody just
+              answered - the field is no longer a way round a missing
+              screenshot, it is the number we already read, offered for a
+              second look. */}
           <h3 className="text-[1rem] font-extrabold text-ink-900">
-            Don&apos;t have a checkout screenshot?
+            {cartSettlesTheBill ? "Your final total" : "Don't have a checkout screenshot?"}
           </h3>
           <p className="mt-0.5 mb-3 text-[0.88rem] leading-snug text-slate-600">
-            Enter your final payable amount instead — after discounts, fees and delivery.
+            {cartSettlesTheBill
+              ? "This is what we read off your cart screenshot — after discounts, fees and delivery."
+              : "Enter your final payable amount instead — after discounts, fees and delivery."}
           </p>
           <AmountInput
             label="Your final total"
