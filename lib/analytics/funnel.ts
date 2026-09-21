@@ -17,13 +17,25 @@ export const FUNNEL_STEPS = [
   // walks away is what step_basket alone can never tell apart from a visit
   // that never uploaded at all.
   { event: "cart_uploaded", label: "Uploaded a screenshot" },
-  // Each of these fires on ARRIVAL at a screen, so the honest label is the
-  // thing the customer just finished, not the screen they are now looking at.
-  // They used to be named one step ahead of themselves - "Gave area and total"
-  // sat on the event that fires the moment somebody *reaches* the area screen,
-  // having given nothing - which read as a far warmer funnel than the real one.
-  { event: "step_basket", label: "Reached the basket screen" },
-  { event: "step_where", label: "Confirmed their basket" },
+  // Three rungs that used to be three screens, and are now three moments on
+  // one. The names are deliberately unchanged: they are what the funnel table,
+  // the area report and every row already recorded call these steps, and
+  // renaming them to match a new layout would split the history in half at the
+  // deploy for no gain the dashboard can use.
+  //
+  // What each one MEANS is now what it always claimed. They fired on arrival
+  // at a screen, which is a weaker thing than the label said - "Gave area and
+  // total" sat on the moment somebody reached the area screen, having given
+  // nothing. With the screens merged there is nothing to arrive at, so each
+  // fires on the act itself, once per visit.
+  { event: "step_basket", label: "Reached the confirm screen" },
+  // Fires when the area is chosen, not when a screen holding an area field
+  // opens - which is also what keeps the area report alive. A visit's area is
+  // resolved from whichever of its events carries one, and this is the first
+  // event that can: every step below it inherits the attribution from here.
+  { event: "step_where", label: "Chose their delivery area" },
+  // Fires once area, total and the Keeta question are all answered. The label
+  // is the one it has always had, and for the first time it is exactly true.
   { event: "step_review", label: "Gave area and total" },
   { event: "submitted", label: "Sent the order" },
   { event: "result_viewed", label: "Opened their result" },
