@@ -19,7 +19,7 @@ describe("buildVisitsCsv", () => {
         event: "submitted",
         created_at: at(7),
         areas: { name: "Al Karama" },
-        submissions: { reference_number: "K4M2PQ" },
+        submissions: { reference_number: "K4M2PQ", utm_source: null, utm_campaign: null, utm_content: null },
       }),
     ]),
   );

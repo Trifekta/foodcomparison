@@ -138,6 +138,9 @@ export default async function AttributionPage({
                     "Comparison",
                     "Restaurant",
                     "From",
+                    "Source",
+                    "Campaign",
+                    "Ad/Creative",
                     "Area",
                     "Original",
                     COMPARISON_APP,
@@ -170,6 +173,15 @@ export default async function AttributionPage({
                     <td className="px-3 py-2 text-ink-800">{click.restaurant_name ?? "—"}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-ink-600">
                       {click.source_app ?? "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-ink-600">
+                      {click.utm_source ?? "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-ink-600">
+                      {click.utm_campaign ?? "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-ink-600">
+                      {click.utm_content ?? "—"}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-ink-600">
                       {click.area_name ?? "—"}

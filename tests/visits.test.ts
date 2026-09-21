@@ -99,7 +99,7 @@ describe("summarizeVisits", () => {
         visit_id: "a",
         event: "submitted",
         created_at: at(7),
-        submissions: { reference_number: "K4M2PQ" },
+        submissions: { reference_number: "K4M2PQ", utm_source: null, utm_campaign: null, utm_content: null },
       }),
     ]);
     expect(visits[0].areaName).toBe("Al Karama");
