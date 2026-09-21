@@ -10,10 +10,19 @@ on:
   push:
     branches: [claude/findfoodae-mvp-build-rc77aj]
 
-# A new push makes the previous run pointless; let it go rather than queue.
+# Nothing here writes to the repository; the deploy job authenticates to
+# Cloudflare with its own token.
+permissions:
+  contents: read
+
+# A new push makes the previous PR run pointless; let it go rather than queue.
+#
+# Only for pull requests, though. A push run ends in a deploy, and cancelling
+# a run mid-`wrangler deploy` would leave the Worker in whatever state the
+# upload had reached.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -47,3 +56,91 @@ jobs:
       # of what would break it.
       - name: Build
         run: npm run build
+
+  # Ship what just passed.
+  #
+  # This replaces the Cloudflare Workers Builds git integration, which failed
+  # on every pull request from the day it was connected - always in under a
+  # second, which is to say it never got as far as running a build. Deploying
+  # from here means the thing that decides whether to ship is the same thing
+  # that ran the tests, and a failure lands in a log this repository can read.
+  #
+  # Disconnect the Workers Builds integration in the Cloudflare dashboard once
+  # this has shipped once, or every merge builds twice and one of the two
+  # results is noise.
+  deploy:
+    # Only on a merge to the default branch. The `on.push.branches` filter
+    # above already restricts that, so the branch is named in one place.
+    if: github.event_name == 'push'
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Gives the repository a Deployments view, and somewhere to require an
+    # approval later without touching this file.
+    environment:
+      name: production
+      url: ${{ vars.NEXT_PUBLIC_APP_URL }}
+
+    # Two merges in quick succession deploy one after the other rather than
+    # racing to overwrite the same Worker.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      # Before the build, not after, because a missing NEXT_PUBLIC_ value does
+      # not fail anything by itself. Those three are inlined into the bundle by
+      # `next build`, and lib/env.ts defaults each to "" - so the build passes,
+      # `wrangler deploy` passes, the Worker starts, and the site cannot reach
+      # Supabase. Cheaper to refuse here than to find out from a customer.
+      - name: Check the deploy is configured
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=()
+          for name in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY NEXT_PUBLIC_APP_URL; do
+            [ -n "${!name}" ] || missing+=("$name (Variables)")
+          done
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            [ -n "${!name}" ] || missing+=("$name (Secrets)")
+          done
+
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Not configured to deploy. Missing: ${missing[*]}"
+            echo "Set these under Settings -> Secrets and variables -> Actions."
+            echo "The three NEXT_PUBLIC_ names are public values baked into the browser bundle, so they belong under Variables."
+            echo "The two Cloudflare names are credentials and belong under Secrets."
+            exit 1
+          fi
+
+      # Runs next build itself and bundles the Worker into .open-next/.
+      # Separate from the deploy step so a red tick says which of the two broke.
+      - name: Build the Worker
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+        run: npm run cf:build
+
+      # Runtime secrets are NOT set from here. They live on the Worker, and
+      # `keep_vars: true` in wrangler.jsonc stops this deploy removing the
+      # plain-text variables set beside them in the dashboard.
+      - name: Deploy to Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
