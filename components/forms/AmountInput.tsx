@@ -14,6 +14,12 @@ interface AmountInputProps {
   name?: string;
   /** "lg" renders the headline-sized field used on the customer total screen. */
   scale?: "md" | "lg";
+  /**
+   * Keep the label for screen readers but take it off the screen, for a field
+   * whose surrounding card already names it - otherwise the same three words
+   * appear twice, one line apart.
+   */
+  hideLabel?: boolean;
   onChange?: React.ChangeEventHandler<HTMLInputElement>;
   onBlur?: React.FocusEventHandler<HTMLInputElement>;
 }
@@ -24,7 +30,7 @@ interface AmountInputProps {
  * quirks - the value is validated as a decimal string.
  */
 export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(function AmountInput(
-  { label, hint, error, placeholder = "72.50", scale = "md", ...rest },
+  { label, hint, error, placeholder = "72.50", scale = "md", hideLabel = false, ...rest },
   ref,
 ) {
   const id = useId();
@@ -34,7 +40,13 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
 
   return (
     <div>
-      <label htmlFor={id} className="mb-2 block text-[0.95rem] font-bold text-ink-900">
+      <label
+        htmlFor={id}
+        className={cn(
+          "mb-2 block text-[0.95rem] font-bold text-ink-900",
+          hideLabel && "sr-only",
+        )}
+      >
         {label}
       </label>
       {hint ? (

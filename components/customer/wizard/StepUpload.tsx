@@ -364,6 +364,7 @@ export function StepUpload({
           </p>
           <AmountInput
             label={subtotalOnly ? "Your order subtotal" : "Your final total"}
+            hideLabel={subtotalOnly}
             value={manualTotal}
             onChange={(event) => onManualTotalChange(event.target.value)}
             error={totalError}
