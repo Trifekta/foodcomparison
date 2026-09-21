@@ -55,19 +55,24 @@ export interface ReadTotals {
 }
 
 /**
- * Two screens: upload, then confirm and send.
+ * Three screens: the cart, the total, then confirm and send.
  *
- * It was four - upload, confirm the basket, where and how much, then review -
- * and the last of those existed to show the customer what they had just typed.
- * Everything a person actually answers now lives on the second screen, and the
- * screen that only repeated those answers back is gone.
+ * It was four, then two, and is now three - which is not a retreat. The two
+ * were upload and confirm, and "upload" quietly held three jobs: the cart
+ * screenshot, the checkout screenshot, and a total typed by hand. The second
+ * of those is what turns a subtotal into the number somebody actually paid,
+ * and on one screen it sat below the fold behind the card that had just been
+ * satisfied. Plenty of people never scrolled to it.
  *
- * What did NOT move is the checking. The basket read off the screenshot is
- * still shown and still editable; it is folded behind a summary rather than
- * spread over a screen of its own, and it opens itself whenever there is a
- * reason to look (see itemsNeedAttention).
+ * So the screen that was doing two jobs now does one each, and each hands over
+ * by itself once its screenshot has been read (see autoAdvanceTarget). The
+ * count went up; the work per screen went down, and nothing is scrolled past.
+ *
+ * No "Step n of m" anywhere - the bar carries it. Naming a number invites the
+ * comparison this change would lose, and the honest thing to show is how much
+ * is left, which is what a bar is for.
  */
-export const TOTAL_STEPS = 2;
+export const TOTAL_STEPS = 3;
 
 export const WIZARD_DEFAULTS: WizardValues = {
   restaurantName: "",
@@ -283,6 +288,41 @@ export function readTotalOffer(totals: ReadTotals | null): TotalOffer {
   if (totals.finalTotal !== "") return { value: totals.finalTotal, kind: "subtotal" };
   if (totals.subtotal !== "") return { value: totals.subtotal, kind: "subtotal" };
   return { value: "", kind: "none" };
+}
+
+/**
+ * Where a screen hands over to, once its screenshot has been read.
+ *
+ * Null means stay put. The rule is small and the consequences are not, so it
+ * is here with a test rather than inline in an effect:
+ *
+ *  - nothing read yet, or still reading, and nobody is moved. A screen that
+ *    changes while somebody is still looking at the card they just filled is
+ *    how a mis-tap happens.
+ *  - from the cart screen, a bill that is already settled skips the total
+ *    screen entirely. There is nothing left to ask for: the fees and the
+ *    total were on the screenshot they already sent, and putting a screen in
+ *    front of them to say so is the friction this whole flow is against.
+ *  - once a screen has handed over, it never does so again. Otherwise Back is
+ *    a button that throws you forward again, which is worse than no Back.
+ */
+export function autoAdvanceTarget(input: {
+  /** Which screen the customer is on now. */
+  step: number;
+  /** How the read for THIS screen's screenshot is going. */
+  status: ExtractionStatus;
+  /** Whether that screenshot has been chosen at all. */
+  hasFile: boolean;
+  /** Whether the cart screenshot carried the fees and the total. */
+  cartSettled: boolean;
+  /** This screen has already handed over once. */
+  alreadyAdvanced: boolean;
+}): number | null {
+  if (input.alreadyAdvanced || !input.hasFile) return null;
+  if (input.status === "reading" || input.status === "idle") return null;
+  if (input.step === 1) return input.cartSettled ? 3 : 2;
+  if (input.step === 2) return 3;
+  return null;
 }
 
 /**
