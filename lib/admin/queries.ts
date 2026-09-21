@@ -543,6 +543,13 @@ export async function getValidationData(range: DateRange = {}): Promise<Validati
   const supabase = await createServerSupabaseClient();
   const bounds = rangeToInstants(range.from || range.to ? range : defaultVisitRange());
 
+  interface RawValidationRow {
+    visit_id: string;
+    client_ip: string;
+    created_at: string;
+    submissions: { reference_number: string } | null;
+  }
+
   const { data, error } = await supabase
     .from("visitor_ips")
     .select(
@@ -550,11 +557,14 @@ export async function getValidationData(range: DateRange = {}): Promise<Validati
     )
     .gte("created_at", bounds.since ?? "1970-01-01T00:00:00Z")
     .lte("created_at", bounds.until ?? "2999-12-31T23:59:59Z")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false }) as {
+      data: RawValidationRow[] | null;
+      error: Error | null;
+    };
 
   if (error) throw new Error(`Could not load validation data: ${error.message}`);
 
-  return (data ?? []).map((row: any) => ({
+  return (data ?? []).map((row) => ({
     visit_id: row.visit_id,
     client_ip: row.client_ip,
     created_at: row.created_at,

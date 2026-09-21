@@ -12,8 +12,8 @@ import { parseDateRange } from "@/lib/admin/filters";
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const from = url.searchParams.get("from");
-    const to = url.searchParams.get("to");
+    const from = url.searchParams.get("from") ?? undefined;
+    const to = url.searchParams.get("to") ?? undefined;
 
     const range = parseDateRange({ from, to });
     const data = await getValidationData(range);
