@@ -29,6 +29,10 @@ export interface ClickRow {
   keeta_cheaper: boolean | null;
   destination_url: string;
   conversion_status: string;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
   submissions: { reference_number: string } | null;
 }
 
@@ -55,7 +59,7 @@ export async function getKeetaClicks(range: DateRange = {}, limit = 2000): Promi
   const { data, error } = await supabase
     .from("keeta_clicks")
     .select(
-      "click_ref, submission_id, clicked_at, visit_id, restaurant_name, source_app, area_name, current_total, comparison_total, saving_amount, saving_percentage, keeta_cheaper, destination_url, conversion_status, submissions(reference_number)",
+      "click_ref, submission_id, clicked_at, visit_id, restaurant_name, source_app, area_name, current_total, comparison_total, saving_amount, saving_percentage, keeta_cheaper, destination_url, conversion_status, utm_source, utm_medium, utm_campaign, utm_content, submissions(reference_number)",
     )
     .gte("clicked_at", since ?? "1970-01-01T00:00:00Z")
     .lte("clicked_at", until ?? "2999-12-31T23:59:59Z")

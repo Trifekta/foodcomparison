@@ -92,6 +92,9 @@ export function VisitsTable({
                 <th className="px-4 py-2.5">Last seen</th>
                 <th className="px-4 py-2.5 text-right">Shots</th>
                 <th className="px-4 py-2.5">Got as far as</th>
+                <th className="px-4 py-2.5">Source</th>
+                <th className="px-4 py-2.5">Campaign</th>
+                <th className="px-4 py-2.5">Ad/Creative</th>
                 <th className="px-4 py-2.5">Area</th>
                 <th className="px-4 py-2.5">Order</th>
               </tr>
@@ -126,6 +129,9 @@ export function VisitsTable({
                       </span>
                     ) : null}
                   </td>
+                  <td className="px-4 py-2.5 text-ink-600">{visit.utmSource ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-ink-600">{visit.utmCampaign ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-ink-600">{visit.utmContent ?? "—"}</td>
                   <td className="px-4 py-2.5 text-ink-600">{visit.areaName ?? "—"}</td>
                   <td className="px-4 py-2.5">
                     {visit.reference ? (

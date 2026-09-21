@@ -17,7 +17,7 @@ export interface VisitEventRow {
   event: string;
   created_at: string;
   areas: { name: string } | null;
-  submissions: { reference_number: string } | null;
+  submissions: { reference_number: string; utm_source: string | null; utm_campaign: string | null; utm_content: string | null } | null;
 }
 
 export interface VisitSummary {
@@ -41,6 +41,12 @@ export interface VisitSummary {
   reference: string | null;
   /** Whether this visit ever sent an order. */
   completed: boolean;
+  /** UTM source from the landing page. */
+  utmSource: string | null;
+  /** UTM campaign from the landing page. */
+  utmCampaign: string | null;
+  /** UTM content (ad/creative) from the landing page. */
+  utmContent: string | null;
 }
 
 const ORDER = new Map<string, number>(FUNNEL_STEPS.map((step, index) => [step.event, index]));
@@ -79,6 +85,9 @@ export function summarizeVisits(rows: VisitEventRow[]): VisitSummary[] {
     let sentOrder = false;
     let areaName: string | null = null;
     let reference: string | null = null;
+    let utmSource: string | null = null;
+    let utmCampaign: string | null = null;
+    let utmContent: string | null = null;
 
     for (const row of events) {
       if (row.created_at < firstSeen) firstSeen = row.created_at;
@@ -99,6 +108,16 @@ export function summarizeVisits(rows: VisitEventRow[]): VisitSummary[] {
       if (!reference && row.submissions?.reference_number) {
         reference = row.submissions.reference_number;
       }
+      // Attribution fields are also resolved from the submission when available
+      if (!utmSource && row.submissions?.utm_source) {
+        utmSource = row.submissions.utm_source;
+      }
+      if (!utmCampaign && row.submissions?.utm_campaign) {
+        utmCampaign = row.submissions.utm_campaign;
+      }
+      if (!utmContent && row.submissions?.utm_content) {
+        utmContent = row.submissions.utm_content;
+      }
     }
 
     summaries.push({
@@ -117,6 +136,9 @@ export function summarizeVisits(rows: VisitEventRow[]): VisitSummary[] {
       areaName,
       reference,
       completed: sentOrder,
+      utmSource,
+      utmCampaign,
+      utmContent,
     });
   }
 

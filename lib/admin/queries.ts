@@ -514,7 +514,7 @@ export async function getVisitEvents(
 
   const { data, error } = await supabase
     .from("funnel_events")
-    .select("visit_id, event, created_at, areas(name), submissions(reference_number)")
+    .select("visit_id, event, created_at, areas(name), submissions(reference_number, utm_source, utm_campaign, utm_content)")
     .gte("created_at", bounds.since ?? "1970-01-01T00:00:00Z")
     .lte("created_at", bounds.until ?? "2999-12-31T23:59:59Z")
     .order("created_at", { ascending: false })
