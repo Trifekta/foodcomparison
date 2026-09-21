@@ -727,6 +727,8 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           onCheckoutPicked={(file) => startRead(file, "checkout")}
           manualTotal={values.currentTotal}
           totalKind={offer.kind}
+          checkoutStatus={checkoutStatus}
+          prefilledFromScreenshot={offer.value !== "" && values.currentTotal === offer.value}
           onManualTotalChange={(value) => setField("currentTotal", value)}
           totalError={errors.currentTotal?.message}
           error={cartError}
