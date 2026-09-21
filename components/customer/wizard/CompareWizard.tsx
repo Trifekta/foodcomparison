@@ -33,6 +33,7 @@ import {
   combineStatus,
   hasAnyTotal,
   mergeReadTotals,
+  readTotalOffer,
   shouldAutofillTotal,
   totalsAreSettled,
   trustedFinalTotal,
@@ -313,20 +314,38 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
    * the upload screen is telling the customer this slot still needs a look.
    */
   const autofilled = useRef<string | null>(null);
+
+  /**
+   * Two figures, for two different jobs.
+   *
+   * `offer` is what goes in the field: the best number the screenshots printed,
+   * which may be a settled bill or only the food. It exists so a customer whose
+   * cart screen never showed a delivery fee is not left retyping a number they
+   * have already sent us.
+   *
+   * `trustedTotal` stays settled-or-nothing, because it answers a different
+   * question - may we tell this customer their fees were checked? A subtotal
+   * can never answer yes to that, however useful it is in the field.
+   */
+  const offer = readTotalOffer(readTotals);
   const trustedTotal = trustedFinalTotal(readTotals);
 
   useEffect(() => {
     const decision = shouldAutofillTotal({
-      readFinalTotal: trustedTotal,
+      readFinalTotal: offer.value,
       typed: getValues("currentTotal"),
       lastAutofilled: autofilled.current,
     });
     if (!decision) return;
 
-    setValue("currentTotal", trustedTotal);
+    // Upgrades as well as fills. A subtotal put here from the cart screenshot
+    // is still `lastAutofilled`, so adding the checkout screen later - which
+    // settles the bill - is allowed to replace it. Anything the customer typed
+    // themselves is not touched either time.
+    setValue("currentTotal", offer.value);
     clearErrors("currentTotal");
-    autofilled.current = trustedTotal;
-  }, [trustedTotal, getValues, setValue, clearErrors]);
+    autofilled.current = offer.value;
+  }, [offer.value, getValues, setValue, clearErrors]);
 
   const setField = <K extends keyof WizardValues & string>(
     name: K,
@@ -692,6 +711,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           }}
           onCheckoutPicked={(file) => startRead(file, "checkout")}
           manualTotal={values.currentTotal}
+          totalKind={offer.kind}
           onManualTotalChange={(value) => setField("currentTotal", value)}
           totalError={errors.currentTotal?.message}
           error={cartError}
@@ -708,14 +728,14 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           extractionStatus={extractionStatus}
           readTotals={readTotals}
           totalsFromCheckout={totalsFromCheckout}
-          // Both the hint and its "Use this" button offer a figure as something
-          // to trust, same as the silent autofill above - so both read from
-          // trustedTotal, not from whatever final_total happened to hold. An
-          // unsettled total still shows in the basket panel, which prints every
-          // field exactly as read, just never offered here as an answer.
-          readTotal={trustedTotal || null}
+          // The hint and its button offer whatever the screenshots printed,
+          // settled or not - and `totalKind` travels with it so the screen can
+          // name the figure honestly rather than implying every number here is
+          // a final bill.
+          readTotal={offer.value || null}
+          totalKind={offer.kind}
           totalFromCheckout={totalsFromCheckout && checkoutTotals.finalTotal !== ""}
-          prefilledFromScreenshot={trustedTotal !== "" && values.currentTotal === trustedTotal}
+          prefilledFromScreenshot={offer.value !== "" && values.currentTotal === offer.value}
           waitingOnRead={cartReading && !readWaitExpired}
           submitting={submitting}
           submitError={submitError}
@@ -732,7 +752,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           onCurrentTotalChange={(value) => setField("currentTotal", value)}
           onNewToKeetaChange={(value) => setField("newToKeeta", value)}
           onUseReadTotal={() => {
-            if (trustedTotal) setField("currentTotal", trustedTotal);
+            if (offer.value) setField("currentTotal", offer.value);
           }}
           onDialCodeChange={(code) => setField("dialCode", code)}
           onWhatsappNumberChange={(value) => setField("whatsappNumber", value)}

@@ -34,6 +34,7 @@ import {
   type CartItemDraft,
   type ExtractionStatus,
   type ReadTotals,
+  type TotalKind,
   type WizardFiles,
   type WizardValues,
 } from "./types";
@@ -46,8 +47,10 @@ interface StepConfirmProps {
   extractionStatus: ExtractionStatus;
   readTotals: ReadTotals | null;
   totalsFromCheckout: boolean;
-  /** The total read off the screenshots, once it is one worth offering. */
+  /** The best figure the screenshots printed, settled or not. */
   readTotal: string | null;
+  /** What that figure is - a finished bill, or the food before fees. */
+  totalKind: TotalKind;
   /** Whether that total came off the checkout screen rather than the cart. */
   totalFromCheckout: boolean;
   /** The field already holds the number read off one of their screenshots. */
@@ -143,6 +146,7 @@ export function StepConfirm({
   readTotals,
   totalsFromCheckout,
   readTotal,
+  totalKind,
   totalFromCheckout,
   prefilledFromScreenshot,
   waitingOnRead,
@@ -197,9 +201,29 @@ export function StepConfirm({
   const basketOpen = errors.restaurantName ? true : (basketToggled ?? basketOpensItself);
 
   const total = values.currentTotal ? `${CURRENCY} ${values.currentTotal}` : "";
-  // Offered only when it is a figure worth trusting AND it disagrees with what
-  // is in the field. Agreement needs no sentence.
+  // Offered only when the read found something AND it disagrees with what is in
+  // the field. Agreement needs no sentence.
   const showReadHint = readTotal !== null && readTotal !== "" && readTotal !== values.currentTotal;
+
+  /**
+   * The field holds the food and not the fees.
+   *
+   * Worth saying plainly, and worth saying every time. The number we compare
+   * against is whatever sits in this field, and the price an admin finds on
+   * Keeta is always a grand total - so a subtotal left here unremarked does not
+   * produce a slightly rough saving, it produces one that is wrong in a
+   * predictable direction. The customer is the only person who can close that
+   * gap, and they can only do it if they are told it is open.
+   */
+  const isSubtotal = totalKind === "subtotal" && values.currentTotal === readTotal;
+
+  const totalLabel = isSubtotal
+    ? "Your order subtotal"
+    : hasCheckoutShot
+      ? "Your checkout total"
+      : totalKind === "settled" && prefilledFromScreenshot
+        ? "Your total paid"
+        : "Total you entered";
 
   return (
     <>
@@ -436,7 +460,7 @@ export function StepConfirm({
         <div>
           <div className="rounded-3xl bg-linear-to-b from-brand-100 to-beige p-3.5">
             <AmountInput
-              label={hasCheckoutShot ? "Your checkout total" : "Total you entered"}
+              label={totalLabel}
               scale="lg"
               value={values.currentTotal}
               onChange={(event) => onCurrentTotalChange(event.target.value)}
@@ -444,7 +468,16 @@ export function StepConfirm({
             />
           </div>
 
-          {prefilledFromScreenshot ? (
+          {prefilledFromScreenshot && isSubtotal ? (
+            <p className="mt-3 flex items-start gap-2 rounded-2xl bg-flame-50 px-3.5 py-3 text-sm leading-snug text-ink-700 ring-1 ring-flame-200">
+              <ScanLine aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-flame-500" />
+              <span>
+                <span className="font-bold">This is your food subtotal.</span> Your screenshot
+                didn&apos;t show delivery or service fees, so add them for an exact comparison — or
+                send the checkout screen and we&apos;ll read them.
+              </span>
+            </p>
+          ) : prefilledFromScreenshot ? (
             <p className="mt-3 flex items-start gap-2 rounded-2xl bg-chip-green-bg px-3.5 py-3 text-sm leading-snug text-chip-green-fg">
               <ScanLine aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
@@ -468,7 +501,8 @@ export function StepConfirm({
                   <span className="font-extrabold tabular-nums">
                     {CURRENCY} {readTotal}
                   </span>{" "}
-                  in your {totalFromCheckout ? "checkout screenshot" : "screenshot"}.
+                  {totalKind === "subtotal" ? "as the subtotal on" : "in"} your{" "}
+                  {totalFromCheckout ? "checkout screenshot" : "screenshot"}.
                 </span>
               </p>
               <button
@@ -484,11 +518,13 @@ export function StepConfirm({
           <p className="mt-3 flex items-start gap-2 rounded-2xl bg-flame-50 p-3.5 text-sm leading-relaxed text-ink-600">
             <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-flame-500" />
             <span>
-              {prefilledFromScreenshot
-                ? "This is the number we compare against, so it's worth a glance before you send."
-                : hasCheckoutShot
-                  ? "We'll cross-check this against the checkout screenshot you added."
-                  : "Include delivery fees and any discounts — this is the number we compare against."}
+              {isSubtotal
+                ? "We compare against this number, and Keeta's price will include its own fees — so a subtotal makes the saving look smaller than it is."
+                : prefilledFromScreenshot
+                  ? "This is the number we compare against, so it's worth a glance before you send."
+                  : hasCheckoutShot
+                    ? "We'll cross-check this against the checkout screenshot you added."
+                    : "Include delivery fees and any discounts — this is the number we compare against."}
             </span>
           </p>
         </div>
