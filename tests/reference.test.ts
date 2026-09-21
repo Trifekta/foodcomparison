@@ -50,9 +50,26 @@ describe("reference numbers", () => {
     }
   });
 
+  /**
+   * Rare, which is not the same as impossible - and this asserted impossible.
+   *
+   * 5000 draws from 30^6 references expect 0.017 collisions between them, so
+   * about one run in sixty of a generator working exactly as designed went
+   * red. Measured over 120 trials the generator is uniform: every character
+   * appears at every position, chi-squared well inside the 99.9% bound, and
+   * collisions arrive at the rate the arithmetic predicts. The test was the
+   * broken part, and a flaky test is worse here than no test, because CI now
+   * gates the deploy.
+   *
+   * Three or more collisions is about one run in a million, and anything that
+   * had really lost its spread - a constant, a collapsed alphabet, a modulo
+   * over the wrong range - produces far more than three.
+   */
   it("spreads widely enough that collisions stay rare", () => {
-    const seen = new Set(Array.from({ length: 5000 }, () => generateReferenceNumber()));
-    expect(seen.size).toBe(5000);
+    const draws = 5000;
+    const seen = new Set(Array.from({ length: draws }, () => generateReferenceNumber()));
+
+    expect(draws - seen.size).toBeLessThanOrEqual(2);
     for (const reference of seen) expect(isValidReferenceNumber(reference)).toBe(true);
   });
 });
