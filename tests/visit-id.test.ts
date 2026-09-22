@@ -1,116 +1,124 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { visitId } from "@/lib/analytics/track";
-import { VISIT_ID_PATTERN } from "@/lib/analytics/funnel";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
- * How long one visit lasts.
+ * One page view, one visit id.
  *
- * The id is one browser for one Dubai day. Both halves of that matter: it has
- * to survive the tab closing (the same person arriving from Instagram twice is
- * one visit), and it has to NOT survive midnight (an id that straddled the
- * boundary would put one visit's events in two of the dashboard's day windows,
- * which is the cross-day mixing the visits page exists to avoid).
+ * The failure this file exists for: an in-app browser that accepts setItem and
+ * then returns null from the very next getItem. visitId() read storage on
+ * every call, so each track() on the page minted a fresh id and one person
+ * arrived in the data as four, their events split between ids seconds apart.
+ * Every funnel percentage divides by a count of distinct visit ids, so the
+ * denominators moved with it.
  */
 
-const KEY = "snipsavor.visit";
-
-let store: Map<string, string>;
-
-/** Just enough of the Storage interface for the three calls visitId() makes. */
-function installStorage(throwOnAccess = false) {
-  store = new Map();
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    get() {
-      if (throwOnAccess) throw new Error("storage is off");
-      return {
-        getItem: (key: string) => store.get(key) ?? null,
-        setItem: (key: string, value: string) => void store.set(key, value),
-        removeItem: (key: string) => void store.delete(key),
-      };
-    },
-  });
+/** Storage that keeps what it is given, the way a browser is supposed to. */
+function workingStorage() {
+  const held = new Map<string, string>();
+  return {
+    getItem: (key: string) => held.get(key) ?? null,
+    setItem: (key: string, value: string) => void held.set(key, value),
+    removeItem: (key: string) => void held.delete(key),
+    clear: () => held.clear(),
+    key: () => null,
+    length: 0,
+  } as unknown as Storage;
 }
 
-/** 4pm in Dubai on the given day, as the instant the clock is set to. */
-const dubaiAfternoon = (day: string) => new Date(`${day}T12:00:00Z`);
+/** Storage that takes a write, says nothing, and keeps none of it. */
+function amnesiacStorage() {
+  return {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+    key: () => null,
+    length: 0,
+  } as unknown as Storage;
+}
 
-beforeEach(() => {
-  vi.useFakeTimers();
-  installStorage();
-});
+/** Storage switched off hard, the way private mode used to behave. */
+function throwingStorage() {
+  return {
+    getItem: () => {
+      throw new Error("storage disabled");
+    },
+    setItem: () => {
+      throw new Error("storage disabled");
+    },
+    removeItem: () => {},
+    clear: () => {},
+    key: () => null,
+    length: 0,
+  } as unknown as Storage;
+}
+
+/**
+ * A fresh module instance, which is what a new page load is. The id is
+ * memoised in module scope, so resetting modules is the only honest way to
+ * ask "what would the next page view do".
+ */
+async function loadPage(storage: Storage) {
+  vi.resetModules();
+  vi.stubGlobal("localStorage", storage);
+  const { visitId } = await import("@/lib/analytics/track");
+  return visitId;
+}
 
 afterEach(() => {
-  vi.useRealTimers();
-  Reflect.deleteProperty(globalThis, "localStorage");
+  vi.unstubAllGlobals();
 });
 
 describe("visitId", () => {
-  it("makes one id and keeps handing back the same one", () => {
-    vi.setSystemTime(dubaiAfternoon("2026-09-21"));
+  it("gives one id to every event in a page view when storage works", async () => {
+    const visitId = await loadPage(workingStorage());
+    const ids = [visitId(), visitId(), visitId(), visitId()];
 
-    const first = visitId();
-    expect(first).toMatch(VISIT_ID_PATTERN);
-    expect(visitId()).toBe(first);
-    expect(visitId()).toBe(first);
+    expect(new Set(ids).size).toBe(1);
+    expect(ids[0]).toMatch(/^[0-9a-f]{16}$/);
   });
 
-  it("stamps the id with the Dubai day it was made on", () => {
-    // 9pm UTC is already the 21st in Dubai, and the stamp has to say so or the
-    // id expires a day late for everyone browsing in the evening.
-    vi.setSystemTime(new Date("2026-09-20T21:00:00Z"));
+  it("still gives one id when storage accepts writes and keeps nothing", async () => {
+    const visitId = await loadPage(amnesiacStorage());
+    const ids = [visitId(), visitId(), visitId(), visitId()];
 
-    const id = visitId();
-    expect(JSON.parse(store.get(KEY)!)).toEqual({ id, day: "2026-09-21" });
+    expect(new Set(ids).size).toBe(1);
   });
 
-  it("survives the tab closing - the same browser later that day is one visit", () => {
-    vi.setSystemTime(dubaiAfternoon("2026-09-21"));
-    const morning = visitId();
+  it("still gives one id when storage throws outright", async () => {
+    const visitId = await loadPage(throwingStorage());
+    const ids = [visitId(), visitId(), visitId()];
 
-    // Nothing is cleared: localStorage is what outlives a tab, which is the
-    // whole reason this moved off sessionStorage.
-    vi.setSystemTime(new Date("2026-09-21T18:00:00Z"));
-    expect(visitId()).toBe(morning);
+    expect(new Set(ids).size).toBe(1);
+    // It used to return null here, so a visit in private mode recorded nothing
+    // at all rather than recording itself once.
+    expect(ids[0]).toMatch(/^[0-9a-f]{16}$/);
   });
 
-  it("starts a new visit once the Dubai day turns over", () => {
-    // 11:30pm Dubai, then half an hour later - the same 24-hour window, and
-    // deliberately two different visits.
-    vi.setSystemTime(new Date("2026-09-21T19:30:00Z"));
-    const lastNight = visitId();
+  it("carries one id across page loads when storage works", async () => {
+    const shared = workingStorage();
 
-    vi.setSystemTime(new Date("2026-09-21T20:30:00Z"));
-    const today = visitId();
+    const first = await loadPage(shared);
+    const before = first();
 
-    expect(today).not.toBe(lastNight);
-    expect(today).toMatch(VISIT_ID_PATTERN);
-    expect(JSON.parse(store.get(KEY)!).day).toBe("2026-09-22");
+    const second = await loadPage(shared);
+    const after = second();
+
+    expect(after).toBe(before);
   });
 
-  it("replaces an id left over from an earlier day", () => {
-    store.set(KEY, JSON.stringify({ id: "a".repeat(16), day: "2026-09-14" }));
-    vi.setSystemTime(dubaiAfternoon("2026-09-21"));
+  /**
+   * The limit of the memo, stated as a test so nobody reads more into it than
+   * it does. A browser that keeps nothing gets a new id per page load, and no
+   * amount of module state can fix that from inside the page - which is what
+   * groupVisitors is for.
+   */
+  it("cannot carry an id across page loads when storage keeps nothing", async () => {
+    const first = await loadPage(amnesiacStorage());
+    const before = first();
 
-    expect(visitId()).not.toBe("a".repeat(16));
-  });
+    const second = await loadPage(amnesiacStorage());
+    const after = second();
 
-  it("replaces whatever else ended up under the key, rather than going quiet", () => {
-    vi.setSystemTime(dubaiAfternoon("2026-09-21"));
-
-    for (const junk of ["not json at all", "null", '{"day":"2026-09-21"}', '{"id":"nope","day":"2026-09-21"}']) {
-      store.set(KEY, junk);
-      const id = visitId();
-      expect(id).toMatch(VISIT_ID_PATTERN);
-      // And the good value is what stays behind, so the next call is cheap.
-      expect(visitId()).toBe(id);
-    }
-  });
-
-  it("gives up quietly when storage is switched off", () => {
-    installStorage(true);
-    vi.setSystemTime(dubaiAfternoon("2026-09-21"));
-
-    expect(visitId()).toBeNull();
+    expect(after).not.toBe(before);
   });
 });

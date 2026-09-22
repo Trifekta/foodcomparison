@@ -27,6 +27,7 @@ import { resultPath } from "@/lib/utils/reference";
 import { allowedKeetaHosts } from "@/lib/keeta/destination";
 import { maskEmail } from "@/lib/utils/phone";
 import { statusLabel } from "@/lib/utils/status";
+import { eventLabel } from "@/lib/admin/event-labels";
 import type { SubmissionItemSource } from "@/types/database";
 import { toPublicArea } from "@/lib/areas";
 import { areasMentionedIn } from "@/lib/area-mentions";
@@ -415,7 +416,7 @@ export default async function SubmissionDetailPage({
               {events.map((event) => (
                 <li key={event.id} className="flex items-baseline justify-between gap-4 text-sm">
                   <span className="text-ink-700">
-                    {event.event_type.replace(/_/g, " ")}
+                    {eventLabel(event.event_type)}
                     {event.new_status ? (
                       <span className="text-ink-400"> → {statusLabel(event.new_status)}</span>
                     ) : null}

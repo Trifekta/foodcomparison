@@ -53,35 +53,74 @@ interface StoredVisit {
 
 /** Whatever is in storage, if it is still today's and still looks like an id. */
 function storedVisit(today: string): string | null {
-  const raw = localStorage.getItem(KEY);
-  if (!raw) return null;
-
   try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return null;
+
     const stored = JSON.parse(raw) as Partial<StoredVisit> | null;
     if (!stored || stored.day !== today) return null;
     return typeof stored.id === "string" && VISIT_ID_PATTERN.test(stored.id) ? stored.id : null;
   } catch {
-    // Something else wrote here, or a half-written value survived a crash.
-    // Treated as no id at all, so the line below replaces it - throwing from
-    // here instead would leave the bad value in place and stop this browser
-    // being counted again, permanently.
+    // Something else wrote here, a half-written value survived a crash, or
+    // reading storage threw outright. All three mean "no id on file", so the
+    // caller mints one - throwing from here instead would leave the bad value
+    // in place and stop this browser being counted again, permanently.
     return null;
   }
 }
 
+/**
+ * The id this document has already settled on.
+ *
+ * The reason it exists rather than reading storage every time: an in-app
+ * browser - Instagram's and Facebook's especially - accepts setItem without
+ * complaint and then hands back nothing on the next read. Every track() call
+ * then found an empty store, minted a fresh id, and filed one page view under
+ * several visits seconds apart. The funnel counts distinct visit ids per step,
+ * so that inflated every denominator it touched, and the live table showed one
+ * person as a crowd.
+ *
+ * Module scope, so it lives exactly as long as the document does. It cannot
+ * replace storage and is not meant to: a second page load is a second module
+ * instance and reads the store again, which is what keeps one browser on one
+ * id across a whole visit wherever storage does work. All this guarantees is
+ * that a single page view agrees with itself, which storage alone could not.
+ */
+let known: StoredVisit | null = null;
+
 export function visitId(): string | null {
   try {
     const today = dubaiIsoDate();
+
+    // Whatever this document already decided, before asking storage again.
+    // Day-stamped like the stored copy, so a tab left open across midnight
+    // rolls onto the new day's id rather than holding yesterday's.
+    if (known && known.day === today) return known.id;
+
     const existing = storedVisit(today);
-    if (existing) return existing;
+    if (existing) {
+      known = { id: existing, day: today };
+      return existing;
+    }
 
     const bytes = new Uint8Array(8);
     crypto.getRandomValues(bytes);
     const created = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-    localStorage.setItem(KEY, JSON.stringify({ id: created, day: today } satisfies StoredVisit));
+    known = { id: created, day: today };
+
+    try {
+      localStorage.setItem(KEY, JSON.stringify({ id: created, day: today } satisfies StoredVisit));
+    } catch {
+      // Storage refused to keep it. The memo above still holds for this page
+      // view, so its events at least agree with each other - and this visit is
+      // now counted once instead of not at all, which is what happened when
+      // this throw reached the outer catch.
+    }
+
     return created;
   } catch {
-    // Private mode, or storage switched off. Counting stops; nothing else does.
+    // No crypto at all, or something else missing outright. Counting stops;
+    // nothing else does.
     return null;
   }
 }

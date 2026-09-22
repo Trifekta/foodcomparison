@@ -41,6 +41,10 @@ export async function POST(request: Request) {
   const clientKey = clientKeyFromHeaders(request.headers);
   const clientIp = clientKey; // Same extraction, for IP audit table
 
+  // Capped before it reaches Postgres. A header is whatever the caller says it
+  // is, and a column is not the place to find out how long that can be.
+  const userAgent = request.headers.get("user-agent")?.trim().slice(0, 400) || null;
+
   try {
     const body = (await request.json()) as {
       event?: unknown;
@@ -126,11 +130,18 @@ export async function POST(request: Request) {
         },
         { onConflict: "visit_id" },
       ),
-      // IP audit trail: record once per visit so Keeta can validate real traffic.
-      // upsert on visit_id means only the first event's IP is recorded; later
-      // events update the submission_id if one now exists, but not the IP.
+      // IP audit trail: one row per visit, so Keeta can validate real traffic
+      // and so the admin can tell repeat visits from one device apart from
+      // different people behind one address. The user-agent is the second half
+      // of that second question - neither half is identity on its own, and
+      // groupVisitors will not group a visit missing either.
       supabase.from("visitor_ips").upsert(
-        { visit_id: visitId, client_ip: clientIp, submission_id: submissionId },
+        {
+          visit_id: visitId,
+          client_ip: clientIp,
+          user_agent: userAgent,
+          submission_id: submissionId,
+        },
         { onConflict: "visit_id" },
       ),
     ]);

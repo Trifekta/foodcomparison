@@ -9,7 +9,7 @@ import {
   buildAdLabelIndex,
   type AdLabelIndex,
 } from "@/lib/analytics/ad-labels";
-import type { VisitEventRow } from "@/lib/calculations/visits";
+import type { VisitEventRow, VisitIpRow } from "@/lib/calculations/visits";
 import { withAmountStrings } from "@/lib/calculations/money";
 import { dubaiIsoDate } from "@/lib/utils/text";
 import type {
@@ -206,15 +206,48 @@ export async function getLatestExtraction(id: string): Promise<SubmissionExtract
 export async function getSubmissionEvents(id: string): Promise<SubmissionEventRow[]> {
   const supabase = await createServerSupabaseClient();
 
-  const { data, error } = await supabase
-    .from("submission_events")
-    .select("*")
-    .eq("submission_id", id)
-    .order("created_at", { ascending: false })
-    .limit(30);
+  const [submissionEventsResult, funnelEventsResult] = await Promise.all([
+    supabase
+      .from("submission_events")
+      .select("*")
+      .eq("submission_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("funnel_events")
+      .select("id, created_at, event, submission_id")
+      .eq("submission_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
 
-  if (error) throw new Error(`Could not load history: ${error.message}`);
-  return (data ?? []) as SubmissionEventRow[];
+  if (submissionEventsResult.error) {
+    throw new Error(`Could not load history: ${submissionEventsResult.error.message}`);
+  }
+
+  const submissionEvents = (submissionEventsResult.data ?? []) as SubmissionEventRow[];
+
+  // Convert funnel events to match SubmissionEventRow schema
+  interface FunnelEventRow {
+    id: number;
+    created_at: string;
+    event: string;
+    submission_id: string | null;
+  }
+  const funnelEvents = (funnelEventsResult.data ?? []).map((e: FunnelEventRow) => ({
+    id: e.id.toString(),
+    submission_id: e.submission_id,
+    event_type: e.event,
+    new_status: null,
+    created_at: e.created_at,
+    created_by: null,
+  })) as SubmissionEventRow[];
+
+  // Combine and sort by created_at descending
+  const allEvents = [...submissionEvents, ...funnelEvents].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+
+  // Limit to 30 most recent events
+  return allEvents.slice(0, 30);
 }
 
 export async function listAreas(includeInactive = true): Promise<AreaRow[]> {
@@ -628,45 +661,24 @@ export async function getVisitEvents(
  * This is what Keeta uses to validate that reported visits and conversions
  * are genuine traffic from real devices, not simulated or fabricated.
  */
-export interface ValidationRow {
-  visit_id: string;
-  client_ip: string;
-  created_at: string;
-  reference_number: string | null;
-  converted: boolean;
-}
-
-/** Validation export: all IPs matched to orders (if any) in a date range. */
-export async function getValidationData(range: DateRange = {}): Promise<ValidationRow[]> {
+/**
+ * The raw IP rows for a range, one per visit.
+ *
+ * Deliberately not joined to the funnel here. mergeValidationRows does that,
+ * so the rules that decide "how many visits share this address" stay pure and
+ * testable without a database, like every other calculation in this codebase.
+ */
+export async function getVisitorIps(range: DateRange = {}): Promise<VisitIpRow[]> {
   const supabase = await createServerSupabaseClient();
   const bounds = rangeToInstants(range.from || range.to ? range : defaultVisitRange());
 
-  interface RawValidationRow {
-    visit_id: string;
-    client_ip: string;
-    created_at: string;
-    submissions: { reference_number: string } | null;
-  }
-
   const { data, error } = await supabase
     .from("visitor_ips")
-    .select(
-      "visit_id, client_ip, created_at, submissions(reference_number)",
-    )
+    .select("visit_id, client_ip, created_at, submissions(reference_number)")
     .gte("created_at", bounds.since ?? "1970-01-01T00:00:00Z")
     .lte("created_at", bounds.until ?? "2999-12-31T23:59:59Z")
-    .order("created_at", { ascending: false }) as {
-      data: RawValidationRow[] | null;
-      error: Error | null;
-    };
+    .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Could not load validation data: ${error.message}`);
-
-  return (data ?? []).map((row) => ({
-    visit_id: row.visit_id,
-    client_ip: row.client_ip,
-    created_at: row.created_at,
-    reference_number: row.submissions?.reference_number ?? null,
-    converted: !!row.submissions?.reference_number,
-  }));
+  return (data ?? []) as unknown as VisitIpRow[];
 }

@@ -660,14 +660,13 @@ export function StepConfirm({
           onClick={onSubmit}
           loading={submitting}
           loadingLabel="Sending…"
-          disabled={waitingOnRead}
           arrow
         >
           Get a {COMPARISON_APP} price
         </Button>
         <p className="mt-2.5 text-center text-[0.9rem] font-semibold text-slate-500">
           {waitingOnRead
-            ? "Reading your screenshot — one moment."
+            ? "We're reading your screenshot in the background. You can submit now or wait for the details to fill in."
             : `Usually ${RESULT_PROMISE}. Nothing is ordered.`}
         </p>
       </StepActions>

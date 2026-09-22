@@ -146,6 +146,253 @@ export function summarizeVisits(rows: VisitEventRow[]): VisitSummary[] {
   return summaries.sort((a, b) => (a.lastSeen < b.lastSeen ? 1 : a.lastSeen > b.lastSeen ? -1 : 0));
 }
 
+/** One row of visitor_ips, as stored. */
+export interface VisitIpRow {
+  visit_id: string;
+  client_ip: string;
+  /** Null on rows written before 0025, and on anything that sent no header. */
+  user_agent: string | null;
+  created_at: string;
+  submissions: { reference_number: string } | null;
+}
+
+/**
+ * How long a gap can be before two visits stop looking like one person.
+ *
+ * Thirty minutes, the convention every web analytics tool uses for the same
+ * judgement. It is a guess either way; what matters is that it is one number,
+ * written down, rather than a feeling applied per report.
+ */
+export const VISITOR_GAP_MS = 30 * 60 * 1000;
+
+export interface VisitorGroupInput {
+  visitId: string;
+  clientIp: string | null;
+  userAgent: string | null;
+  firstSeen: string;
+  lastSeen: string;
+  reference: string | null;
+}
+
+export interface VisitorGroup {
+  /** Stable across a render, named for the earliest visit in the group. */
+  key: string;
+  /** Every visit id in the group, earliest first. One id is the common case. */
+  visitIds: string[];
+}
+
+/**
+ * Visits that were probably the same person, without touching what a visit is.
+ *
+ * Nothing here is written anywhere. visit_id stays exactly as recorded, which
+ * matters more than it sounds: computeFunnel divides by counts of distinct
+ * visit ids, so a merge in the data would silently rewrite every percentage
+ * this dashboard has ever shown. This is a reading of the rows, taken fresh
+ * each time, and deleting it changes no stored number.
+ *
+ * The rule is deliberately timid. Same address AND same browser AND within
+ * half an hour of the group so far, or it stands alone. Two errors are
+ * available and they are not equal: splitting one person into two overstates
+ * how many people came, which is the error the raw table already makes and
+ * everybody already reads around. Merging two people into one understates it
+ * and invents a person who did more than anybody did - a claim a report should
+ * never make on evidence this thin. So when in doubt this splits.
+ *
+ * What it cannot do: an address is not a person. Carriers here put many
+ * subscribers behind one, offices and cafes share wifi, and a phone moving
+ * between wifi and mobile data changes address mid-visit. So a group is a
+ * suggestion to a human reading the table, never a number to plan against on
+ * its own.
+ */
+export function groupVisitors(
+  rows: VisitorGroupInput[],
+  gapMs = VISITOR_GAP_MS,
+): VisitorGroup[] {
+  const groups: VisitorGroup[] = [];
+  const buckets = new Map<string, VisitorGroupInput[]>();
+
+  for (const row of rows) {
+    // No address or no browser string is not weak evidence, it is none. A
+    // visit we know nothing about stands alone rather than being folded in
+    // beside whoever happens to be nearby in time.
+    if (!row.clientIp || !row.userAgent) {
+      groups.push({ key: `alone:${row.visitId}`, visitIds: [row.visitId] });
+      continue;
+    }
+
+    // NUL between the two, so an address ending in text cannot run into a
+    // browser string beginning with it and collide with a different pair.
+    const key = `${row.clientIp}\u0000${row.userAgent}`;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(row);
+    else buckets.set(key, [row]);
+  }
+
+  for (const bucket of buckets.values()) {
+    const ordered = [...bucket].sort((a, b) =>
+      a.firstSeen < b.firstSeen ? -1 : a.firstSeen > b.firstSeen ? 1 : 0,
+    );
+
+    let open: VisitorGroup | null = null;
+    let latestEnd = 0;
+    let reference: string | null = null;
+
+    for (const row of ordered) {
+      const startedAt = Date.parse(row.firstSeen);
+      const endedAt = Date.parse(row.lastSeen);
+
+      // Two visits that each sent a DIFFERENT order are two customers sitting
+      // near each other, whatever the address says. An order is the one hard
+      // fact available here and it outranks the rest of the evidence.
+      const differentOrders =
+        reference !== null && row.reference !== null && row.reference !== reference;
+
+      const tooLate = !Number.isFinite(startedAt) || startedAt - latestEnd > gapMs;
+
+      if (!open || differentOrders || tooLate) {
+        open = { key: `together:${row.visitId}`, visitIds: [row.visitId] };
+        groups.push(open);
+        latestEnd = Number.isFinite(endedAt) ? endedAt : startedAt;
+        reference = row.reference;
+        continue;
+      }
+
+      open.visitIds.push(row.visitId);
+      // Measured from where the group currently ends, so a chain of short
+      // visits stays one person rather than breaking on the gap to its start.
+      if (Number.isFinite(endedAt) && endedAt > latestEnd) latestEnd = endedAt;
+      if (!reference) reference = row.reference;
+    }
+  }
+
+  return groups;
+}
+
+/** The group each visit landed in, for a table that renders one row at a time. */
+export function visitorGroupByVisit(groups: VisitorGroup[]): Map<string, VisitorGroup> {
+  const index = new Map<string, VisitorGroup>();
+  for (const group of groups) {
+    for (const visitId of group.visitIds) index.set(visitId, group);
+  }
+  return index;
+}
+
+/** A visit with both its IP and what the funnel saw it do. */
+export interface ValidationRow {
+  visit_id: string;
+  client_ip: string;
+  user_agent: string | null;
+  /**
+   * The group this visit was read into, and how many visits are in it. Derived
+   * at export time by groupVisitors and stored nowhere.
+   */
+  visitor_key: string;
+  visits_in_group: number;
+  /**
+   * How many visits in this range came from this IP.
+   *
+   * The column the rest of this report exists for. A visit id is one browser
+   * for one Dubai day, so anybody in an in-app browser - which is most ad
+   * traffic - can produce a fresh one every time they tap the ad. Three visit
+   * ids behind one IP is one person retrying, and the per-visit table reads
+   * that as three people with no way to tell the difference.
+   *
+   * It errs the other way too, and knowing which way matters: carriers here
+   * put many subscribers behind one address, so a shared IP is evidence and
+   * not proof. Visit count is the ceiling on how many people there were, this
+   * is the floor.
+   */
+  visits_from_ip: number;
+  created_at: string;
+  first_seen: string | null;
+  last_seen: string | null;
+  screenshots: number;
+  furthest_step: string;
+  area: string | null;
+  converted: boolean;
+  reference_number: string | null;
+  utm_source: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+}
+
+/**
+ * The IP rows joined to the funnel's own view of each visit.
+ *
+ * The IP rows are the spine: one per visit, written on that visit's first
+ * event. A visit that somehow recorded no funnel events still appears, with
+ * its step columns empty, because a row that vanishes from an audit export is
+ * worse than one that admits it knows nothing.
+ */
+export function mergeValidationRows(
+  ips: VisitIpRow[],
+  summaries: VisitSummary[],
+): ValidationRow[] {
+  const byVisit = new Map(summaries.map((visit) => [visit.visitId, visit]));
+
+  const perIp = new Map<string, number>();
+  for (const row of ips) {
+    perIp.set(row.client_ip, (perIp.get(row.client_ip) ?? 0) + 1);
+  }
+
+  // The same reading the dashboard shows, so a row exported and a row on
+  // screen never disagree about who was probably who.
+  const groups = groupVisitors(
+    ips.map((row) => {
+      const visit = byVisit.get(row.visit_id);
+      return {
+        visitId: row.visit_id,
+        clientIp: row.client_ip,
+        userAgent: row.user_agent,
+        firstSeen: visit?.firstSeen ?? row.created_at,
+        lastSeen: visit?.lastSeen ?? row.created_at,
+        reference: row.submissions?.reference_number ?? visit?.reference ?? null,
+      };
+    }),
+  );
+  const groupOf = visitorGroupByVisit(groups);
+
+  const rows = ips.map((row) => {
+    const visit = byVisit.get(row.visit_id);
+    // Either source will do. visitor_ips learns the submission on the event
+    // that created it; funnel_events carries it on the same event. Taking
+    // whichever has it means one missed upsert does not file a real order as
+    // an abandoned visit.
+    const reference = row.submissions?.reference_number ?? visit?.reference ?? null;
+    const group = groupOf.get(row.visit_id);
+
+    return {
+      visit_id: row.visit_id,
+      client_ip: row.client_ip,
+      user_agent: row.user_agent,
+      visitor_key: group?.key ?? `alone:${row.visit_id}`,
+      visits_in_group: group?.visitIds.length ?? 1,
+      visits_from_ip: perIp.get(row.client_ip) ?? 1,
+      created_at: row.created_at,
+      first_seen: visit?.firstSeen ?? null,
+      last_seen: visit?.lastSeen ?? null,
+      screenshots: visit?.screenshots ?? 0,
+      furthest_step: visit?.furthestLabel ?? "—",
+      area: visit?.areaName ?? null,
+      converted: reference !== null,
+      reference_number: reference,
+      utm_source: visit?.utmSource ?? null,
+      utm_campaign: visit?.utmCampaign ?? null,
+      utm_content: visit?.utmContent ?? null,
+    };
+  });
+
+  // Busiest addresses first, each one's visits kept together and in order.
+  // The repeat sessions this report exists to find end up adjacent at the top,
+  // rather than scattered down a file sorted by time.
+  return rows.sort(
+    (a, b) =>
+      b.visits_from_ip - a.visits_from_ip ||
+      (a.client_ip < b.client_ip ? -1 : a.client_ip > b.client_ip ? 1 : 0) ||
+      (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0),
+  );
+}
+
 export interface VisitTotals {
   visits: number;
   uploaded: number;

@@ -1,5 +1,10 @@
 import Link from "next/link";
-import type { VisitSummary, VisitTotals } from "@/lib/calculations/visits";
+import {
+  visitorGroupByVisit,
+  type VisitorGroup,
+  type VisitSummary,
+  type VisitTotals,
+} from "@/lib/calculations/visits";
 import { formatDubaiTime } from "@/lib/utils/text";
 import { AdLabelCell } from "@/components/admin/AdLabelCell";
 import type { AdLabelIndex } from "@/lib/analytics/ad-labels";
@@ -52,10 +57,32 @@ function Screenshots({ count }: { count: number }) {
  */
 const MAX_ROWS = 200;
 
+/**
+ * Says a row is probably not a new person, without hiding that it is a row.
+ *
+ * The visit stays exactly where it was, with its own id still printed beside
+ * this. Somebody checking whether the grouping is sensible needs to see what
+ * was grouped, and an admin reading the funnel needs to know this row may not
+ * be a new arrival. One line does both.
+ */
+function SameVisitor({ group }: { group: VisitorGroup }) {
+  const others = group.visitIds.length - 1;
+
+  return (
+    <span
+      className="mt-0.5 block whitespace-nowrap text-[0.7rem] font-medium text-amber-700"
+      title={`Same address and browser, within half an hour: ${group.visitIds.join(", ")}. A guess from weak signals - shared wifi and mobile networks can put different people on one address.`}
+    >
+      Likely same visitor (+{others})
+    </span>
+  );
+}
+
 export function VisitsTable({
   visits,
   totals,
   labels,
+  groups,
 }: {
   visits: VisitSummary[];
   totals: VisitTotals;
@@ -64,20 +91,36 @@ export function VisitsTable({
    * without it - an unlabelled id is a worse read, not a broken page.
    */
   labels?: AdLabelIndex;
+  /**
+   * Visits that were probably one person. Optional for the same reason: a
+   * database without 0025 has no browser strings to group on, and the table
+   * should read exactly as it did before rather than fail.
+   */
+  groups?: VisitorGroup[];
 }) {
   const shown = visits.slice(0, MAX_ROWS);
   const hidden = visits.length - shown.length;
+  const groupByVisit = groups ? visitorGroupByVisit(groups) : null;
 
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-ink-200 bg-white px-4 py-3">
         {[
-          { label: "Visits", value: totals.visits },
-          { label: "Uploaded", value: totals.uploaded },
-          { label: "Screenshots", value: totals.screenshots },
-          { label: "Completed", value: totals.completed },
+          { label: "Visits", value: totals.visits, hint: undefined },
+          ...(groups
+            ? [
+                {
+                  label: "Likely visitors",
+                  value: groups.length,
+                  hint: "Visits from one address and browser within half an hour, counted once. A floor, not a fact: shared wifi and carrier networks put different people on one address, so the real number sits between this and Visits.",
+                },
+              ]
+            : []),
+          { label: "Uploaded", value: totals.uploaded, hint: undefined },
+          { label: "Screenshots", value: totals.screenshots, hint: undefined },
+          { label: "Completed", value: totals.completed, hint: undefined },
         ].map((stat) => (
-          <div key={stat.label}>
+          <div key={stat.label} title={stat.hint}>
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
               {stat.label}
             </p>
@@ -112,6 +155,12 @@ export function VisitsTable({
                 <tr key={visit.visitId} className={visit.completed ? "bg-emerald-50/40" : undefined}>
                   <td className="px-4 py-2.5">
                     <VisitId id={visit.visitId} />
+                    {(() => {
+                      const group = groupByVisit?.get(visit.visitId);
+                      return group && group.visitIds.length > 1 ? (
+                        <SameVisitor group={group} />
+                      ) : null;
+                    })()}
                   </td>
                   <td className="px-4 py-2.5 tabular-nums text-ink-600">
                     {formatDubaiTime(visit.firstSeen)}
@@ -171,9 +220,11 @@ export function VisitsTable({
       ) : null}
 
       <p className="text-xs text-ink-500">
-        A visit is one browser on one day — the same phone coming back tomorrow is a second row,
-        and the same phone opening the link twice this afternoon is still one. Nothing here
-        identifies anybody.{" "}
+        A visit is one browser on one day, and the same phone coming back tomorrow is a second
+        row. In-app browsers — Instagram&apos;s and Facebook&apos;s — often keep nothing between
+        page loads, so one person there can still arrive as several rows; that is what
+        &ldquo;Likely visitors&rdquo; counts once and what the note under a visit id marks.
+        Nothing here identifies anybody.{" "}
         <Link href="/admin/analytics" className="underline underline-offset-2 hover:text-ink-800">
           The funnel view
         </Link>{" "}
