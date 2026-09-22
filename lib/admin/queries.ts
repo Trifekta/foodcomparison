@@ -206,15 +206,48 @@ export async function getLatestExtraction(id: string): Promise<SubmissionExtract
 export async function getSubmissionEvents(id: string): Promise<SubmissionEventRow[]> {
   const supabase = await createServerSupabaseClient();
 
-  const { data, error } = await supabase
-    .from("submission_events")
-    .select("*")
-    .eq("submission_id", id)
-    .order("created_at", { ascending: false })
-    .limit(30);
+  const [submissionEventsResult, funnelEventsResult] = await Promise.all([
+    supabase
+      .from("submission_events")
+      .select("*")
+      .eq("submission_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("funnel_events")
+      .select("id, created_at, event, submission_id")
+      .eq("submission_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
 
-  if (error) throw new Error(`Could not load history: ${error.message}`);
-  return (data ?? []) as SubmissionEventRow[];
+  if (submissionEventsResult.error) {
+    throw new Error(`Could not load history: ${submissionEventsResult.error.message}`);
+  }
+
+  const submissionEvents = (submissionEventsResult.data ?? []) as SubmissionEventRow[];
+
+  // Convert funnel events to match SubmissionEventRow schema
+  interface FunnelEventRow {
+    id: number;
+    created_at: string;
+    event: string;
+    submission_id: string | null;
+  }
+  const funnelEvents = (funnelEventsResult.data ?? []).map((e: FunnelEventRow) => ({
+    id: e.id.toString(),
+    submission_id: e.submission_id,
+    event_type: e.event,
+    new_status: null,
+    created_at: e.created_at,
+    created_by: null,
+  })) as SubmissionEventRow[];
+
+  // Combine and sort by created_at descending
+  const allEvents = [...submissionEvents, ...funnelEvents].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+
+  // Limit to 30 most recent events
+  return allEvents.slice(0, 30);
 }
 
 export async function listAreas(includeInactive = true): Promise<AreaRow[]> {
