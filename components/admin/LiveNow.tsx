@@ -8,6 +8,12 @@ import type { LivePresenceSummary } from "@/lib/calculations/presence";
  * longer on purpose so a visit does not just vanish the instant it crosses the
  * line. The two are allowed to disagree; that disagreement is the honest
  * picture of people arriving and drifting off.
+ *
+ * The chips are not allowed that licence: they split the headline number and
+ * nothing else, so "Just arrived" plus every chip beside it is exactly the
+ * count above them. Funnel rungs are brand-coloured and the detours beside
+ * them (the example link, a food-app tile) are grey, because a detour that
+ * looked like a rung would read as progress it is not.
  */
 export function LiveNow({ summary }: { summary: LivePresenceSummary }) {
   return (
@@ -35,10 +41,20 @@ export function LiveNow({ summary }: { summary: LivePresenceSummary }) {
           {summary.byStep.map((step) => (
             <span
               key={step.event}
-              className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-900"
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${
+                step.kind === "step"
+                  ? "bg-brand-50 text-brand-900"
+                  : "bg-ink-100 text-ink-700"
+              }`}
             >
               {step.label}
-              <span className="tabular-nums text-brand-700">{step.count}</span>
+              <span
+                className={`tabular-nums ${
+                  step.kind === "step" ? "text-brand-700" : "text-ink-500"
+                }`}
+              >
+                {step.count}
+              </span>
             </span>
           ))}
         </div>
