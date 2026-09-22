@@ -8,6 +8,7 @@ import { ImageUpload } from "@/components/forms/ImageUpload";
 import { AmountInput } from "@/components/forms/AmountInput";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
+import { Camera, Smartphone } from "lucide-react";
 import { LastOrderBanner } from "@/components/customer/LastOrderBanner";
 import { ScrollDepth } from "@/components/customer/ScrollDepth";
 import { FoodAppLinks } from "./FoodAppLinks";
@@ -136,6 +137,9 @@ export function StepUpload({
   // read's own latency fix (onFilePicked, ahead of that same downscale) exists
   // for. The banner should disappear on the same signal, not lag behind it.
   const [uploadStarted, setUploadStarted] = useState(false);
+  const [forkChoice, setForkChoice] = useState<"none" | "upload" | "app">(
+    returnedFromApp ? "upload" : "none",
+  );
 
   // The field is holding what we read, and what we read was the food without
   // its fees. Only while that number is still the one in the field - the
@@ -279,162 +283,187 @@ export function StepUpload({
         Your result, usually {RESULT_PROMISE}
       </p>
 
-      {/* The fork, asked out loud. Everything below answers one of two states,
-          and a first-timer from an advert is in the second one - which nothing
-          on this screen used to acknowledge until they had scrolled past both
-          upload slots. Withdrawn once a screenshot exists, because by then
-          they have answered it. */}
-      {cartFile ? null : (
-        <h2 className="mt-5 text-[1.05rem] font-extrabold leading-tight text-ink-900">
-          Already have your cart screenshot?
-        </h2>
+      {/* Two-path fork for visitors without a screenshot. Once a cart file
+          exists the fork disappears and the full upload flow takes over. */}
+      {!cartFile && (
+        <div className="mt-5">
+          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setForkChoice("upload")}
+              className={`rounded-2xl border-2 p-4 text-left transition-colors ${
+                forkChoice === "upload"
+                  ? "border-brand-500 bg-brand-50"
+                  : "border-ink-200 bg-white hover:border-brand-300"
+              }`}
+            >
+              <Camera aria-hidden="true" className="h-6 w-6 text-brand-600" />
+              <h2 className="mt-2 text-[1rem] font-extrabold text-ink-900">
+                Have a screenshot?
+              </h2>
+              <p className="mt-1 text-[0.85rem] leading-snug text-slate-600">
+                Upload it now
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setForkChoice("app")}
+              className={`rounded-2xl border-2 p-4 text-left transition-colors ${
+                forkChoice === "app"
+                  ? "border-brand-500 bg-brand-50"
+                  : "border-ink-200 bg-white hover:border-brand-300"
+              }`}
+            >
+              <Smartphone aria-hidden="true" className="h-6 w-6 text-brand-600" />
+              <h2 className="mt-2 text-[1rem] font-extrabold text-ink-900">
+                Need to take one?
+              </h2>
+              <p className="mt-1 text-[0.85rem] leading-snug text-slate-600">
+                Choose your food app
+              </p>
+            </button>
+          </div>
+
+          {forkChoice === "upload" && (
+            <div className="mt-3">
+              <ImageUpload
+                step={1}
+                label="Cart screenshot"
+                hint="Restaurant and selected items"
+                helper="Make sure your restaurant name and ordered items are visible."
+                requirement="required"
+                art="cartDoc"
+                example="cart"
+                file={cartFile}
+                onChange={onCartChange}
+                onFilePicked={(file) => {
+                  setUploadStarted(true);
+                  track("cart_uploaded");
+                  onCartPicked(file);
+                }}
+                error={error}
+              />
+            </div>
+          )}
+
+          {forkChoice === "app" && (
+            <div className="mt-3 space-y-3">
+              <p className="text-[0.88rem] leading-snug text-slate-600">
+                No Keeta screenshot needed — we check Keeta for you.
+              </p>
+              <FoodAppLinks />
+            </div>
+          )}
+        </div>
       )}
 
-      <div className={cartFile ? "mt-4 space-y-3" : "mt-2.5 space-y-3"}>
-        <ImageUpload
-          step={1}
-          label="Cart screenshot"
-          hint="Restaurant and selected items"
-          helper="Make sure your restaurant name and ordered items are visible."
-          requirement="required"
-          art="cartDoc"
-          example="cart"
-          file={cartFile}
-          onChange={onCartChange}
-          onFilePicked={(file) => {
-            setUploadStarted(true);
-            track("cart_uploaded");
-            onCartPicked(file);
-          }}
-          error={error}
-        />
-
-        {/* Between the two slots, not under them.
-
-            This is the "no" branch of the question above, so it belongs beside
-            the "yes" branch rather than below the whole form - under both
-            upload cards it began 1163px down, which is a screen and a half
-            past where somebody without a screenshot gives up. Hidden the
-            moment one is picked: they have answered the question, and an exit
-            to another app in front of somebody one tap from finishing is a way
-            to lose them. */}
-        {cartFile ? null : <FoodAppLinks />}
-
-        {/* Withdrawn, not just quieted, once the first screenshot settles the
-            bill - the slot stays on the screen but stops being asked for.
-            Confirmed short, the pill still says Recommended; only the
-            emphasize prop changes, because a read that came back with items
-            and no payment summary is the one case here where we know, rather
-            than guess, that this slot is what completes the comparison - and
-            knowing that earns a stronger look, not a stronger rule. */}
-        <ImageUpload
-          step={2}
-          label="Checkout total"
-          hint={
-            checkoutFile
-              ? checkoutStatus === "reading"
-                ? "Reading this screenshot…"
-                : checkoutStatus === "applied"
-                  ? "We read your total from this one"
-                  : "No total found on this one"
-              : cartSettlesTheBill
-                ? "Already covered by your first screenshot"
-                : cartConfirmedShort
-                  ? "Your total wasn't on the first screenshot"
-                  : "Fees, discounts and final total"
-          }
-          /* Once a second screenshot exists, this line stops asking for one and
-             reports what became of it. It used to be decided entirely by the
-             CART read, so it went on saying "add this one so we compare the
-             right number" to somebody looking at the one they had added. */
-          helper={
-            checkoutAnswered
-              ? checkoutStatus === "applied"
-                ? "Got it — your total below now comes from this screenshot."
-                : "We couldn't find a total on this one. Check nothing got cut off, or type your total below."
-              : checkoutFile
-                ? "Reading it now — your total will fill in below."
-                : cartSettlesTheBill
-                  ? "Your first screenshot already showed the fees and total, so you can skip this."
-                  : cartConfirmedShort
-                    ? "We read your cart screenshot but didn't find a total on it — add this one so we compare the right number."
-                    : cartReading
-                      ? "Checking your first screenshot — add this if your total is on a different screen."
-                      : "From the same app as your cart — this shows your discounts, fees and final total."
-          }
-          requirement={cartSettlesTheBill ? "optional" : "recommended"}
-          emphasize={cartConfirmedShort && checkoutFile === null}
-          art="receipt"
-          example="checkout"
-          allowRemove
-          file={checkoutFile}
-          onChange={onCheckoutChange}
-          onFilePicked={(file) => {
-            setUploadStarted(true);
-            onCheckoutPicked(file);
-          }}
-        />
-
-        {/* The way through for somebody who cannot produce that screenshot.
-            Deliberately not a peer of the slot above it - a toggle offering
-            "photograph it OR type it" is answered by almost everybody with the
-            two-second option, and the two are not equivalent. The screenshot
-            is read, and the number it prints is checked against what the
-            customer says they paid; that agreement is the whole of what lets
-            a result claim the fees were verified rather than taken on trust.
-            Typed alone, the figure is still perfectly usable - it is just
-            unverified, and the result says so.
-
-            So: a fallback, under an OR, in a quieter card, with the
-            recommendation restated beneath it. Everybody who can send the
-            screenshot still does; nobody who cannot is stopped. */}
-        <div className="relative py-0.5">
-          <span aria-hidden="true" className="absolute inset-x-0 top-1/2 h-px bg-ink-200" />
-          <span className="relative mx-auto block w-12 bg-canvas text-center text-[0.78rem] font-bold uppercase tracking-wide text-slate-500">
-            or
-          </span>
-        </div>
-
-        <div className="rounded-3xl bg-cream p-3.5 ring-1 ring-sand">
-          {/* Three states, because the card answers a different question in
-              each. Once the first screenshot has settled the bill it holds the
-              number we already read. Once it has given us the food but no fees
-              it holds THAT, said out loud - a subtotal quietly presented as a
-              final total is how a saving gets understated. Before either, it
-              is the way through for somebody who cannot produce the checkout
-              screen at all. */}
-          <h3 className="text-[1rem] font-extrabold text-ink-900">
-            {askingForOne ? "Don't have a checkout screenshot?" : fieldLabel}
-          </h3>
-          <p className="mt-0.5 mb-3 text-[0.88rem] leading-snug text-slate-600">
-            {cartSettlesTheBill
-              ? "This is what we read off your cart screenshot — after discounts, fees and delivery."
-              : settledFill
-                ? "This is what we read off your screenshots — after discounts, fees and delivery."
-                : subtotalOnly
-                  ? "We read this off your cart screenshot. It's the food only — the screen didn't show delivery or service fees."
-                  : checkoutFile
-                    ? "We couldn't read a total off your screenshots — type the final payable amount here."
-                    : "Enter your final payable amount instead — after discounts, fees and delivery."}
-          </p>
-          <AmountInput
-            label={fieldLabel}
-            hideLabel={!askingForOne}
-            value={manualTotal}
-            onChange={(event) => onManualTotalChange(event.target.value)}
-            error={totalError}
+      {/* Full upload flow once a cart screenshot exists. */}
+      {cartFile && (
+        <div className="mt-4 space-y-3">
+          <ImageUpload
+            step={1}
+            label="Cart screenshot"
+            hint="Restaurant and selected items"
+            helper="Make sure your restaurant name and ordered items are visible."
+            requirement="required"
+            art="cartDoc"
+            example="cart"
+            file={cartFile}
+            onChange={onCartChange}
+            onFilePicked={(file) => {
+              setUploadStarted(true);
+              track("cart_uploaded");
+              onCartPicked(file);
+            }}
+            error={error}
           />
-          <p className="mt-3 text-[0.82rem] leading-snug text-slate-500">
-            {cartSettlesTheBill || settledFill
-              ? "Change it only if it looks wrong."
-              : subtotalOnly
-                ? "Add the checkout screenshot above and we'll read your real total — or type it here yourself."
+
+          <ImageUpload
+            step={2}
+            label="Checkout total"
+            hint={
+              checkoutFile
+                ? checkoutStatus === "reading"
+                  ? "Reading this screenshot…"
+                  : checkoutStatus === "applied"
+                    ? "We read your total from this one"
+                    : "No total found on this one"
+                : cartSettlesTheBill
+                  ? "Already covered by your first screenshot"
+                  : cartConfirmedShort
+                    ? "Your total wasn't on the first screenshot"
+                    : "Fees, discounts and final total"
+            }
+            helper={
+              checkoutAnswered
+                ? checkoutStatus === "applied"
+                  ? "Got it — your total below now comes from this screenshot."
+                  : "We couldn't find a total on this one. Check nothing got cut off, or type your total below."
                 : checkoutFile
-                  ? "You can change this on the next screen."
-                  : "A checkout screenshot gives the most accurate comparison, but either one works. You can change this on the next screen."}
-          </p>
+                  ? "Reading it now — your total will fill in below."
+                  : cartSettlesTheBill
+                    ? "Your first screenshot already showed the fees and total, so you can skip this."
+                    : cartConfirmedShort
+                      ? "We read your cart screenshot but didn't find a total on it — add this one so we compare the right number."
+                      : cartReading
+                        ? "Checking your first screenshot — add this if your total is on a different screen."
+                        : "From the same app as your cart — this shows your discounts, fees and final total."
+            }
+            requirement={cartSettlesTheBill ? "optional" : "recommended"}
+            emphasize={cartConfirmedShort && checkoutFile === null}
+            art="receipt"
+            example="checkout"
+            allowRemove
+            file={checkoutFile}
+            onChange={onCheckoutChange}
+            onFilePicked={(file) => {
+              setUploadStarted(true);
+              onCheckoutPicked(file);
+            }}
+          />
+
+          <div className="relative py-0.5">
+            <span aria-hidden="true" className="absolute inset-x-0 top-1/2 h-px bg-ink-200" />
+            <span className="relative mx-auto block w-12 bg-canvas text-center text-[0.78rem] font-bold uppercase tracking-wide text-slate-500">
+              or
+            </span>
+          </div>
+
+          <div className="rounded-3xl bg-cream p-3.5 ring-1 ring-sand">
+            <h3 className="text-[1rem] font-extrabold text-ink-900">
+              {askingForOne ? "Don't have a checkout screenshot?" : fieldLabel}
+            </h3>
+            <p className="mt-0.5 mb-3 text-[0.88rem] leading-snug text-slate-600">
+              {cartSettlesTheBill
+                ? "This is what we read off your cart screenshot — after discounts, fees and delivery."
+                : settledFill
+                  ? "This is what we read off your screenshots — after discounts, fees and delivery."
+                  : subtotalOnly
+                    ? "We read this off your cart screenshot. It's the food only — the screen didn't show delivery or service fees."
+                    : checkoutFile
+                      ? "We couldn't read a total off your screenshots — type the final payable amount here."
+                      : "Enter your final payable amount instead — after discounts, fees and delivery."}
+            </p>
+            <AmountInput
+              label={fieldLabel}
+              hideLabel={!askingForOne}
+              value={manualTotal}
+              onChange={(event) => onManualTotalChange(event.target.value)}
+              error={totalError}
+            />
+            <p className="mt-3 text-[0.82rem] leading-snug text-slate-500">
+              {cartSettlesTheBill || settledFill
+                ? "Change it only if it looks wrong."
+                : subtotalOnly
+                  ? "Add the checkout screenshot above and we'll read your real total — or type it here yourself."
+                  : checkoutFile
+                    ? "You can change this on the next screen."
+                    : "A checkout screenshot gives the most accurate comparison, but either one works. You can change this on the next screen."}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <StepActions>
         <Button onClick={onContinue} disabled={!cartFile} arrow>
