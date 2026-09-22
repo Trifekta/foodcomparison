@@ -71,14 +71,14 @@ export default function LandingPage() {
             advert click read was a pair of prices for a basket they had no
             reason to care about yet. The sentence is what makes the numbers
             mean something, so it goes above them. */}
-        <h1 className="relative mt-4 text-[2.1rem] font-extrabold leading-[1.12] text-ink-900">
+        <h1 className="relative mt-4 text-[2.1rem] font-extrabold leading-[1.12] text-ink-900 max-[389px]:mt-3 max-[389px]:text-[1.72rem]">
           Before you order,
           <br />
           check if you can <span className="marker">save.</span>
           <Sparks className="ml-1 inline-block h-5 w-5 align-top" />
         </h1>
 
-        <p className="mt-2.5 text-[1rem] leading-relaxed text-slate-600">
+        <p className="mt-2.5 text-[1rem] leading-relaxed text-slate-600 max-[389px]:mt-2 max-[389px]:text-[0.92rem] max-[389px]:leading-snug">
           Upload your cart from Talabat, Careem, Deliveroo or Noon Food. We&apos;ll check the same
           basket on Keeta.
         </p>
@@ -88,12 +88,12 @@ export default function LandingPage() {
             also what the example sheet reads - one basket, quoted once. Two
             surfaces disagreeing about the same order would undo exactly the
             trust this is here to build. */}
-        <div className="relative mt-4 overflow-hidden rounded-3xl bg-linear-to-r from-brand-100 to-beige px-3.5 py-3">
+        <div className="relative mt-4 overflow-hidden rounded-3xl bg-linear-to-r from-brand-100 to-beige px-3.5 py-3 max-[389px]:mt-3 max-[389px]:px-3 max-[389px]:py-2.5">
           <div className="flex items-center gap-2.5">
             <FoodPhoto
               name="spread"
               eager
-              className="pointer-events-none w-[22%] shrink-0 select-none"
+              className="pointer-events-none w-[22%] shrink-0 select-none max-[389px]:hidden"
             />
 
             <div className="min-w-0 flex-1">
@@ -109,7 +109,7 @@ export default function LandingPage() {
               <div className="mt-1 text-[0.68rem] font-bold uppercase tracking-[0.06em] text-ink-500">
                 Keeta
               </div>
-              <span className="block whitespace-nowrap text-[1.3rem] font-extrabold tabular-nums leading-tight text-ink-900">
+              <span className="block whitespace-nowrap text-[1.3rem] font-extrabold tabular-nums leading-tight text-ink-900 max-[389px]:text-[1.2rem]">
                 AED {aed(toTotal)}
               </span>
             </div>
@@ -127,7 +127,7 @@ export default function LandingPage() {
           {/* What kind of claim this is. Driven by the data, so the day real
               numbers land the wording corrects itself rather than waiting for
               somebody to remember this line exists. */}
-          <p className="mt-2 text-center text-[0.72rem] font-semibold text-ink-500">
+          <p className="mt-2 text-center text-[0.72rem] font-semibold text-ink-500 max-[389px]:mt-1.5">
             {EXAMPLE_NEEDS_REAL_DATA
               ? "Same items · Same restaurant · Example"
               : "Same items · Same restaurant · Real comparison"}
@@ -140,7 +140,7 @@ export default function LandingPage() {
             better. */}
         <LandingActions />
 
-        <p className="mt-3 text-center text-[0.92rem] font-semibold text-slate-500">
+        <p className="mt-3 text-center text-[0.92rem] font-semibold text-slate-500 max-[389px]:mt-2 max-[389px]:text-[0.85rem]">
           Free · No account needed · About a minute
         </p>
 
@@ -148,7 +148,7 @@ export default function LandingPage() {
             Stacked, the explainer pushed everything under it - the food-app
             card included - a full screen further down. Across, it reads as one
             short process at a glance, which is all it was ever meant to do. */}
-        <ol className="mt-5 flex items-start gap-1 rounded-3xl bg-white p-3 shadow-[0_2px_12px_rgba(23,23,28,0.04)] ring-1 ring-ink-100">
+        <ol className="mt-5 max-[389px]:mt-4 flex items-start gap-1 rounded-3xl bg-white p-3 shadow-[0_2px_12px_rgba(23,23,28,0.04)] ring-1 ring-ink-100">
           {STEPS.map((step, index) => (
             <li key={step.title} className="flex min-w-0 flex-1 items-start gap-1">
               <div className="flex min-w-0 flex-1 flex-col items-center text-center">
