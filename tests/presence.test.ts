@@ -55,8 +55,8 @@ describe("summarizeLivePresence", () => {
     expect(summary.activeCount).toBe(3);
     expect(summary.arrivedCount).toBe(0);
     expect(summary.byStep).toEqual([
-      { event: "step_where", label: "Chose their delivery area", count: 2 },
-      { event: "submitted", label: "Sent the order", count: 1 },
+      { event: "step_where", label: "Chose their delivery area", count: 2, kind: "step" },
+      { event: "submitted", label: "Sent the order", count: 1, kind: "step" },
     ]);
   });
 
@@ -73,6 +73,65 @@ describe("summarizeLivePresence", () => {
       "landing_viewed",
       "keeta_opened",
     ]);
+  });
+
+  it("gives a visit sitting on a side event its own chip", () => {
+    const summary = summarizeLivePresence([row({ last_event: "cta_example" })], NOW);
+
+    expect(summary.activeCount).toBe(1);
+    expect(summary.arrivedCount).toBe(0);
+    expect(summary.byStep).toEqual([
+      { event: "cta_example", label: "Opened the example", count: 1, kind: "side" },
+    ]);
+  });
+
+  it("puts the detours after the funnel rungs, whatever order the rows came in", () => {
+    const summary = summarizeLivePresence(
+      [
+        row({ visit_id: "a", last_event: "cta_example" }),
+        row({ visit_id: "b", last_event: "landing_viewed" }),
+        row({ visit_id: "c", last_event: "app_opened" }),
+        row({ visit_id: "d", last_event: "submitted" }),
+      ],
+      NOW,
+    );
+
+    expect(summary.byStep.map((step) => step.event)).toEqual([
+      "landing_viewed",
+      "submitted",
+      "app_opened",
+      "cta_example",
+    ]);
+  });
+
+  it("names an event it does not recognise rather than dropping it", () => {
+    const summary = summarizeLivePresence([row({ last_event: "retired_event" })], NOW);
+
+    expect(summary.byStep).toEqual([
+      { event: "retired_event", label: "retired_event", count: 1, kind: "side" },
+    ]);
+  });
+
+  // The bug these chips had: a visit whose latest event was a side event was
+  // counted in the headline and shown in none of the chips, so the two
+  // disagreed - 2 active, one chip reading 1.
+  it("splits the active count exactly, arrived and chips together", () => {
+    const rows = [
+      row({ visit_id: "a", last_event: "landing_viewed" }),
+      row({ visit_id: "b", last_event: "cta_example" }),
+      row({ visit_id: "c", last_event: "scroll_50" }),
+      row({ visit_id: "d", last_event: null }),
+      row({ visit_id: "e", last_event: "keeta_opened" }),
+      row({ visit_id: "f", last_event: "made_up_event" }),
+      // Outside the window: in none of these numbers at all.
+      row({ visit_id: "g", last_event: "submitted", last_seen_at: secondsAgo(5 * 60) }),
+    ];
+
+    const summary = summarizeLivePresence(rows, NOW);
+    const chipped = summary.byStep.reduce((total, step) => total + step.count, 0);
+
+    expect(summary.activeCount).toBe(6);
+    expect(summary.arrivedCount + chipped).toBe(summary.activeCount);
   });
 
   it("reads as empty with no active visits at all", () => {

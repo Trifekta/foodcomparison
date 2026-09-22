@@ -1,4 +1,4 @@
-import { FUNNEL_STEPS } from "@/lib/analytics/funnel";
+import { FUNNEL_STEPS, SIDE_EVENTS } from "@/lib/analytics/funnel";
 
 /**
  * Turning visit_presence rows into the numbers the live admin view shows.
@@ -19,6 +19,8 @@ export interface LiveStepCount {
   event: string;
   label: string;
   count: number;
+  /** A funnel rung, or one of the detours beside it - see SIDE_EVENTS. */
+  kind: "step" | "side";
 }
 
 export interface LivePresenceSummary {
@@ -26,7 +28,13 @@ export interface LivePresenceSummary {
   activeCount: number;
   /** Active visits with no step yet - on the site, but too early to say where. */
   arrivedCount: number;
-  /** Only steps somebody is currently on, in funnel order. */
+  /**
+   * Where the active visits are, funnel rungs first and detours after.
+   *
+   * Only what somebody is actually on - an empty step is left out. Together
+   * with arrivedCount these always account for every active visit, so the
+   * chips add up to activeCount rather than trailing it.
+   */
   byStep: LiveStepCount[];
 }
 
@@ -58,12 +66,34 @@ export function summarizeLivePresence(
 
   // FUNNEL_STEPS order, not insertion order - so the live view reads as a
   // funnel (arrived, then basket, then where, ...) rather than however the
-  // rows happened to come back.
-  const byStep = FUNNEL_STEPS.map((step) => ({
-    event: step.event,
-    label: step.label,
-    count: counts.get(step.event) ?? 0,
-  })).filter((step) => step.count > 0);
+  // rows happened to come back. The detours follow the rungs for the same
+  // reason: they are not progress, and interleaving them by event name would
+  // put "went to a food app" between two steps as though it were one.
+  const byStep: LiveStepCount[] = [];
+  const take = (event: string, label: string, kind: "step" | "side") => {
+    const count = counts.get(event);
+    if (!count) return;
+    // Taken rather than read, so whatever is left below is exactly the set
+    // neither list names.
+    counts.delete(event);
+    byStep.push({ event, label, count, kind });
+  };
+
+  for (const step of FUNNEL_STEPS) take(step.event, step.label, "step");
+  // SIDE_EVENTS too, not FUNNEL_STEPS alone. A visit whose latest event is a
+  // detour - the example link, a food-app tile, a scroll depth - is on the
+  // site and counted in activeCount, and listing only the rungs left it in no
+  // chip at all: the headline said 2 and the chips beneath it said 1.
+  for (const side of SIDE_EVENTS) take(side.event, side.label, "side");
+
+  // Anything neither list names - a row recorded under an event since renamed,
+  // say. Shown under its own name rather than dropped, because the point of
+  // the two loops above is that every active visit appears exactly once, and
+  // silently losing the unrecognised ones would reopen the same gap. Sorted so
+  // the order does not depend on how the rows came back.
+  for (const event of [...counts.keys()].sort()) {
+    byStep.push({ event, label: event, count: counts.get(event) ?? 0, kind: "side" });
+  }
 
   return { activeCount: active.length, arrivedCount, byStep };
 }
