@@ -101,6 +101,17 @@ const OTHER_PROBES: { file: string; table: string; column: string; breaks: strin
     breaks: "the Live page - it would show nobody on the site even while people are",
   },
   {
+    file: "0025_admin_activity.sql",
+    table: "admin_activity",
+    column: "hits",
+    // Degrades rather than breaks, the same way ad_labels does: requireAdmin()
+    // swallows the failed write, so every admin page keeps working and the
+    // Team page simply has nothing to show. What is lost is the record of who
+    // used the dashboard while the migration was outstanding, and that cannot
+    // be backfilled - which is why it is worth naming here.
+    breaks: "the Team page, and the record of who used the dashboard meanwhile",
+  },
+  {
     file: "0024_ad_labels.sql",
     table: "ad_labels",
     column: "label",

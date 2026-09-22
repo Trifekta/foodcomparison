@@ -17,7 +17,7 @@ import { dubaiIsoDate } from "@/lib/utils/text";
  * Through the SERVICE ROLE, not the admin's own session. The row is a statement
  * about the person making the request, and a person who could write it could
  * also shape it - the table has no insert or update policy for admins at all
- * (see migration 0024), so this is the only way in. It is also why the admin id
+ * (see migration 0025), so this is the only way in. It is also why the admin id
  * is taken from the already-verified session and never from anything the
  * request could set.
  */
