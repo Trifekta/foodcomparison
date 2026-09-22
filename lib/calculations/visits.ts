@@ -146,6 +146,102 @@ export function summarizeVisits(rows: VisitEventRow[]): VisitSummary[] {
   return summaries.sort((a, b) => (a.lastSeen < b.lastSeen ? 1 : a.lastSeen > b.lastSeen ? -1 : 0));
 }
 
+/** One row of visitor_ips, as stored. */
+export interface VisitIpRow {
+  visit_id: string;
+  client_ip: string;
+  created_at: string;
+  submissions: { reference_number: string } | null;
+}
+
+/** A visit with both its IP and what the funnel saw it do. */
+export interface ValidationRow {
+  visit_id: string;
+  client_ip: string;
+  /**
+   * How many visits in this range came from this IP.
+   *
+   * The column the rest of this report exists for. A visit id is one browser
+   * for one Dubai day, so anybody in an in-app browser - which is most ad
+   * traffic - can produce a fresh one every time they tap the ad. Three visit
+   * ids behind one IP is one person retrying, and the per-visit table reads
+   * that as three people with no way to tell the difference.
+   *
+   * It errs the other way too, and knowing which way matters: carriers here
+   * put many subscribers behind one address, so a shared IP is evidence and
+   * not proof. Visit count is the ceiling on how many people there were, this
+   * is the floor.
+   */
+  visits_from_ip: number;
+  created_at: string;
+  first_seen: string | null;
+  last_seen: string | null;
+  screenshots: number;
+  furthest_step: string;
+  area: string | null;
+  converted: boolean;
+  reference_number: string | null;
+  utm_source: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+}
+
+/**
+ * The IP rows joined to the funnel's own view of each visit.
+ *
+ * The IP rows are the spine: one per visit, written on that visit's first
+ * event. A visit that somehow recorded no funnel events still appears, with
+ * its step columns empty, because a row that vanishes from an audit export is
+ * worse than one that admits it knows nothing.
+ */
+export function mergeValidationRows(
+  ips: VisitIpRow[],
+  summaries: VisitSummary[],
+): ValidationRow[] {
+  const byVisit = new Map(summaries.map((visit) => [visit.visitId, visit]));
+
+  const perIp = new Map<string, number>();
+  for (const row of ips) {
+    perIp.set(row.client_ip, (perIp.get(row.client_ip) ?? 0) + 1);
+  }
+
+  const rows = ips.map((row) => {
+    const visit = byVisit.get(row.visit_id);
+    // Either source will do. visitor_ips learns the submission on the event
+    // that created it; funnel_events carries it on the same event. Taking
+    // whichever has it means one missed upsert does not file a real order as
+    // an abandoned visit.
+    const reference = row.submissions?.reference_number ?? visit?.reference ?? null;
+
+    return {
+      visit_id: row.visit_id,
+      client_ip: row.client_ip,
+      visits_from_ip: perIp.get(row.client_ip) ?? 1,
+      created_at: row.created_at,
+      first_seen: visit?.firstSeen ?? null,
+      last_seen: visit?.lastSeen ?? null,
+      screenshots: visit?.screenshots ?? 0,
+      furthest_step: visit?.furthestLabel ?? "—",
+      area: visit?.areaName ?? null,
+      converted: reference !== null,
+      reference_number: reference,
+      utm_source: visit?.utmSource ?? null,
+      utm_campaign: visit?.utmCampaign ?? null,
+      utm_content: visit?.utmContent ?? null,
+    };
+  });
+
+  // Busiest addresses first, each one's visits kept together and in order.
+  // The repeat sessions this report exists to find end up adjacent at the top,
+  // rather than scattered down a file sorted by time.
+  return rows.sort(
+    (a, b) =>
+      b.visits_from_ip - a.visits_from_ip ||
+      (a.client_ip < b.client_ip ? -1 : a.client_ip > b.client_ip ? 1 : 0) ||
+      (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0),
+  );
+}
+
 export interface VisitTotals {
   visits: number;
   uploaded: number;

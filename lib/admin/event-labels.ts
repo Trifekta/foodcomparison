@@ -1,29 +1,34 @@
+import { FUNNEL_STEP_LABELS } from "@/lib/analytics/funnel";
+
 /**
- * Human-readable labels for funnel and side events in the admin dashboard.
+ * A history row's label, for a list that now shows two kinds of event.
+ *
+ * The submission history reads submission_events - what an admin did to an
+ * order - and funnel_events, what the customer's browser recorded on the way
+ * to placing it. Only the first kind is named here. The second already has
+ * canonical labels in FUNNEL_STEP_LABELS, and copying them into a second map
+ * is how "Scrolled three quarters" in one view becomes "Scrolled 3/4" in
+ * another: the same event, two names, and no way to tell which is current.
+ *
+ * Anything neither map knows falls back to its own name with the underscores
+ * taken out, which is what this list did for everything before it existed.
  */
+const ADMIN_ACTIONS: Record<string, string> = {
+  submission_created: "Order received",
+  review_started: "Review started",
+  comparison_added: "Comparison added",
+  status_changed: "Status changed",
+  result_generated: "Result generated",
+  result_sent: "Result sent",
+  submission_edited: "Order edited",
+  submission_archived: "Archived",
+  submission_unarchived: "Restored from archive",
+};
 
 export function eventLabel(eventType: string): string {
-  const labels: Record<string, string> = {
-    // Funnel steps
-    wizard_started: "Entered upload page",
-    cart_uploaded: "Cart screenshot uploaded",
-    step_basket: "Moved to basket review",
-    step_where: "Selected delivery area",
-    step_review: "Moved to final review",
-    submitted: "Submitted order",
-    result_viewed: "Viewed comparison result",
-    keeta_opened: "Opened Keeta",
-
-    // Side events: pages
-    landing_viewed: "Viewed landing page",
-
-    // Side events: scroll depth
-    scroll_0: "Didn't scroll",
-    scroll_25: "Scrolled a quarter",
-    scroll_50: "Scrolled halfway",
-    scroll_75: "Scrolled 3/4",
-    scroll_100: "Scrolled to bottom",
-  };
-
-  return labels[eventType] || eventType.replace(/_/g, " ");
+  return (
+    ADMIN_ACTIONS[eventType] ??
+    FUNNEL_STEP_LABELS[eventType] ??
+    eventType.replace(/_/g, " ")
+  );
 }

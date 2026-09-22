@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { clientKeyFromHeaders } from "@/lib/utils/rate-limit";
+import { buildValidationCsv } from "@/lib/admin/export";
+import {
+  mergeValidationRows,
+  type VisitIpRow,
+  type VisitSummary,
+} from "@/lib/calculations/visits";
 
 /**
  * IP audit trail tests.
@@ -33,128 +39,158 @@ describe("IP extraction from headers", () => {
   });
 });
 
-/**
- * CSV format validation for Keeta export.
- *
- * Validates that the exported CSV is properly formatted with:
- * - Correct headers
- * - Escaped quotes
- * - Proper comma delimiters
- */
-function csvLine(
-  visitId: string,
-  ip: string,
-  timestamp: string,
-  converted: boolean,
-  reference: string | null,
-) {
-  return [
-    visitId,
-    ip,
-    timestamp,
-    converted ? "Yes" : "No",
-    reference || "",
-  ]
-    .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-    .join(",");
-}
+const ipRow = (
+  visit_id: string,
+  client_ip: string,
+  created_at: string,
+  reference?: string,
+): VisitIpRow => ({
+  visit_id,
+  client_ip,
+  created_at,
+  submissions: reference ? { reference_number: reference } : null,
+});
 
-describe("CSV export format", () => {
-  it("formats a basic row correctly", () => {
-    const line = csvLine(
-      "a1b2c3d4e5f6g7h8",
-      "203.0.113.5",
-      "2026-09-21T12:00:00Z",
-      false,
-      null,
-    );
-    expect(line).toBe(
-      '"a1b2c3d4e5f6g7h8","203.0.113.5","2026-09-21T12:00:00Z","No",""',
-    );
-  });
-
-  it("includes reference number when converted", () => {
-    const line = csvLine(
-      "a1b2c3d4e5f6g7h8",
-      "203.0.113.5",
-      "2026-09-21T12:00:00Z",
-      true,
-      "SN001",
-    );
-    expect(line).toBe(
-      '"a1b2c3d4e5f6g7h8","203.0.113.5","2026-09-21T12:00:00Z","Yes","SN001"',
-    );
-  });
-
-  it("escapes quotes in values", () => {
-    // Edge case: IP with quotes (hypothetical, but testing the escaping)
-    const line = csvLine(
-      "a1b2c3d4e5f6g7h8",
-      '203.0.113.5"test',
-      "2026-09-21T12:00:00Z",
-      false,
-      null,
-    );
-    expect(line).toContain('203.0.113.5""test');
-  });
-
-  it("has the correct header row", () => {
-    const header = "Visit ID,Client IP,Timestamp,Converted,Order Reference";
-    expect(header).toMatch(/Visit ID/);
-    expect(header).toMatch(/Client IP/);
-    expect(header).toMatch(/Converted/);
-  });
+const visit = (visitId: string, over: Partial<VisitSummary> = {}): VisitSummary => ({
+  visitId,
+  firstSeen: "2026-09-21T12:00:00Z",
+  lastSeen: "2026-09-21T12:05:00Z",
+  screenshots: 0,
+  furthestEvent: null,
+  furthestLabel: "—",
+  furthestIndex: -1,
+  returning: false,
+  areaName: null,
+  reference: null,
+  completed: false,
+  utmSource: null,
+  utmCampaign: null,
+  utmContent: null,
+  ...over,
 });
 
 /**
- * Validation data shape for Keeta.
- *
- * Ensures the data returned from getValidationData() has the right structure.
+ * The question this export exists to answer: was that three people, or one
+ * person who tapped the ad three times?
  */
-describe("Validation data shape", () => {
-  interface ValidationRow {
-    visit_id: string;
-    client_ip: string;
-    created_at: string;
-    reference_number: string | null;
-    converted: boolean;
-  }
+describe("mergeValidationRows", () => {
+  it("counts how many visits share one address", () => {
+    const rows = mergeValidationRows(
+      [
+        ipRow("aaaaaaaaaaaaaaaa", "203.0.113.5", "2026-09-21T12:00:00Z"),
+        ipRow("bbbbbbbbbbbbbbbb", "203.0.113.5", "2026-09-21T12:04:00Z"),
+        ipRow("cccccccccccccccc", "203.0.113.5", "2026-09-21T12:09:00Z"),
+        ipRow("dddddddddddddddd", "70.41.3.18", "2026-09-21T12:10:00Z"),
+      ],
+      [],
+    );
 
-  it("has all required fields", () => {
-    const row: ValidationRow = {
-      visit_id: "a1b2c3d4e5f6g7h8",
-      client_ip: "203.0.113.5",
-      created_at: "2026-09-21T12:00:00Z",
-      reference_number: "SN001",
-      converted: true,
-    };
-
-    expect(row).toHaveProperty("visit_id");
-    expect(row).toHaveProperty("client_ip");
-    expect(row).toHaveProperty("created_at");
-    expect(row).toHaveProperty("converted");
-    expect(row.converted).toBe(true);
+    const shared = rows.filter((row) => row.client_ip === "203.0.113.5");
+    expect(shared).toHaveLength(3);
+    expect(shared.every((row) => row.visits_from_ip === 3)).toBe(true);
+    expect(rows.find((row) => row.client_ip === "70.41.3.18")?.visits_from_ip).toBe(1);
   });
 
-  it("marks converted correctly based on reference_number", () => {
-    const converted: ValidationRow = {
-      visit_id: "a1b2c3d4e5f6g7h8",
-      client_ip: "203.0.113.5",
-      created_at: "2026-09-21T12:00:00Z",
-      reference_number: "SN001",
-      converted: true,
-    };
+  it("puts the busiest address first, with its visits in the order they happened", () => {
+    const rows = mergeValidationRows(
+      [
+        ipRow("dddddddddddddddd", "70.41.3.18", "2026-09-21T12:10:00Z"),
+        ipRow("cccccccccccccccc", "203.0.113.5", "2026-09-21T12:09:00Z"),
+        ipRow("aaaaaaaaaaaaaaaa", "203.0.113.5", "2026-09-21T12:00:00Z"),
+      ],
+      [],
+    );
 
-    const abandoned: ValidationRow = {
-      visit_id: "x9y8z7w6v5u4t3s2",
-      client_ip: "70.41.3.18",
-      created_at: "2026-09-21T12:15:00Z",
-      reference_number: null,
-      converted: false,
-    };
+    expect(rows.map((row) => row.visit_id)).toEqual([
+      "aaaaaaaaaaaaaaaa",
+      "cccccccccccccccc",
+      "dddddddddddddddd",
+    ]);
+  });
 
-    expect(converted.converted).toBe(true);
-    expect(abandoned.converted).toBe(false);
-    expect(abandoned.reference_number).toBeNull();
+  it("carries the funnel's view of each visit across", () => {
+    const [row] = mergeValidationRows(
+      [ipRow("aaaaaaaaaaaaaaaa", "203.0.113.5", "2026-09-21T12:00:00Z")],
+      [
+        visit("aaaaaaaaaaaaaaaa", {
+          screenshots: 2,
+          furthestLabel: "Reached the confirm screen",
+          areaName: "Dubai Marina",
+          utmSource: "instagram",
+        }),
+      ],
+    );
+
+    expect(row.screenshots).toBe(2);
+    expect(row.furthest_step).toBe("Reached the confirm screen");
+    expect(row.area).toBe("Dubai Marina");
+    expect(row.utm_source).toBe("instagram");
+  });
+
+  it("keeps a visit that recorded no funnel events rather than dropping it", () => {
+    const [row] = mergeValidationRows(
+      [ipRow("aaaaaaaaaaaaaaaa", "203.0.113.5", "2026-09-21T12:00:00Z")],
+      [],
+    );
+
+    expect(row.visit_id).toBe("aaaaaaaaaaaaaaaa");
+    expect(row.furthest_step).toBe("—");
+    expect(row.screenshots).toBe(0);
+    expect(row.converted).toBe(false);
+  });
+
+  it("counts an order whichever source recorded it", () => {
+    const fromIpTable = mergeValidationRows(
+      [ipRow("aaaaaaaaaaaaaaaa", "203.0.113.5", "2026-09-21T12:00:00Z", "SN001")],
+      [],
+    );
+    expect(fromIpTable[0].converted).toBe(true);
+    expect(fromIpTable[0].reference_number).toBe("SN001");
+
+    const fromFunnel = mergeValidationRows(
+      [ipRow("bbbbbbbbbbbbbbbb", "70.41.3.18", "2026-09-21T12:00:00Z")],
+      [visit("bbbbbbbbbbbbbbbb", { reference: "SN002", completed: true })],
+    );
+    expect(fromFunnel[0].converted).toBe(true);
+    expect(fromFunnel[0].reference_number).toBe("SN002");
+  });
+});
+
+describe("buildValidationCsv", () => {
+  it("names every column in the header", () => {
+    const [header] = buildValidationCsv([]).split("\r\n");
+    expect(header).toContain('"Client IP"');
+    expect(header).toContain('"Visits from this IP"');
+    expect(header).toContain('"Converted"');
+  });
+
+  it("writes the IP and its visit count", () => {
+    const csv = buildValidationCsv(
+      mergeValidationRows(
+        [
+          ipRow("aaaaaaaaaaaaaaaa", "203.0.113.5", "2026-09-21T12:00:00Z"),
+          ipRow("bbbbbbbbbbbbbbbb", "203.0.113.5", "2026-09-21T12:04:00Z"),
+        ],
+        [],
+      ),
+    );
+
+    expect(csv).toContain('"203.0.113.5","2"');
+  });
+
+  /**
+   * client_ip arrives in a request header, so it is the one value in any of
+   * these exports that somebody outside chooses. Excel runs a leading =.
+   */
+  it("defuses a formula smuggled in through the IP header", () => {
+    const csv = buildValidationCsv(
+      mergeValidationRows(
+        [ipRow("aaaaaaaaaaaaaaaa", '=cmd|"/c calc"!A1', "2026-09-21T12:00:00Z")],
+        [],
+      ),
+    );
+
+    expect(csv).toContain("\"'=cmd|\"\"/c calc\"\"!A1\"");
+    expect(csv).not.toContain('"=cmd');
   });
 });

@@ -1,5 +1,5 @@
 import type { SubmissionListRow, DateRange } from "./queries";
-import type { VisitSummary } from "@/lib/calculations/visits";
+import type { ValidationRow, VisitSummary } from "@/lib/calculations/visits";
 import type { ValidationMetrics } from "@/lib/calculations/analytics";
 import {
   AREA_FUNNEL_STEPS,
@@ -279,4 +279,67 @@ export function buildVisitsCsv(visits: VisitSummary[]): string {
 export function visitsCsvFilename(range: DateRange, step?: string | null): string {
   const window = range.from || range.to ? `${range.from ?? "start"}-to-${range.to ?? "today"}` : "today";
   return `snipsavor-visits-${window}${step ? `-${step}` : ""}.csv`;
+}
+
+/**
+ * The visits table again, with the address each one came from.
+ *
+ * Everything the visits export has, plus the IP and - the reason this file
+ * exists rather than a column on the other one - how many visits that address
+ * produced. Sorted so the repeats sit together at the top: the question this
+ * answers is "was that three people or one person three times", and a file
+ * that makes somebody pivot it themselves has not answered it.
+ *
+ * Built through field() like every other export here, which matters more than
+ * usual: client_ip arrives in a request header, so it is the one value in any
+ * of these files that somebody outside chooses, and a leading = would run in
+ * the admin's spreadsheet.
+ */
+const VALIDATION_HEADERS = [
+  "Visit",
+  "Client IP",
+  "Visits from this IP",
+  "Started (Dubai)",
+  "Last seen (Dubai)",
+  "Screenshots",
+  "Got as far as",
+  "Area",
+  "Converted",
+  "Order",
+  "UTM source",
+  "UTM campaign",
+  "UTM content",
+] as const;
+
+export function buildValidationCsv(rows: ValidationRow[]): string {
+  const lines = [VALIDATION_HEADERS.map(field).join(",")];
+
+  for (const row of rows) {
+    lines.push(
+      [
+        field(row.visit_id),
+        field(row.client_ip),
+        field(String(row.visits_from_ip)),
+        // Falls back to the IP row's own timestamp, which is written on the
+        // visit's first event and so means the same thing.
+        field(formatDubaiTimestamp(row.first_seen ?? row.created_at)),
+        field(row.last_seen ? formatDubaiTimestamp(row.last_seen) : ""),
+        field(String(row.screenshots)),
+        field(row.furthest_step === "—" ? "" : row.furthest_step),
+        field(row.area ?? ""),
+        field(row.converted ? "Yes" : "No"),
+        field(row.reference_number ?? ""),
+        field(row.utm_source ?? ""),
+        field(row.utm_campaign ?? ""),
+        field(row.utm_content ?? ""),
+      ].join(","),
+    );
+  }
+
+  return `﻿${lines.join("\r\n")}\r\n`;
+}
+
+export function validationCsvFilename(range: DateRange): string {
+  const window = range.from || range.to ? `${range.from ?? "start"}-to-${range.to ?? "today"}` : "today";
+  return `snipsavor-validation-${window}.csv`;
 }
