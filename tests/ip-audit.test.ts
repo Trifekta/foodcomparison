@@ -44,9 +44,11 @@ const ipRow = (
   client_ip: string,
   created_at: string,
   reference?: string,
+  user_agent: string | null = null,
 ): VisitIpRow => ({
   visit_id,
   client_ip,
+  user_agent,
   created_at,
   submissions: reference ? { reference_number: reference } : null,
 });
@@ -165,7 +167,7 @@ describe("buildValidationCsv", () => {
   });
 
   it("writes the IP and its visit count", () => {
-    const csv = buildValidationCsv(
+    const [, first] = buildValidationCsv(
       mergeValidationRows(
         [
           ipRow("aaaaaaaaaaaaaaaa", "203.0.113.5", "2026-09-21T12:00:00Z"),
@@ -173,9 +175,41 @@ describe("buildValidationCsv", () => {
         ],
         [],
       ),
+    ).split("\r\n");
+
+    expect(first).toContain('"203.0.113.5"');
+    // Two visits behind the one address, said on every row that address owns.
+    expect(first.split(",")).toContain('"2"');
+  });
+
+  /**
+   * Without a browser string there is no second signal, so the export must
+   * report the visits separately however suggestive the timing looks.
+   */
+  it("leaves visits ungrouped when the browser is unknown", () => {
+    const rows = mergeValidationRows(
+      [
+        ipRow("aaaaaaaaaaaaaaaa", "203.0.113.5", "2026-09-21T12:00:00Z"),
+        ipRow("bbbbbbbbbbbbbbbb", "203.0.113.5", "2026-09-21T12:04:00Z"),
+      ],
+      [],
     );
 
-    expect(csv).toContain('"203.0.113.5","2"');
+    expect(rows.every((row) => row.visits_in_group === 1)).toBe(true);
+  });
+
+  it("groups them once the browser string agrees", () => {
+    const ua = "Mozilla/5.0 (iPhone) Instagram 300.0";
+    const rows = mergeValidationRows(
+      [
+        ipRow("aaaaaaaaaaaaaaaa", "203.0.113.5", "2026-09-21T12:00:00Z", undefined, ua),
+        ipRow("bbbbbbbbbbbbbbbb", "203.0.113.5", "2026-09-21T12:04:00Z", undefined, ua),
+      ],
+      [],
+    );
+
+    expect(rows.every((row) => row.visits_in_group === 2)).toBe(true);
+    expect(new Set(rows.map((row) => row.visitor_key)).size).toBe(1);
   });
 
   /**

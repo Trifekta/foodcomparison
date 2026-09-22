@@ -298,6 +298,9 @@ export function visitsCsvFilename(range: DateRange, step?: string | null): strin
 const VALIDATION_HEADERS = [
   "Visit",
   "Client IP",
+  "Browser",
+  "Likely visitor",
+  "Visits in group",
   "Visits from this IP",
   "Started (Dubai)",
   "Last seen (Dubai)",
@@ -319,6 +322,9 @@ export function buildValidationCsv(rows: ValidationRow[]): string {
       [
         field(row.visit_id),
         field(row.client_ip),
+        field(row.user_agent ?? ""),
+        field(row.visitor_key),
+        field(String(row.visits_in_group)),
         field(String(row.visits_from_ip)),
         // Falls back to the IP row's own timestamp, which is written on the
         // visit's first event and so means the same thing.

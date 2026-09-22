@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
 import { Download, Fingerprint } from "lucide-react";
 import { Suspense } from "react";
-import { getAdLabelIndex, getVisitEvents } from "@/lib/admin/queries";
-import { filterByStep, isStepMatch, summarizeVisits, totalVisits } from "@/lib/calculations/visits";
+import { getAdLabelIndex, getVisitEvents, getVisitorIps } from "@/lib/admin/queries";
+import {
+  filterByStep,
+  groupVisitors,
+  isStepMatch,
+  summarizeVisits,
+  totalVisits,
+} from "@/lib/calculations/visits";
 import { parseDateRange } from "@/lib/admin/filters";
 import { VisitFilters } from "@/components/admin/VisitFilters";
 import { VisitsTable } from "@/components/admin/VisitsTable";
@@ -50,14 +56,31 @@ export default async function VisitsPage({ searchParams }: { searchParams: Searc
   if (range.to) rangeParams.set("to", range.to);
   const rangeQuery = rangeParams.toString();
 
-  // Allowed to fail on a database that has not run 0021 yet.
-  const [visitEvents, adLabels] = await Promise.all([
+  // Allowed to fail on a database that has not run 0021 yet. The IP rows are
+  // allowed to fail on one that has not run 0025: without them every visit
+  // simply stands alone, which is what the table said before grouping existed.
+  const [visitEvents, ips, adLabels] = await Promise.all([
     getVisitEvents(range).catch(() => []),
+    getVisitorIps(range).catch(() => []),
     getAdLabelIndex(),
   ]);
 
   const visits = filterByStep(summarizeVisits(visitEvents), step, match);
   const totals = totalVisits(visits);
+
+  // Grouped over the filtered list, so the count on screen always describes
+  // the rows on screen. A step filter therefore narrows both numbers together.
+  const ipByVisit = new Map(ips.map((row) => [row.visit_id, row]));
+  const groups = groupVisitors(
+    visits.map((visit) => ({
+      visitId: visit.visitId,
+      clientIp: ipByVisit.get(visit.visitId)?.client_ip ?? null,
+      userAgent: ipByVisit.get(visit.visitId)?.user_agent ?? null,
+      firstSeen: visit.firstSeen,
+      lastSeen: visit.lastSeen,
+      reference: visit.reference,
+    })),
+  );
 
   return (
     <div className="space-y-5">
@@ -101,7 +124,7 @@ export default async function VisitsPage({ searchParams }: { searchParams: Searc
         <Suspense fallback={<div className="h-28 rounded-2xl border border-ink-200 bg-white" />}>
           <VisitFilters />
         </Suspense>
-        <VisitsTable visits={visits} totals={totals} labels={adLabels} />
+        <VisitsTable visits={visits} totals={totals} labels={adLabels} groups={groups} />
       </div>
     </div>
   );
