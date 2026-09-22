@@ -39,6 +39,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 
 export async function POST(request: Request) {
   const clientKey = clientKeyFromHeaders(request.headers);
+  const clientIp = clientKey; // Same extraction, for IP audit table
 
   try {
     const body = (await request.json()) as {
@@ -123,6 +124,13 @@ export async function POST(request: Request) {
           submission_id: submissionId,
           area_id: areaId,
         },
+        { onConflict: "visit_id" },
+      ),
+      // IP audit trail: record once per visit so Keeta can validate real traffic.
+      // upsert on visit_id means only the first event's IP is recorded; later
+      // events update the submission_id if one now exists, but not the IP.
+      supabase.from("visitor_ips").upsert(
+        { visit_id: visitId, client_ip: clientIp, submission_id: submissionId },
         { onConflict: "visit_id" },
       ),
     ]);

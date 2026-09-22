@@ -523,3 +523,52 @@ export async function getVisitEvents(
   if (error) throw new Error(`Could not load visits: ${error.message}`);
   return (data ?? []) as unknown as VisitEventRow[];
 }
+
+/**
+ * Validation data for partners: IPs + orders, for proving traffic is real.
+ *
+ * This is what Keeta uses to validate that reported visits and conversions
+ * are genuine traffic from real devices, not simulated or fabricated.
+ */
+export interface ValidationRow {
+  visit_id: string;
+  client_ip: string;
+  created_at: string;
+  reference_number: string | null;
+  converted: boolean;
+}
+
+/** Validation export: all IPs matched to orders (if any) in a date range. */
+export async function getValidationData(range: DateRange = {}): Promise<ValidationRow[]> {
+  const supabase = await createServerSupabaseClient();
+  const bounds = rangeToInstants(range.from || range.to ? range : defaultVisitRange());
+
+  interface RawValidationRow {
+    visit_id: string;
+    client_ip: string;
+    created_at: string;
+    submissions: { reference_number: string } | null;
+  }
+
+  const { data, error } = await supabase
+    .from("visitor_ips")
+    .select(
+      "visit_id, client_ip, created_at, submissions(reference_number)",
+    )
+    .gte("created_at", bounds.since ?? "1970-01-01T00:00:00Z")
+    .lte("created_at", bounds.until ?? "2999-12-31T23:59:59Z")
+    .order("created_at", { ascending: false }) as {
+      data: RawValidationRow[] | null;
+      error: Error | null;
+    };
+
+  if (error) throw new Error(`Could not load validation data: ${error.message}`);
+
+  return (data ?? []).map((row) => ({
+    visit_id: row.visit_id,
+    client_ip: row.client_ip,
+    created_at: row.created_at,
+    reference_number: row.submissions?.reference_number ?? null,
+    converted: !!row.submissions?.reference_number,
+  }));
+}
