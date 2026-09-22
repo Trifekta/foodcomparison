@@ -353,7 +353,7 @@ export function StepUpload({
                     ? "We read your cart screenshot but didn't find a total on it — add this one so we compare the right number."
                     : cartReading
                       ? "Checking your first screenshot — add this if your total is on a different screen."
-                      : "Recommended for the most accurate comparison — this shows your discounts, fees and final total."
+                      : "From the same app as your cart — this shows your discounts, fees and final total."
           }
           requirement={cartSettlesTheBill ? "optional" : "recommended"}
           emphasize={cartConfirmedShort && checkoutFile === null}
