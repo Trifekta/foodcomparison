@@ -4,10 +4,16 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { SIGNED_URL_TTL_SECONDS, STORAGE_BUCKET } from "@/lib/constants";
 import type { AnalyticsRow, SavingSummaryRow } from "@/lib/calculations/analytics";
 import type { FunnelAreaRow, FunnelRow } from "@/lib/analytics/funnel";
+import {
+  BUILT_IN_AD_LABELS,
+  buildAdLabelIndex,
+  type AdLabelIndex,
+} from "@/lib/analytics/ad-labels";
 import type { VisitEventRow } from "@/lib/calculations/visits";
 import { withAmountStrings } from "@/lib/calculations/money";
 import { dubaiIsoDate } from "@/lib/utils/text";
 import type {
+  AdLabelRow,
   AreaRow,
   SubmissionEventRow,
   SubmissionExtractionRow,
@@ -220,6 +226,98 @@ export async function listAreas(includeInactive = true): Promise<AreaRow[]> {
   const { data, error } = await query;
   if (error) throw new Error(`Could not load areas: ${error.message}`);
   return (data ?? []) as AreaRow[];
+}
+
+/**
+ * Every advert label an admin has saved.
+ *
+ * Returns an empty list rather than throwing when the table is not there yet.
+ * Migrations here are applied by hand, so 0024 can lag the deploy - and the
+ * cost of that must be the labels an admin has typed since, not the Live and
+ * Attribution pages themselves. Without the rows the resolver still has its
+ * built-ins, so the sources and the two ids that were already running keep
+ * reading correctly; the schema check names the file to run.
+ */
+export async function listAdLabels(): Promise<AdLabelRow[]> {
+  const supabase = await createServerSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("ad_labels")
+    .select("*")
+    .order("kind")
+    .order("label");
+
+  if (error) return [];
+  return (data ?? []) as AdLabelRow[];
+}
+
+/**
+ * The lookup the admin tables read, built once per page.
+ *
+ * Built-ins first and the saved rows second, so an admin who renames a
+ * campaign overrides the name shipped in code - see buildAdLabelIndex.
+ */
+export async function getAdLabelIndex(): Promise<AdLabelIndex> {
+  const saved = await listAdLabels();
+  return buildAdLabelIndex(
+    BUILT_IN_AD_LABELS,
+    saved.map((row) => ({ kind: row.kind, value: row.value, label: row.label })),
+  );
+}
+
+/**
+ * Advert values that have actually arrived, and what they resolve to.
+ *
+ * This is what stops "label your new creative" being a hunt. Without it an
+ * admin has to notice an unfamiliar number in a table, copy it, and come to
+ * this form - which is the manual ID matching the labels exist to abolish,
+ * moved one screen along.
+ *
+ * Read from submissions rather than from keeta_clicks: a submission exists for
+ * every visit that got that far, and a click only for the ones that switched,
+ * so a creative that brings people who never switch - exactly the one worth
+ * finding - would be invisible in the narrower table.
+ *
+ * Capped, because this is a distinct-values question asked of a growing table
+ * and Postgres has no index that answers it cheaply. The cap is recent rows,
+ * which is the right end: an advert nobody has run for months does not need
+ * naming today.
+ */
+export async function listSeenAdValues(limit = 2000): Promise<
+  { kind: "source" | "campaign" | "creative"; value: string; count: number }[]
+> {
+  const supabase = await createServerSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("submissions")
+    .select("utm_source, utm_campaign, utm_content")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) return [];
+
+  const counts = new Map<string, { kind: "source" | "campaign" | "creative"; value: string; count: number }>();
+
+  const note = (kind: "source" | "campaign" | "creative", raw: string | null) => {
+    const value = raw?.trim();
+    if (!value) return;
+    const key = `${kind}:${value.toLowerCase()}`;
+    const seen = counts.get(key);
+    if (seen) seen.count += 1;
+    else counts.set(key, { kind, value, count: 1 });
+  };
+
+  for (const row of (data ?? []) as {
+    utm_source: string | null;
+    utm_campaign: string | null;
+    utm_content: string | null;
+  }[]) {
+    note("source", row.utm_source);
+    note("campaign", row.utm_campaign);
+    note("creative", row.utm_content);
+  }
+
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 }
 
 /**

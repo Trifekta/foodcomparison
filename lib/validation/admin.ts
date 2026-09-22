@@ -113,6 +113,31 @@ export const areaInputSchema = z.object({
 
 export type AreaInput = z.infer<typeof areaInputSchema>;
 
+/**
+ * One advert value and the name it should read as.
+ *
+ * `value` is matched case-insensitively by the resolver, so it is lower-cased
+ * here rather than trusted as typed: stored both ways it becomes two rows for
+ * one advert, and the second one silently never wins.
+ *
+ * The kinds are a closed set because they name the three columns this labels,
+ * not a taxonomy anybody should be able to extend from a form - a typo'd kind
+ * would save cleanly and then match nothing for the rest of its life.
+ */
+export const adLabelInputSchema = z.object({
+  kind: z.enum(["source", "campaign", "creative"]),
+  value: z
+    .string()
+    .trim()
+    .min(1, "Paste the Meta ID or utm value")
+    .max(160)
+    .transform((raw) => raw.toLowerCase()),
+  label: z.string().trim().min(2, "Give it a name an admin would recognise").max(120),
+  notes: z.string().trim().max(500).optional(),
+});
+
+export type AdLabelInput = z.infer<typeof adLabelInputSchema>;
+
 export const adminCredentialsSchema = z.object({
   email: z.email({ message: "Enter a valid email address." }),
   password: z.string().min(8, "Password must be at least 8 characters."),

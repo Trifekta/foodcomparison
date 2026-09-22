@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { VisitSummary, VisitTotals } from "@/lib/calculations/visits";
 import { formatDubaiTime } from "@/lib/utils/text";
+import { AdLabelCell } from "@/components/admin/AdLabelCell";
+import type { AdLabelIndex } from "@/lib/analytics/ad-labels";
 
 /**
  * One row per visit, which is the only view that answers "what did this one
@@ -53,9 +55,15 @@ const MAX_ROWS = 200;
 export function VisitsTable({
   visits,
   totals,
+  labels,
 }: {
   visits: VisitSummary[];
   totals: VisitTotals;
+  /**
+   * Names for the advert columns. Optional so this table still renders
+   * without it - an unlabelled id is a worse read, not a broken page.
+   */
+  labels?: AdLabelIndex;
 }) {
   const shown = visits.slice(0, MAX_ROWS);
   const hidden = visits.length - shown.length;
@@ -129,9 +137,15 @@ export function VisitsTable({
                       </span>
                     ) : null}
                   </td>
-                  <td className="px-4 py-2.5 text-ink-600">{visit.utmSource ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-ink-600">{visit.utmCampaign ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-ink-600">{visit.utmContent ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-ink-600">
+                    <AdLabelCell kind="source" value={visit.utmSource} index={labels} />
+                  </td>
+                  <td className="px-4 py-2.5 text-ink-600">
+                    <AdLabelCell kind="campaign" value={visit.utmCampaign} index={labels} />
+                  </td>
+                  <td className="px-4 py-2.5 text-ink-600">
+                    <AdLabelCell kind="creative" value={visit.utmContent} index={labels} />
+                  </td>
                   <td className="px-4 py-2.5 text-ink-600">{visit.areaName ?? "—"}</td>
                   <td className="px-4 py-2.5">
                     {visit.reference ? (
