@@ -6,7 +6,8 @@ import type { AnalyticsRow, SavingSummaryRow } from "@/lib/calculations/analytic
 import type { FunnelAreaRow, FunnelRow } from "@/lib/analytics/funnel";
 import type { VisitEventRow } from "@/lib/calculations/visits";
 import { withAmountStrings } from "@/lib/calculations/money";
-import { dubaiIsoDate } from "@/lib/utils/text";
+import { dubaiIsoDate, dubaiIsoDateDaysAgo } from "@/lib/utils/text";
+import type { AdminActivityRow } from "@/lib/analytics/admin-activity";
 import type {
   AreaRow,
   SubmissionEventRow,
@@ -38,6 +39,14 @@ export interface SubmissionFilters {
   to?: string;
   search?: string;
 }
+
+/**
+ * How much of the admin log one screen shows.
+ *
+ * Two weeks: long enough to answer "has anyone been in since the weekend" and
+ * short enough that the page stays a list somebody reads rather than scrolls.
+ */
+export const ADMIN_ACTIVITY_DAYS = 14;
 
 const LIST_COLUMNS =
   "id, reference_number, created_at, status, source_app, source_app_other, current_total, comparison_total, saving_amount, saving_percentage, contact_type, area_id, archived_at, new_to_keeta, areas(id, name)";
@@ -571,4 +580,30 @@ export async function getValidationData(range: DateRange = {}): Promise<Validati
     reference_number: row.submissions?.reference_number ?? null,
     converted: !!row.submissions?.reference_number,
   }));
+}
+
+/**
+ * Who used the dashboard, over the last few days.
+ *
+ * Through the session client like everything else here, so RLS decides: the
+ * admin_activity policy lets any admin read the whole log, which is deliberate.
+ * A record of who opened what is only worth keeping if the team can see it,
+ * and one visible to its subjects is the kind that keeps itself honest.
+ *
+ * A day count rather than a free date range, because this is a short log read
+ * from one screen - the range pickers elsewhere exist to slice months of
+ * orders, and there is nothing here to slice.
+ */
+export async function getAdminActivity(days = ADMIN_ACTIVITY_DAYS): Promise<AdminActivityRow[]> {
+  const supabase = await createServerSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("admin_activity")
+    .select("admin_id, day, path, first_seen_at, last_seen_at, hits, admin_profiles(display_name)")
+    .gte("day", dubaiIsoDateDaysAgo(days - 1))
+    .order("day", { ascending: false })
+    .order("first_seen_at", { ascending: true });
+
+  if (error) throw new Error(`Could not load admin activity: ${error.message}`);
+  return (data ?? []) as unknown as AdminActivityRow[];
 }

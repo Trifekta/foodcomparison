@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient as createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getAdminSession, requireAdmin } from "@/lib/supabase/auth";
+import { recordAdminUse } from "@/lib/admin/activity";
+import { SIGN_IN_PATH } from "@/lib/analytics/admin-activity";
 import {
   areaInputSchema,
   comparisonInputSchema,
@@ -674,6 +676,17 @@ export async function signIn(formData: FormData): Promise<ActionResult> {
     await supabase.auth.signOut();
     return { ok: false, message: "This account doesn't have dashboard access." };
   }
+
+  // The one moment requireAdmin() cannot record for itself: this action does
+  // not call it (there is no session to guard until the line above succeeds),
+  // and the page the admin lands on afterwards records that page, not the
+  // arrival. Recorded here, the log gets a first_seen_at that means "this is
+  // when their day started" rather than "this is the first page they opened".
+  //
+  // Only a sign-in that reached this line is recorded - a wrong password, or an
+  // account with no admin profile, has nobody to record it against and is not
+  // admin use. Failed attempts are Supabase Auth's own log to keep.
+  await recordAdminUse(session.user.id, SIGN_IN_PATH);
 
   return { ok: true };
 }

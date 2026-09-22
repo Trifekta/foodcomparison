@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/admin/analytics", label: "Validation" },
   { href: "/admin/attribution", label: "Attribution" },
   { href: "/admin/areas", label: "Areas" },
+  { href: "/admin/activity", label: "Team" },
 ];
 
 export function AdminNav({ displayName }: { displayName: string }) {
