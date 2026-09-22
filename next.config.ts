@@ -1,10 +1,24 @@
 import type { NextConfig } from "next";
 
+// Temporary UX test: send landing-page visitors straight to the upload wizard.
+// To restore the normal flow: remove the redirects() block below.
+const BYPASS_INTRO = true;
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Screenshots are uploaded through a server route; allow room for two 10 MB images.
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
+  },
+  async redirects() {
+    if (!BYPASS_INTRO) return [];
+    return [
+      {
+        source: "/",
+        destination: "/compare",
+        permanent: false,
+      },
+    ];
   },
 };
 
