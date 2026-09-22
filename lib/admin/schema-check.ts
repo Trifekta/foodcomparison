@@ -100,6 +100,16 @@ const OTHER_PROBES: { file: string; table: string; column: string; breaks: strin
     column: "last_seen_at",
     breaks: "the Live page - it would show nobody on the site even while people are",
   },
+  {
+    file: "0024_ad_labels.sql",
+    table: "ad_labels",
+    column: "label",
+    // Degrades rather than breaks: the built-in labels in
+    // lib/analytics/ad-labels.ts still resolve the sources and the two ids
+    // that were running when this shipped. What is missing is the ability to
+    // name anything launched since.
+    breaks: "naming new campaigns and creatives from /admin/ad-labels",
+  },
 ];
 
 export interface SchemaGap {

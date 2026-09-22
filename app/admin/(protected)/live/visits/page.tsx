@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Download } from "lucide-react";
 import { Suspense } from "react";
-import { getVisitEvents } from "@/lib/admin/queries";
+import { getAdLabelIndex, getVisitEvents } from "@/lib/admin/queries";
 import { filterByStep, isStepMatch, summarizeVisits, totalVisits } from "@/lib/calculations/visits";
 import { parseDateRange } from "@/lib/admin/filters";
 import { VisitFilters } from "@/components/admin/VisitFilters";
@@ -43,7 +43,10 @@ export default async function VisitsPage({ searchParams }: { searchParams: Searc
   const exportQuery = exportParams.toString();
 
   // Allowed to fail on a database that has not run 0021 yet.
-  const visitEvents = await getVisitEvents(range).catch(() => []);
+  const [visitEvents, adLabels] = await Promise.all([
+    getVisitEvents(range).catch(() => []),
+    getAdLabelIndex(),
+  ]);
 
   const visits = filterByStep(summarizeVisits(visitEvents), step, match);
   const totals = totalVisits(visits);
@@ -70,7 +73,7 @@ export default async function VisitsPage({ searchParams }: { searchParams: Searc
         <Suspense fallback={<div className="h-28 rounded-2xl border border-ink-200 bg-white" />}>
           <VisitFilters />
         </Suspense>
-        <VisitsTable visits={visits} totals={totals} />
+        <VisitsTable visits={visits} totals={totals} labels={adLabels} />
       </div>
     </div>
   );

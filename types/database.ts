@@ -51,6 +51,23 @@ export interface AreaRow {
   created_at: string;
 }
 
+/**
+ * One advert value and what it should read as.
+ *
+ * Display furniture: nothing here is captured, written to a submission, or
+ * grouped by. See supabase/migrations/0024_ad_labels.sql.
+ */
+export interface AdLabelRow {
+  id: string;
+  kind: "source" | "campaign" | "creative";
+  /** The value exactly as the advert stored it: a Meta id, or a utm slug. */
+  value: string;
+  label: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** The subset of an area that is safe to send to a customer's browser. */
 export interface PublicArea {
   id: string;

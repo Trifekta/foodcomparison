@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, MousePointerClick } from "lucide-react";
 import { getAttributionSummary, getKeetaClicks } from "@/lib/keeta/report";
+import { getAdLabelIndex } from "@/lib/admin/queries";
+import { AdLabelCell } from "@/components/admin/AdLabelCell";
 import { parseDateRange } from "@/lib/admin/filters";
 import { formatDubaiTimestamp } from "@/lib/admin/export";
 import { formatDecimalStringAsCurrency } from "@/lib/calculations/money";
@@ -43,9 +45,10 @@ export default async function AttributionPage({
   const params = await searchParams;
   const range = parseDateRange(params);
 
-  const [summary, clicks] = await Promise.all([
+  const [summary, clicks, adLabels] = await Promise.all([
     getAttributionSummary(range),
     getKeetaClicks(range),
+    getAdLabelIndex(),
   ]);
 
   return (
@@ -174,14 +177,14 @@ export default async function AttributionPage({
                     <td className="whitespace-nowrap px-3 py-2 text-ink-600">
                       {click.source_app ?? "—"}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-ink-600">
-                      {click.utm_source ?? "—"}
+                    <td className="px-3 py-2 text-ink-600">
+                      <AdLabelCell kind="source" value={click.utm_source} index={adLabels} />
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-ink-600">
-                      {click.utm_campaign ?? "—"}
+                    <td className="px-3 py-2 text-ink-600">
+                      <AdLabelCell kind="campaign" value={click.utm_campaign} index={adLabels} />
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-ink-600">
-                      {click.utm_content ?? "—"}
+                    <td className="px-3 py-2 text-ink-600">
+                      <AdLabelCell kind="creative" value={click.utm_content} index={adLabels} />
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-ink-600">
                       {click.area_name ?? "—"}
