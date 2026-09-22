@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient as createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getAdminSession, requireAdmin } from "@/lib/supabase/auth";
 import {
+  adLabelInputSchema,
   areaInputSchema,
   comparisonInputSchema,
   submissionEditSchema,
@@ -651,6 +652,122 @@ export async function toggleAreaActive(id: string, active: boolean): Promise<Act
   revalidatePath("/admin/areas");
   revalidatePath("/compare");
   return { ok: true };
+}
+
+// ---- Advert labels --------------------------------------------------------
+
+/**
+ * The pages that read a label, and therefore the pages a change has to reach.
+ *
+ * Listed once rather than repeated in each action: the failure mode of getting
+ * this wrong is an admin renaming a creative, seeing it change on one screen
+ * and not the other, and reasonably concluding the save did not work.
+ */
+const AD_LABEL_PAGES = [
+  "/admin/ad-labels",
+  "/admin/live/visits",
+  "/admin/attribution",
+] as const;
+
+function revalidateAdLabelPages(): void {
+  for (const page of AD_LABEL_PAGES) revalidatePath(page);
+}
+
+export async function createAdLabel(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+
+  const parsed = adLabelInputSchema.safeParse({
+    kind: String(formData.get("kind") ?? ""),
+    value: String(formData.get("value") ?? ""),
+    label: String(formData.get("label") ?? ""),
+    notes: String(formData.get("notes") ?? ""),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Check the label details." };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase.from("ad_labels").insert({
+    kind: parsed.data.kind,
+    value: parsed.data.value,
+    label: parsed.data.label,
+    notes: sanitiseText(parsed.data.notes, 500),
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message:
+        error.code === "23505"
+          ? "That ID already has a label. Edit the existing row instead."
+          : "Could not save the label. Run 0024_ad_labels.sql if it has not been applied.",
+    };
+  }
+
+  revalidateAdLabelPages();
+  return { ok: true, message: "Label added." };
+}
+
+export async function updateAdLabel(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { ok: false, message: "Missing label." };
+
+  const parsed = adLabelInputSchema.safeParse({
+    kind: String(formData.get("kind") ?? ""),
+    value: String(formData.get("value") ?? ""),
+    label: String(formData.get("label") ?? ""),
+    notes: String(formData.get("notes") ?? ""),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Check the label details." };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase
+    .from("ad_labels")
+    .update({
+      kind: parsed.data.kind,
+      value: parsed.data.value,
+      label: parsed.data.label,
+      notes: sanitiseText(parsed.data.notes, 500),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) {
+    return {
+      ok: false,
+      message:
+        error.code === "23505"
+          ? "Another row already labels that ID."
+          : "Could not save the label.",
+    };
+  }
+
+  revalidateAdLabelPages();
+  return { ok: true, message: "Label saved." };
+}
+
+/**
+ * Deleting one, which is safe in a way most deletes here are not.
+ *
+ * A label owns no data. Removing it puts the raw id back on the screen and
+ * takes nothing else with it - no submission, no click, no event changes - so
+ * this needs no archive flag and no confirmation beyond the one in the UI.
+ */
+export async function deleteAdLabel(id: string): Promise<ActionResult> {
+  await requireAdmin();
+
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase.from("ad_labels").delete().eq("id", id);
+  if (error) return { ok: false, message: "Could not remove the label." };
+
+  revalidateAdLabelPages();
+  return { ok: true, message: "Label removed." };
 }
 
 // ---- Auth -----------------------------------------------------------------

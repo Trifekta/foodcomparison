@@ -1093,6 +1093,40 @@ stops a redirect is a destination we will not vouch for.
 click-through rate against comparisons that had a button, and every click with
 its restaurant, source app, prices, saving, area and click id.
 
+**IDs are stored; names are looked up.** Meta's URL builder offers two macros
+for the same field. `{{ad.id}}` writes `120249042878960301` into `utm_content`;
+`{{ad.name}}` writes `Same Order Different Price`. The adverts built first used
+the id form, so the admin tables read as eighteen-digit numbers and comparing
+two creatives meant matching two of those against Ads Manager by eye.
+
+The fix is a lookup, not a change to what is captured. `utm_campaign` and
+`utm_content` still hold exactly what the advert sent, every report still groups
+by those values, and the raw id stays under the name on every row — an id is a
+stable key and a name is not, so a creative renamed in Ads Manager would
+silently start a second row in every report if the name were the key.
+
+Three things resolve a value, in order: a row an admin saved on
+`/admin/ad-labels`, a default shipped in `lib/analytics/ad-labels.ts`, or — for
+a value that was never an id — prettifying the slug, so `validation_week1`
+reads as "Validation Week 1" with nothing registered at all. A bare id nothing
+knows keeps its last six digits and is marked `unnamed`, so two unlabelled
+creatives are still visibly two.
+
+`/admin/ad-labels` also lists the values that have arrived on real visits and
+have no name yet, so labelling a new creative is a tap rather than a hunt
+through the tables for an unfamiliar number.
+
+**For new adverts, set the name macros and skip all of this.** In Ads Manager,
+set the tracking parameters to:
+
+```
+utm_source=instagram&utm_campaign={{campaign.name}}&utm_content={{ad.name}}
+```
+
+Meta then sends the names themselves and nothing needs labelling. Adverts
+already running keep sending ids until their tracking parameters are edited, so
+the saved labels still matter for them and for every visit already recorded.
+
 ---
 
 ## Sending the result as SnipSavor, not as a person
