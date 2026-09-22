@@ -193,8 +193,15 @@ export function StepUpload({
           like. */}
       <ScrollDepth />
 
-      {/* Hero banner. The spread bleeds past the top edge, as in the reference. */}
-      <div className="relative rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4">
+      {/* Hero banner. The spread bleeds past the top edge, as in the reference.
+
+          Hidden below 390px, where it is the difference between seeing the
+          upload button on arrival and having to scroll for it. It restates the
+          landing page's promise to somebody who has already accepted it and is
+          here to act on it - 150px of reassurance charged to the one control
+          this screen exists for. On a roomier phone it costs nothing and
+          stays. */}
+      <div className="relative rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4 max-[389px]:hidden">
         <div className="relative z-10 max-w-[44%]">
           <ScriptNote underline className="text-[1.35rem] text-ink-900">
             Same Food

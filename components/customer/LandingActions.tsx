@@ -166,7 +166,7 @@ export function LandingActions() {
       <Link
         href="/compare"
         onClick={() => track("cta_check_cart")}
-        className="relative mt-4 inline-flex min-h-14 w-full items-center justify-center gap-2.5 rounded-full bg-brand-400 px-6 text-base font-bold text-ink-900 shadow-sm transition-colors hover:bg-brand-300 active:bg-brand-500"
+        className="relative mt-4 inline-flex min-h-14 w-full items-center justify-center gap-2.5 rounded-full bg-brand-400 px-6 text-base font-bold text-ink-900 shadow-sm transition-colors hover:bg-brand-300 active:bg-brand-500 max-[389px]:mt-3"
       >
         <Camera aria-hidden="true" className="h-5 w-5" />
         Check my cart
@@ -179,7 +179,7 @@ export function LandingActions() {
           track("cta_example");
           setShowExample(true);
         }}
-        className="relative mt-2.5 inline-flex min-h-13 w-full items-center justify-center gap-2.5 rounded-full border border-ink-200 bg-white px-6 text-[0.98rem] font-bold text-ink-900 transition-colors hover:bg-ink-50"
+        className="relative mt-2.5 inline-flex min-h-13 w-full items-center justify-center gap-2.5 rounded-full border border-ink-200 bg-white px-6 text-[0.98rem] font-bold text-ink-900 transition-colors hover:bg-ink-50 max-[389px]:mt-2"
       >
         <Eye aria-hidden="true" className="h-5 w-5 text-ink-500" />
         See an example
