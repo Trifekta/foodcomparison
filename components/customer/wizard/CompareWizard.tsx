@@ -23,7 +23,11 @@ import {
   loadWizardSession,
   restoredStep,
   saveWizardSession,
+  type SavedWizardSession,
 } from "@/lib/customer/wizard-session";
+import { DraftSession, type RestoredDraft } from "@/lib/drafts/session";
+import { draftValuesFrom, type DraftProgress } from "@/lib/drafts/progress";
+import type { ResumeMode } from "@/lib/drafts/client";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
 import { StepConfirm } from "./StepConfirm";
@@ -121,8 +125,27 @@ async function readBasket(file: File): Promise<StructuredBasket | null> {
   return empty ? null : basket;
 }
 
-export function CompareWizard({ areas }: { areas: PublicArea[] }) {
+type SavedSession = SavedWizardSession | null;
+
+/** A finished read is worth keeping; one still running does not survive a reload. */
+function finishedRead(status: ExtractionStatus, totals: ReadTotals | null) {
+  return status === "applied" || status === "empty" ? { status, totals } : null;
+}
+
+export function CompareWizard({
+  areas,
+  resumeMode = "off",
+}: {
+  areas: PublicArea[];
+  resumeMode?: ResumeMode;
+}) {
   const router = useRouter();
+  // The server-side draft, when DRAFT_RESUME allows it on this page. With the
+  // flag off every method is a no-op and the wizard is exactly what it was.
+  const [draft] = useState(() => new DraftSession(resumeMode));
+  // Waiting on the draft before showing a step, so a restored screenshot does
+  // not appear a moment after an empty upload card.
+  const [resuming, setResuming] = useState(false);
 
   const {
     control,
@@ -197,48 +220,6 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   const [restored, setRestored] = useState(false);
 
   /**
-   * Picking up where a discarded tab left off.
-   *
-   * This flow sends people to another app on purpose, and a backgrounded tab on
-   * a phone is routinely discarded and reloaded on return - so "come back here"
-   * has to survive the page being rebuilt from nothing. What was typed comes
-   * back; the screenshots cannot (see lib/customer/wizard-session.ts), which is
-   * why restoredStep puts anyone who was further along back on the upload
-   * screen rather than on a step that assumes an image exists.
-   */
-  useEffect(() => {
-    // After mount, deliberately: sessionStorage does not exist while this
-    // renders on the server, so the first paint has to be the empty wizard and
-    // what was stored can only be applied once the browser has it. Same shape
-    // as LastOrderBanner, and the rule is silenced for the same reason.
-    /* eslint-disable react-hooks/set-state-in-effect -- see above */
-    const saved = loadWizardSession();
-    if (saved) {
-      reset(saved.values);
-      setItems(saved.items);
-      // Before anything can read a screenshot, so the first read after a
-      // restore knows whether the total already in the form is ours to
-      // replace or theirs to leave alone.
-      setAutofilled(saved.autofilled);
-      setRestoredProgress(hasProgress(saved));
-      // A reload is the only way this branch is reached, and no File survives
-      // one - so the answer to "do they still have a screenshot" is always no.
-      setStep(restoredStep(saved.step, false, STEP_UPLOAD));
-    }
-    if (consumeReturnFromApp()) {
-      // The landing page has always recorded its own return; this one was
-      // detected for the banner and never counted, so the round trip the whole
-      // food-app detour exists to enable was invisible in the funnel. Same
-      // event name as the landing page's, because it is the same fact.
-      track("returned_from_app");
-      setStep(STEP_UPLOAD);
-      setReturnedFromApp(true);
-    }
-    setRestored(true);
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [reset]);
-
-  /**
    * The same return, on a tab that was never discarded.
    *
    * The lucky case: React state is untouched, so there is nothing to restore
@@ -265,6 +246,59 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     if (!restored) return;
     saveWizardSession({ step, values, items, autofilled });
   }, [restored, step, values, items, autofilled]);
+
+  useEffect(() => {
+    if (!restored) return;
+    const progress: DraftProgress = {
+      step: step === STEP_CONFIRM ? 2 : 1,
+      values: draftValuesFrom(values),
+      items: items.slice(0, 60).map((item) => ({
+        key: item.key,
+        name: item.name.slice(0, 400),
+        quantity: item.quantity,
+        linePrice: item.linePrice,
+        priceUncertain: item.priceUncertain,
+        proposed: item.proposed,
+      })),
+      autofilled,
+      reads: {
+        cart: finishedRead(cartStatus, cartTotals),
+        checkout: finishedRead(checkoutStatus, checkoutTotals),
+      },
+    };
+    draft.update(progress);
+  }, [
+    restored,
+    draft,
+    step,
+    values,
+    items,
+    autofilled,
+    cartStatus,
+    cartTotals,
+    checkoutStatus,
+    checkoutTotals,
+  ]);
+
+  // A new step is saved at once rather than after the usual pause.
+  useEffect(() => {
+    if (restored) void draft.flush();
+  }, [restored, draft, step]);
+
+  // Hidden is the last moment a phone promises to run anything before it
+  // discards the tab, so whatever is pending goes now, with keepalive.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") void draft.flush(true);
+    };
+    const onPageHide = () => void draft.flush(true);
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [draft]);
 
   const setStatus = (slot: ReadSlot, status: ExtractionStatus) => {
     if (slot === "cart") setCartStatus(status);
@@ -476,6 +510,118 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   };
 
   /**
+   * A server-side draft, laid over whatever sessionStorage already restored.
+   *
+   * The screenshots come back as real Files, rebuilt from the draft's own
+   * bytes, so from here on nothing can tell them from ones picked this page
+   * view: the step logic, the thumbnails and the submission all see a File.
+   *
+   * Typed values come from sessionStorage when it survived - it is written on
+   * every keystroke, so it is never older than the draft - and from the draft
+   * when it did not. The WhatsApp number is never in the draft; it comes back
+   * only if sessionStorage kept it.
+   */
+  const applyDraft = (found: RestoredDraft, saved: SavedSession, returning: boolean) => {
+    const { progress, files: restoredFiles } = found;
+
+    if (progress && !saved) {
+      reset({ ...WIZARD_DEFAULTS, ...progress.values } as WizardValues);
+      setItems(progress.items);
+      setAutofilled(progress.autofilled);
+    }
+
+    setFiles(restoredFiles);
+    for (const slot of ["cart", "checkout"] as const) {
+      const file = restoredFiles[slot];
+      if (!file) continue;
+      const read = progress?.reads[slot] ?? null;
+      if (read) {
+        setStatus(slot, read.status);
+        setTotals(slot, read.totals);
+      } else {
+        // They left before this screenshot's read finished; read it again.
+        startRead(file, slot);
+      }
+    }
+
+    // Back from a food app still means the upload screen, as it always has.
+    if (!returning) {
+      const savedStep = saved?.step ?? progress?.step ?? STEP_UPLOAD;
+      setStep(restoredStep(savedStep, restoredFiles.cart !== null, STEP_UPLOAD));
+    }
+    setRestoredProgress(true);
+  };
+
+  /**
+   * Picking up where a discarded tab left off.
+   *
+   * This flow sends people to another app on purpose, and a backgrounded tab on
+   * a phone is routinely discarded and reloaded on return - so "come back here"
+   * has to survive the page being rebuilt from nothing. What was typed comes
+   * back from sessionStorage. The screenshots come back only from a
+   * server-side draft (applyDraft, above, when DRAFT_RESUME allows it);
+   * without one, restoredStep puts anyone who was further along back on the
+   * upload screen rather than on a step that assumes an image exists.
+   */
+  useEffect(() => {
+    // After mount, deliberately: sessionStorage does not exist while this
+    // renders on the server, so the first paint has to be the empty wizard and
+    // what was stored can only be applied once the browser has it. Same shape
+    // as LastOrderBanner, and the rule is silenced for the same reason.
+    /* eslint-disable react-hooks/set-state-in-effect -- see above */
+    const saved = loadWizardSession();
+    if (saved) {
+      reset(saved.values);
+      setItems(saved.items);
+      // Before anything can read a screenshot, so the first read after a
+      // restore knows whether the total already in the form is ours to
+      // replace or theirs to leave alone.
+      setAutofilled(saved.autofilled);
+      setRestoredProgress(hasProgress(saved));
+      // A reload is the only way this branch is reached, and no File survives
+      // one - so the answer to "do they still have a screenshot" is always no.
+      setStep(restoredStep(saved.step, false, STEP_UPLOAD));
+    }
+    const returning = consumeReturnFromApp();
+    if (returning) {
+      // The landing page has always recorded its own return; this one was
+      // detected for the banner and never counted, so the round trip the whole
+      // food-app detour exists to enable was invisible in the funnel. Same
+      // event name as the landing page's, because it is the same fact.
+      track("returned_from_app");
+      setStep(STEP_UPLOAD);
+      setReturnedFromApp(true);
+    } else {
+      // Only track wizard_started on the first visit to the upload screen, not
+      // when returning from a food app (which is tracked as returned_from_app).
+      // An advert can point straight here, and this screen is where campaign
+      // parameters are captured - but this only fires once per page load, not
+      // on every remount, so a return from the food app does not double-count.
+      track("wizard_started");
+    }
+
+    if (!draft.mayRestore) {
+      setRestored(true);
+      return;
+    }
+
+    setResuming(true);
+    let cancelled = false;
+    void draft.restore().then((found) => {
+      if (cancelled) return;
+      if (found) applyDraft(found, saved, returning);
+      setResuming(false);
+      setRestored(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+    /* eslint-enable react-hooks/set-state-in-effect */
+    // applyDraft is rebuilt every render and only ever called from here, once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reset, draft]);
+
+  /**
    * The funnel, now that three screens are one.
    *
    * The event names are unchanged - they are what every row already recorded
@@ -624,6 +770,9 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       for (const [key, value] of Object.entries(parsed.data)) {
         body.append(key, typeof value === "boolean" ? String(value) : value);
       }
+      // Lets the server throw the draft away once the order is in. The
+      // screenshots themselves travel above, like any others.
+      if (draft.currentToken) body.append("draftToken", draft.currentToken);
 
       // Whether the screenshots settled the bill, which decides whether the
       // result carries the caveat about unchecked fees. Two conditions: a
@@ -686,6 +835,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       // The order is in. Anything still held for a half-finished wizard would
       // only reopen it behind them if they came back to /compare later.
       clearWizardSession();
+      draft.finish();
 
       // Straight to their own result page, which starts out saying we are
       // checking and turns into the answer without them doing anything.
@@ -704,7 +854,13 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
 
   return (
     <WizardShell step={step} onBack={step === STEP_UPLOAD ? null : () => goTo(step - 1)}>
-      {step === STEP_UPLOAD ? (
+      {resuming ? (
+        <p role="status" className="py-20 text-center text-sm font-bold text-slate-500">
+          Picking up where you left off…
+        </p>
+      ) : null}
+
+      {!resuming && step === STEP_UPLOAD ? (
         <StepUpload
           cartFile={files.cart}
           checkoutFile={files.checkout}
@@ -715,11 +871,13 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           restoredProgress={restoredProgress}
           onCartChange={(file: File | null) => {
             setFiles((current) => ({ ...current, cart: file }));
+            void draft.syncImage("cart", file);
             setCartError(null);
             if (!file) clearRead("cart");
           }}
           onCheckoutChange={(file: File | null) => {
             setFiles((current) => ({ ...current, checkout: file }));
+            void draft.syncImage("checkout", file);
             if (!file) clearRead("checkout");
           }}
           // Fired the instant a file is picked, ahead of the display copy's
@@ -744,7 +902,7 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
         />
       ) : null}
 
-      {step === STEP_CONFIRM ? (
+      {!resuming && step === STEP_CONFIRM ? (
         <StepConfirm
           values={values}
           files={files}

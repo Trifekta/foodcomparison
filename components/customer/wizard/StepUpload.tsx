@@ -178,15 +178,12 @@ export function StepUpload({
     };
   }, []);
 
-  // The top of the funnel. Recorded once when this screen first appears, which
-  // is the only moment that means "somebody arrived".
+  // Attribution is captured every time we return to the upload screen, but it
+  // is a no-op if already captured by the landing page or on a previous visit.
+  // The wizard_started event itself is now tracked in CompareWizard on the first
+  // visit only, so it does not fire again if returning from a food app.
   useEffect(() => {
-    // An advert can point straight here rather than at the landing page, and if
-    // it does, this screen is the only one that ever sees the campaign
-    // parameters. Captured before the count, and a no-op when the landing page
-    // already did it - first touch wins.
     captureAttribution();
-    track("wizard_started");
   }, []);
 
   return (

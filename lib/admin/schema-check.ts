@@ -110,6 +110,14 @@ const OTHER_PROBES: { file: string; table: string; column: string; breaks: strin
     // name anything launched since.
     breaks: "naming new campaigns and creatives from /admin/ad-labels",
   },
+  {
+    file: "0027_wizard_drafts.sql",
+    table: "wizard_drafts",
+    column: "token_hash",
+    // Nothing breaks while DRAFT_RESUME is off; with it on, the wizard simply
+    // cannot resume and behaves as it did before drafts existed.
+    breaks: "resuming the wizard after a reload, once DRAFT_RESUME is set to test or on",
+  },
 ];
 
 export interface SchemaGap {

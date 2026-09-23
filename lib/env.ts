@@ -77,6 +77,25 @@ export function getCronSecret(): string | null {
   return process.env.CRON_SECRET?.trim() || null;
 }
 
+/**
+ * The wizard-resume feature flag (DRAFT_RESUME).
+ *
+ *   off  - default. The draft API answers 404 and the wizard behaves exactly as
+ *          it did before drafts existed.
+ *   test - the API is live, but the wizard only uses it on a page opened with
+ *          ?resume_test=1, so it can be tried on a real phone without touching
+ *          ad traffic.
+ *   on   - every visitor.
+ *
+ * Anything unrecognised reads as off.
+ */
+export type DraftResumeMode = "off" | "test" | "on";
+
+export function getDraftResumeMode(): DraftResumeMode {
+  const raw = process.env.DRAFT_RESUME?.trim().toLowerCase();
+  return raw === "on" || raw === "test" ? raw : "off";
+}
+
 export interface WebPushConfig {
   publicKey: string;
   privateKey: string;

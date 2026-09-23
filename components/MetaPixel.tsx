@@ -22,6 +22,27 @@ declare global {
   }
 }
 
+/**
+ * Keeping the wizard's draft token away from Meta.
+ *
+ * When drafts are active on this page (the compare page says so in a meta
+ * tag, and in test mode only with ?resume_test=1), the token may sit in the URL
+ * fragment. The pixel reports the page URL, so it must never see one:
+ *
+ *   - a page load that already carries a token in its fragment - a resumed
+ *     reload - does not load the pixel at all;
+ *   - otherwise the pixel's own history tracking is switched off before init,
+ *     so writing the token into the fragment later is not reported as a page
+ *     view. Real navigations are still reported by the effect below.
+ *
+ * With the flag off there is no meta tag, resume stays false, and the snippet
+ * behaves exactly as it always has.
+ */
+const RESUME_GUARD = `var m=document.querySelector('meta[name="snipsavor-resume"]');
+var mode=m&&m.getAttribute('content');
+var resume=mode==='on'||(mode==='test'&&/[?&]resume_test=1(&|$)/.test(location.search));`;
+const RESUME_FRAGMENT = "/(^#|&)resume=/";
+
 export function MetaPixel() {
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith("/admin") ?? false;
@@ -51,7 +72,10 @@ export function MetaPixel() {
   return (
     <>
       <Script id="meta-pixel" strategy="afterInteractive">
-        {`!function(f,b,e,v,n,t,s)
+        {`(function(){
+${RESUME_GUARD}
+if(resume&&${RESUME_FRAGMENT}.test(location.hash))return;
+!function(f,b,e,v,n,t,s)
 {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
 n.callMethod.apply(n,arguments):n.queue.push(arguments)};
 if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
@@ -59,8 +83,10 @@ n.queue=[];t=b.createElement(e);t.async=!0;
 t.src=v;s=b.getElementsByTagName(e)[0];
 s.parentNode.insertBefore(t,s)}(window, document,'script',
 'https://connect.facebook.net/en_US/fbevents.js');
+if(resume)fbq.disablePushState=true;
 fbq('init', '${META_PIXEL_ID}');
-fbq('track', 'PageView');`}
+fbq('track', 'PageView');
+})();`}
       </Script>
       <noscript>
         {/* eslint-disable-next-line @next/next/no-img-element */}
