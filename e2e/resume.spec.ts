@@ -189,6 +189,56 @@ test("cart scroll works when an embedded browser rejects scroll options", async 
   expect(await card.evaluate((element) => element.getBoundingClientRect().top)).toBeGreaterThan(48);
 });
 
+test("the first cart upload guides the customer to the second screenshot card", async ({ page }) => {
+  await page.goto("/compare");
+  await page.getByRole("button", { name: /Have a screenshot/ }).click();
+  const cartInput = page.getByLabel("Cart screenshot", { exact: true });
+  await expect(cartInput).toBeAttached();
+  await page.evaluate(() => {
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (options?: boolean | ScrollIntoViewOptions) {
+      if (this.getAttribute("data-guided-scroll") === "checkout" && typeof options === "object") {
+        document.documentElement.dataset.checkoutScrollBehavior = options.behavior;
+      }
+      original.call(this, options);
+    };
+  });
+
+  await cartInput.setInputFiles({ name: "cart.png", mimeType: "image/png", buffer: CART_PNG });
+  const checkout = page.locator('[data-guided-scroll="checkout"]');
+  await expect(page.locator("html")).toHaveAttribute("data-checkout-scroll-behavior", "smooth");
+  await expect.poll(() => checkout.evaluate((element) => element.getBoundingClientRect().top))
+    .toBeGreaterThan(48);
+  await expect.poll(() => checkout.evaluate((element) => element.getBoundingClientRect().top))
+    .toBeLessThan((page.viewportSize()?.height ?? 0) / 2);
+  await expect(page.getByLabel("Checkout total", { exact: true })).toBeAttached();
+});
+
+test("the second screenshot guide works in an embedded browser without scroll options", async ({ page }) => {
+  await page.goto("/compare");
+  await page.getByRole("button", { name: /Have a screenshot/ }).click();
+  const cartInput = page.getByLabel("Cart screenshot", { exact: true });
+  await expect(cartInput).toBeAttached();
+  await page.evaluate(() => {
+    Element.prototype.scrollIntoView = function (options?: boolean | ScrollIntoViewOptions) {
+      if (typeof options === "object") throw new TypeError("Scroll options unavailable");
+    };
+    const original = window.scrollTo;
+    Object.defineProperty(window, "scrollTo", {
+      configurable: true,
+      value: (x: number, y: number) => {
+        document.documentElement.dataset.checkoutScrollFallback = "used";
+        original.call(window, x, y);
+      },
+    });
+  });
+
+  await cartInput.setInputFiles({ name: "cart.png", mimeType: "image/png", buffer: CART_PNG });
+  await expect(page.locator("html")).toHaveAttribute("data-checkout-scroll-fallback", "used");
+  await expect.poll(() => page.locator('[data-guided-scroll="checkout"]')
+    .evaluate((element) => element.getBoundingClientRect().top)).toBeGreaterThan(48);
+});
+
 test("Need to take one keeps the food-app path without scrolling", async ({ page }) => {
   await page.goto("/compare");
   const choice = page.getByRole("button", { name: /Need to take one/ });

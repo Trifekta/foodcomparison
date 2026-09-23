@@ -142,7 +142,9 @@ export function StepUpload({
     returnedFromApp ? "upload" : "none",
   );
   const cartUploadRef = useRef<HTMLDivElement>(null);
+  const checkoutUploadRef = useRef<HTMLDivElement>(null);
   const scrollRequested = useRef(false);
+  const checkoutScrollRequested = useRef(false);
 
   // The first tap reveals the card; wait until it exists before scrolling.
   // Returning from a food app starts on this choice without requesting a scroll.
@@ -154,6 +156,18 @@ export function StepUpload({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [forkChoice]);
+
+  // The first accepted cart file replaces the fork card with the full upload
+  // flow. Guide that deliberate upload to its next card once the card exists;
+  // a restored draft or a later cart replacement must not move the page.
+  useEffect(() => {
+    if (!cartFile || !checkoutScrollRequested.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      checkoutScrollRequested.current = false;
+      scrollToGuidedTarget(checkoutUploadRef.current);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [cartFile]);
 
   // The field is holding what we read, and what we read was the food without
   // its fees. Only while that number is still the one in the field - the
@@ -364,7 +378,10 @@ export function StepUpload({
                 art="cartDoc"
                 example="cart"
                 file={cartFile}
-                onChange={onCartChange}
+                onChange={(file, original) => {
+                  if (file) checkoutScrollRequested.current = true;
+                  onCartChange(file, original);
+                }}
                 onFilePicked={(file) => {
                   setUploadStarted(true);
                   track("cart_uploaded");
@@ -407,50 +424,52 @@ export function StepUpload({
             error={error}
           />
 
-          <ImageUpload
-            step={2}
-            label="Checkout total"
-            hint={
-              checkoutFile
-                ? checkoutStatus === "reading"
-                  ? "Reading this screenshot…"
-                  : checkoutStatus === "applied"
-                    ? "We read your total from this one"
-                    : "No total found on this one"
-                : cartSettlesTheBill
-                  ? "Already covered by your first screenshot"
-                  : cartConfirmedShort
-                    ? "Your total wasn't on the first screenshot"
-                    : "Fees, discounts and final total"
-            }
-            helper={
-              checkoutAnswered
-                ? checkoutStatus === "applied"
-                  ? "Got it — your total below now comes from this screenshot."
-                  : "We couldn't find a total on this one. Check nothing got cut off, or type your total below."
-                : checkoutFile
-                  ? "Reading it now — your total will fill in below."
+          <div ref={checkoutUploadRef} data-guided-scroll="checkout" className="scroll-mt-24">
+            <ImageUpload
+              step={2}
+              label="Checkout total"
+              hint={
+                checkoutFile
+                  ? checkoutStatus === "reading"
+                    ? "Reading this screenshot…"
+                    : checkoutStatus === "applied"
+                      ? "We read your total from this one"
+                      : "No total found on this one"
                   : cartSettlesTheBill
-                    ? "Your first screenshot already showed the fees and total, so you can skip this."
+                    ? "Already covered by your first screenshot"
                     : cartConfirmedShort
-                      ? "We read your cart screenshot but didn't find a total on it — add this one so we compare the right number."
-                      : cartReading
-                        ? "Checking your first screenshot — add this if your total is on a different screen."
-                        : "From the same app as your cart — this shows your discounts, fees and final total."
-            }
-            requirement={cartSettlesTheBill ? "optional" : "recommended"}
-            emphasize={cartConfirmedShort && checkoutFile === null}
-            art="receipt"
-            example="checkout"
-            allowRemove
-            file={checkoutFile}
-            onChange={onCheckoutChange}
-            onFilePicked={(file) => {
-              setUploadStarted(true);
-              track("checkout_uploaded");
-              onCheckoutPicked(file);
-            }}
-          />
+                      ? "Your total wasn't on the first screenshot"
+                      : "Fees, discounts and final total"
+              }
+              helper={
+                checkoutAnswered
+                  ? checkoutStatus === "applied"
+                    ? "Got it — your total below now comes from this screenshot."
+                    : "We couldn't find a total on this one. Check nothing got cut off, or type your total below."
+                  : checkoutFile
+                    ? "Reading it now — your total will fill in below."
+                    : cartSettlesTheBill
+                      ? "Your first screenshot already showed the fees and total, so you can skip this."
+                      : cartConfirmedShort
+                        ? "We read your cart screenshot but didn't find a total on it — add this one so we compare the right number."
+                        : cartReading
+                          ? "Checking your first screenshot — add this if your total is on a different screen."
+                          : "From the same app as your cart — this shows your discounts, fees and final total."
+              }
+              requirement={cartSettlesTheBill ? "optional" : "recommended"}
+              emphasize={cartConfirmedShort && checkoutFile === null}
+              art="receipt"
+              example="checkout"
+              allowRemove
+              file={checkoutFile}
+              onChange={onCheckoutChange}
+              onFilePicked={(file) => {
+                setUploadStarted(true);
+                track("checkout_uploaded");
+                onCheckoutPicked(file);
+              }}
+            />
+          </div>
 
           <div className="relative py-0.5">
             <span aria-hidden="true" className="absolute inset-x-0 top-1/2 h-px bg-ink-200" />
