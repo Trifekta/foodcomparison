@@ -50,7 +50,19 @@ export async function GET(request: Request) {
       return NextResponse.json({ draft: null }, { status: 200 });
     }
 
-    return NextResponse.json({ draft }, { status: 200 });
+    // Transform database columns to client format
+    return NextResponse.json(
+      {
+        draft: {
+          id: draft.id,
+          step: draft.wizard_step,
+          state: draft.wizard_state_json,
+          cartImagePath: draft.cart_image_path,
+          checkoutImagePath: draft.checkout_image_path,
+        },
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("[drafts] unexpected error in GET", error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
@@ -118,7 +130,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to save draft" }, { status: 500 });
     }
 
-    return NextResponse.json({ draft }, { status: 201 });
+    // Transform database columns to client format
+    return NextResponse.json(
+      {
+        draft: {
+          id: draft.id,
+          step: draft.wizard_step,
+          state: draft.wizard_state_json,
+          cartImagePath: draft.cart_image_path,
+          checkoutImagePath: draft.checkout_image_path,
+        },
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("[drafts] unexpected error in POST", error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });

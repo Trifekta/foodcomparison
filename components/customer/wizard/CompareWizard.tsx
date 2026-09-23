@@ -252,12 +252,13 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       track("wizard_started");
     }
     // Restore draft from server if available. Runs after sessionStorage
-    // restore so both local and server state are recovered.
+    // restore so both local and server state are recovered. Async, so it
+    // completes after sessionStorage restore has already written to the form.
     void (async () => {
       const draft = await restoreDraft();
       if (draft) {
-        // Restore form state from draft
-        reset(draft.state as any);
+        // Merge with defaults to handle schema changes or missing fields
+        reset({ ...WIZARD_DEFAULTS, ...draft.state });
         setDraftPaths({
           cart: draft.cartImagePath,
           checkout: draft.checkoutImagePath,
