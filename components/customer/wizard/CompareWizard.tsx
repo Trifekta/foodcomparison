@@ -730,6 +730,12 @@ export function CompareWizard({
   const handleSubmit = async () => {
     if (submitLock.current) return;
 
+    // Ensure we're on the confirm screen
+    if (step !== STEP_CONFIRM) {
+      goTo(STEP_CONFIRM);
+      return;
+    }
+
     if (!files.cart) {
       setCartError(ERROR_MESSAGES.cartMissing);
       goTo(STEP_UPLOAD);
