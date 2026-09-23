@@ -50,23 +50,7 @@ export async function POST(request: Request) {
 
   let result: Awaited<ReturnType<typeof createSubmission>>;
   try {
-    // Extract draft paths and visit ID if provided
-    const draftCartImagePath =
-      typeof formData.get("draftCartImagePath") === "string"
-        ? (formData.get("draftCartImagePath") as string)
-        : null;
-    const draftCheckoutImagePath =
-      typeof formData.get("draftCheckoutImagePath") === "string"
-        ? (formData.get("draftCheckoutImagePath") as string)
-        : null;
-    const visitId =
-      typeof formData.get("visitId") === "string" ? (formData.get("visitId") as string) : null;
-
-    result = await createSubmission(formData, {
-      draftCartImagePath,
-      draftCheckoutImagePath,
-      visitId,
-    });
+    result = await createSubmission(formData);
   } catch (error) {
     // createSubmission returns its failures rather than throwing, so reaching
     // here means something unforeseen - a missing secret, a runtime limit, a
