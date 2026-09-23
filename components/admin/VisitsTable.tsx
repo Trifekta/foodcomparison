@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   visitorGroupByVisit,
+  type VisitOutcome,
   type VisitorGroup,
   type VisitSummary,
   type VisitTotals,
@@ -78,11 +79,42 @@ function SameVisitor({ group }: { group: VisitorGroup }) {
   );
 }
 
+/**
+ * The visit as a sentence, which is the only column that reads as a story
+ * rather than a fact. The outcome is the last step and carries the colour, so
+ * a row that ended badly is findable by scanning rather than by reading.
+ */
+function Journey({ steps, outcome }: { steps: string[]; outcome: VisitOutcome }) {
+  if (steps.length === 0) return <span className="text-ink-400">—</span>;
+
+  const tone: Record<VisitOutcome, string> = {
+    completed: "text-emerald-700",
+    active: "text-sky-700",
+    at_food_app: "text-amber-700",
+    abandoned: "text-rose-700",
+    idle: "text-ink-500",
+  };
+
+  return (
+    <span className="text-[0.78rem] leading-snug text-ink-600">
+      {steps.map((step, index) => (
+        <span key={`${step}-${index}`}>
+          {index > 0 ? <span aria-hidden="true" className="text-ink-300"> › </span> : null}
+          <span className={index === steps.length - 1 ? `font-semibold ${tone[outcome]}` : undefined}>
+            {step}
+          </span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function VisitsTable({
   visits,
   totals,
   labels,
   groups,
+  journeys,
 }: {
   visits: VisitSummary[];
   totals: VisitTotals;
@@ -97,6 +129,11 @@ export function VisitsTable({
    * should read exactly as it did before rather than fail.
    */
   groups?: VisitorGroup[];
+  /**
+   * What became of each visit, derived by the page. Optional so this table
+   * still renders without it, and so nothing here has to know the clock.
+   */
+  journeys?: Map<string, { outcome: VisitOutcome; steps: string[] }>;
 }) {
   const shown = visits.slice(0, MAX_ROWS);
   const hidden = visits.length - shown.length;
@@ -143,6 +180,7 @@ export function VisitsTable({
                 <th className="px-4 py-2.5">Last seen</th>
                 <th className="px-4 py-2.5 text-right">Shots</th>
                 <th className="px-4 py-2.5">Got as far as</th>
+                {journeys ? <th className="px-4 py-2.5">Journey</th> : null}
                 <th className="px-4 py-2.5">Source</th>
                 <th className="px-4 py-2.5">Campaign</th>
                 <th className="px-4 py-2.5">Ad/Creative</th>
@@ -186,6 +224,18 @@ export function VisitsTable({
                       </span>
                     ) : null}
                   </td>
+                  {journeys ? (
+                    <td className="min-w-[16rem] px-4 py-2.5">
+                      {(() => {
+                        const journey = journeys.get(visit.visitId);
+                        return journey ? (
+                          <Journey steps={journey.steps} outcome={journey.outcome} />
+                        ) : (
+                          <span className="text-ink-400">—</span>
+                        );
+                      })()}
+                    </td>
+                  ) : null}
                   <td className="px-4 py-2.5 text-ink-600">
                     <AdLabelCell kind="source" value={visit.utmSource} index={labels} />
                   </td>

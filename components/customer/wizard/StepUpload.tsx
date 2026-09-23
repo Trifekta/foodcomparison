@@ -290,7 +290,13 @@ export function StepUpload({
           <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
             <button
               type="button"
-              onClick={() => setForkChoice("upload")}
+              // Recorded only when the answer changes, so tapping the same
+              // card twice is one answer rather than two - /api/events is
+              // capped per IP and that cap is shared across a venue's wifi.
+              onClick={() => {
+                if (forkChoice !== "upload") track("fork_have_screenshot");
+                setForkChoice("upload");
+              }}
               className={`rounded-2xl border-2 p-4 text-left transition-colors ${
                 forkChoice === "upload"
                   ? "border-brand-500 bg-brand-50"
@@ -308,7 +314,10 @@ export function StepUpload({
 
             <button
               type="button"
-              onClick={() => setForkChoice("app")}
+              onClick={() => {
+                if (forkChoice !== "app") track("fork_need_to_take");
+                setForkChoice("app");
+              }}
               className={`rounded-2xl border-2 p-4 text-left transition-colors ${
                 forkChoice === "app"
                   ? "border-brand-500 bg-brand-50"
@@ -419,6 +428,7 @@ export function StepUpload({
             onChange={onCheckoutChange}
             onFilePicked={(file) => {
               setUploadStarted(true);
+              track("checkout_uploaded");
               onCheckoutPicked(file);
             }}
           />

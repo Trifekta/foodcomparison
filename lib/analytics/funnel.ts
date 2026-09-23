@@ -94,6 +94,25 @@ export const SIDE_EVENTS = [
   // the primary button and offers somewhere else to go - so it is measured
   // separately from the moment it ships, not reconstructed afterwards.
   { event: "cta_example", label: "Opened the example" },
+  // The two-path fork at the top of the upload screen, which asks the question
+  // this pair answers: do you have a screenshot, or do you need to go and take
+  // one? The buttons shipped without any event on them, so the screen was
+  // putting the question to every visitor and throwing every answer away.
+  //
+  // Deliberately not rungs. Neither is progress - one is a statement of where
+  // somebody already stood when they arrived - and slotting them into the
+  // ladder would divide cart_uploaded by whichever branch happened to be more
+  // popular.
+  //
+  // Fired only when the choice CHANGES, so somebody tapping the same card
+  // twice is one answer and not two.
+  { event: "fork_have_screenshot", label: "Said they have a screenshot" },
+  { event: "fork_need_to_take", label: "Said they need to take one" },
+  // The second slot. cart_uploaded has always covered the first one alone, so
+  // a visit that sent both screenshots and a visit that sent one looked
+  // identical from here - and the second is the one that settles the bill on
+  // Deliveroo, which is exactly the case worth being able to count.
+  { event: "checkout_uploaded", label: "Uploaded a checkout screenshot" },
   // How far down the upload screen they got, one per visit. Buckets rather
   // than a number because this table stores event names and nothing else, and
   // a quarter of a screen is as fine a reading as the question needs: the

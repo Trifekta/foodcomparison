@@ -1,4 +1,4 @@
-import { FUNNEL_STEPS, type FunnelEvent } from "@/lib/analytics/funnel";
+import { FUNNEL_STEPS, FUNNEL_STEP_LABELS, type FunnelEvent } from "@/lib/analytics/funnel";
 
 /**
  * One row per visit, from the events that visit recorded.
@@ -47,6 +47,18 @@ export interface VisitSummary {
   utmCampaign: string | null;
   /** UTM content (ad/creative) from the landing page. */
   utmContent: string | null;
+  /**
+   * The last event recorded, in time order rather than ladder order.
+   *
+   * Not the same question as furthestEvent, and the difference is the whole
+   * point: leaving for a food app is a detour off the ladder, so the visit's
+   * furthest RUNG is still whatever it was, while the last thing it actually
+   * did is app_opened. Only this can tell "went to fetch a screenshot" apart
+   * from "stopped".
+   */
+  lastEvent: string | null;
+  /** Every event in the order it happened, consecutive repeats collapsed. */
+  path: string[];
 }
 
 const ORDER = new Map<string, number>(FUNNEL_STEPS.map((step, index) => [step.event, index]));
@@ -76,9 +88,16 @@ export function summarizeVisits(rows: VisitEventRow[]): VisitSummary[] {
 
   const summaries: VisitSummary[] = [];
 
-  for (const [visitId, events] of byVisit) {
+  for (const [visitId, unordered] of byVisit) {
+    // The query hands these back newest first. Everything below reads the same
+    // either way except the path, which is only a path in time order.
+    const events = [...unordered].sort((a, b) =>
+      a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0,
+    );
+
     let firstSeen = events[0].created_at;
     let lastSeen = events[0].created_at;
+    const path: string[] = [];
     let screenshots = 0;
     let furthestIndex = -1;
     let furthestEvent: FunnelEvent | null = null;
@@ -92,6 +111,11 @@ export function summarizeVisits(rows: VisitEventRow[]): VisitSummary[] {
     for (const row of events) {
       if (row.created_at < firstSeen) firstSeen = row.created_at;
       if (row.created_at > lastSeen) lastSeen = row.created_at;
+
+      // Consecutive repeats collapsed: three cart_uploaded in a row is one
+      // move in the story and a retry count, which `screenshots` already
+      // carries. The same event again LATER is a real return and stays.
+      if (path[path.length - 1] !== row.event) path.push(row.event);
 
       if (row.event === "cart_uploaded") screenshots += 1;
       if (row.event === COMPLETED_EVENT) sentOrder = true;
@@ -139,6 +163,8 @@ export function summarizeVisits(rows: VisitEventRow[]): VisitSummary[] {
       utmSource,
       utmCampaign,
       utmContent,
+      lastEvent: events[events.length - 1]?.event ?? null,
+      path,
     });
   }
 
@@ -390,6 +416,187 @@ export function mergeValidationRows(
       b.visits_from_ip - a.visits_from_ip ||
       (a.client_ip < b.client_ip ? -1 : a.client_ip > b.client_ip ? 1 : 0) ||
       (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0),
+  );
+}
+
+/**
+ * How long a visit can go quiet before it stops being somebody still reading.
+ *
+ * Fifteen minutes, which is the window the live page already uses to decide a
+ * visit is worth listing (LIVE_PRESENCE_WINDOW_MINUTES in lib/admin/queries).
+ * The heartbeat fires every 20 seconds while the tab is visible, so a page
+ * somebody is actually on refreshes last_seen about forty-five times inside
+ * that window: anything quieter is not a person sitting there.
+ *
+ * Not shorter, because the heartbeat stops the moment the tab is hidden and
+ * this flow is built around sending people to another app. Ten minutes would
+ * file somebody still building a Talabat cart as gone. The food-app case is
+ * caught by its own rule below rather than by this number, but the margin is
+ * deliberate: the cost of calling a live visitor abandoned is a wrong story in
+ * a report, and the cost of waiting another five minutes is nothing.
+ */
+export const INACTIVITY_MS = 15 * 60_000;
+
+/**
+ * What became of a visit, as far as the record can say.
+ *
+ * Derived, never stored. That is the property that matters: a visit called
+ * abandoned at 14:05 and seen again at 14:40 is simply recomputed as active
+ * the next time anybody looks, with no row to correct and no backfill to run.
+ * It also means this reads correctly over visits recorded long before the
+ * function existed.
+ */
+export type VisitOutcome =
+  | "completed"
+  | "active"
+  | "at_food_app"
+  | "abandoned"
+  | "idle";
+
+export const OUTCOME_LABELS: Record<VisitOutcome, string> = {
+  completed: "Sent the order",
+  active: "Still here",
+  at_food_app: "Away at a food app",
+  abandoned: "Left without uploading",
+  idle: "Stopped",
+};
+
+/**
+ * @param lastSeenAt visit_presence.last_seen_at, which the heartbeat keeps
+ *   current while a tab is open. The visit's own last EVENT is not a
+ *   substitute: somebody reading the screen for ten minutes records nothing,
+ *   and judging them by their last event would call them gone while they are
+ *   looking at it. Null falls back to the last event, which is all a visit
+ *   predating the presence table has.
+ */
+export function visitOutcome(
+  visit: VisitSummary,
+  lastSeenAt: string | null,
+  now: number,
+  inactivityMs = INACTIVITY_MS,
+): VisitOutcome {
+  // An order was sent. Nothing after that changes what this visit was.
+  if (visit.completed) return "completed";
+
+  const seen = Date.parse(lastSeenAt ?? visit.lastSeen);
+  const quietFor = Number.isFinite(seen) ? now - seen : Infinity;
+  if (quietFor <= inactivityMs) return "active";
+
+  // Off to fetch the screenshot we asked for, and not back yet. An intended
+  // part of the flow, so it is never abandonment however long it has been -
+  // the moment they return, returned_from_app becomes the last event and this
+  // visit is judged on what it did afterwards instead.
+  if (visit.lastEvent === "app_opened") return "at_food_app";
+
+  // Quiet, no order, and they had started. The specific loss worth naming.
+  if (visit.screenshots === 0 && visit.path.includes("wizard_started")) {
+    return "abandoned";
+  }
+
+  // Quiet and no order, but they did upload something, or never opened the
+  // wizard at all. Real, and not the same failure.
+  return "idle";
+}
+
+/**
+ * The visit as a sentence: "Need to take one → Talabat → Back → Uploaded".
+ *
+ * Short labels rather than the funnel's own, which are written to be read one
+ * at a time in a table ("Went to a food app", "Came back from a food app") and
+ * become unreadable chained five deep. Only the events that appear in a path
+ * are named here, and anything unnamed falls through to the canonical label
+ * rather than being dropped - a step missing from a journey is worse than a
+ * long one.
+ */
+const PATH_LABELS: Record<string, string> = {
+  landing_viewed: "Landed",
+  cta_check_cart: "Tapped Check my cart",
+  cta_example: "Saw the example",
+  wizard_started: "Opened wizard",
+  fork_have_screenshot: "Have a screenshot",
+  fork_need_to_take: "Need to take one",
+  app_opened: "Food app",
+  landing_app_opened: "Food app",
+  returned_from_app: "Returned",
+  cart_uploaded: "Uploaded",
+  checkout_uploaded: "Uploaded checkout",
+  step_basket: "Confirm screen",
+  step_where: "Chose area",
+  step_review: "Gave details",
+  submitted: "Sent",
+  result_viewed: "Saw result",
+  keeta_opened: "Tapped to Keeta",
+  scroll_0: "Saw top only",
+  scroll_25: "Scrolled ¼",
+  scroll_50: "Scrolled ½",
+  scroll_75: "Scrolled ¾",
+  scroll_100: "Reached bottom",
+};
+
+export function pathLabel(event: string): string {
+  return PATH_LABELS[event] ?? FUNNEL_STEP_LABELS[event] ?? event.replace(/_/g, " ");
+}
+
+/** The journey's steps, with what became of it as the final one. */
+export function describeJourney(visit: VisitSummary, outcome: VisitOutcome): string[] {
+  const steps = visit.path.map(pathLabel);
+
+  // The ending, which is not an event and so is never in the path. Without it
+  // a journey stops mid-sentence and two very different visits - one still
+  // reading, one gone - read identically.
+  const ending: Record<VisitOutcome, string | null> = {
+    completed: null, // "Sent" is already the last step.
+    active: "Still here",
+    at_food_app: "Still away",
+    abandoned: "Left",
+    idle: "Stopped",
+  };
+
+  const last = ending[outcome];
+  return last ? [...steps, last] : steps;
+}
+
+export interface JourneyPath {
+  /** The journey, as its steps. */
+  steps: string[];
+  /** How many visits walked exactly this path. */
+  visits: number;
+  /** How many of those sent an order. */
+  completed: number;
+}
+
+/**
+ * Identical journeys, counted.
+ *
+ * The number that answers the question the exit survey was going to ask. One
+ * visit's path is an anecdote; twelve visits that all read "Have a screenshot
+ * → Uploaded → Left" is a screen that loses people at a nameable moment.
+ */
+export function topPaths(journeys: { steps: string[]; completed: boolean }[]): JourneyPath[] {
+  const counts = new Map<string, JourneyPath>();
+
+  for (const journey of journeys) {
+    // The joined string is only a map key; steps are kept as an array so the
+    // caller never has to split a label containing the separator back apart.
+    const key = journey.steps.join("\u0000");
+    const existing = counts.get(key);
+
+    if (existing) {
+      existing.visits += 1;
+      if (journey.completed) existing.completed += 1;
+    } else {
+      counts.set(key, {
+        steps: journey.steps,
+        visits: 1,
+        completed: journey.completed ? 1 : 0,
+      });
+    }
+  }
+
+  // Commonest first; a stable tiebreak so equal counts do not reorder between
+  // two renders of the same data.
+  return [...counts.values()].sort(
+    (a, b) => b.visits - a.visits || a.steps.join(" ").localeCompare(b.steps.join(" ")),
   );
 }
 

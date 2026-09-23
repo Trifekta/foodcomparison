@@ -68,6 +68,8 @@ const visit = (visitId: string, over: Partial<VisitSummary> = {}): VisitSummary 
   utmSource: null,
   utmCampaign: null,
   utmContent: null,
+  lastEvent: null,
+  path: [],
   ...over,
 });
 

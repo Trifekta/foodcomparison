@@ -1,17 +1,27 @@
 import type { Metadata } from "next";
 import { Download, Fingerprint } from "lucide-react";
 import { Suspense } from "react";
-import { getAdLabelIndex, getVisitEvents, getVisitorIps } from "@/lib/admin/queries";
 import {
+  getAdLabelIndex,
+  getVisitEvents,
+  getVisitPresence,
+  getVisitorIps,
+} from "@/lib/admin/queries";
+import {
+  describeJourney,
   filterByStep,
   groupVisitors,
   isStepMatch,
   summarizeVisits,
+  topPaths,
   totalVisits,
+  visitOutcome,
+  type VisitOutcome,
 } from "@/lib/calculations/visits";
 import { parseDateRange } from "@/lib/admin/filters";
 import { VisitFilters } from "@/components/admin/VisitFilters";
 import { VisitsTable } from "@/components/admin/VisitsTable";
+import { TopPaths } from "@/components/admin/TopPaths";
 
 export const metadata: Metadata = {
   title: "Visits",
@@ -59,14 +69,27 @@ export default async function VisitsPage({ searchParams }: { searchParams: Searc
   // Allowed to fail on a database that has not run 0021 yet. The IP rows are
   // allowed to fail on one that has not run 0025: without them every visit
   // simply stands alone, which is what the table said before grouping existed.
-  const [visitEvents, ips, adLabels] = await Promise.all([
+  const [visitEvents, ips, presence, adLabels] = await Promise.all([
     getVisitEvents(range).catch(() => []),
     getVisitorIps(range).catch(() => []),
+    getVisitPresence(range).catch(() => ({ now: 0, rows: [] })),
     getAdLabelIndex(),
   ]);
 
   const visits = filterByStep(summarizeVisits(visitEvents), step, match);
   const totals = totalVisits(visits);
+
+  // Outcome and journey are derived on every render and stored nowhere. A
+  // visit called abandoned at 14:05 and seen again at 14:40 simply reads as
+  // active the next time this page loads - nothing to correct and nothing to
+  // backfill. It is also why this reads correctly over visits recorded long
+  // before any of it existed.
+  const seenByVisit = new Map(presence.rows.map((row) => [row.visit_id, row.last_seen_at]));
+  const journeys = new Map<string, { outcome: VisitOutcome; steps: string[] }>();
+  for (const visit of visits) {
+    const outcome = visitOutcome(visit, seenByVisit.get(visit.visitId) ?? null, presence.now);
+    journeys.set(visit.visitId, { outcome, steps: describeJourney(visit, outcome) });
+  }
 
   // Grouped over the filtered list, so the count on screen always describes
   // the rows on screen. A step filter therefore narrows both numbers together.
@@ -124,7 +147,24 @@ export default async function VisitsPage({ searchParams }: { searchParams: Searc
         <Suspense fallback={<div className="h-28 rounded-2xl border border-ink-200 bg-white" />}>
           <VisitFilters />
         </Suspense>
-        <VisitsTable visits={visits} totals={totals} labels={adLabels} groups={groups} />
+        <VisitsTable
+          visits={visits}
+          totals={totals}
+          labels={adLabels}
+          groups={groups}
+          journeys={journeys}
+        />
+      </div>
+
+      <div className="space-y-3">
+        <TopPaths
+          paths={topPaths(
+            visits.map((visit) => ({
+              steps: journeys.get(visit.visitId)?.steps ?? [],
+              completed: visit.completed,
+            })),
+          )}
+        />
       </div>
     </div>
   );
