@@ -662,6 +662,43 @@ export async function getVisitEvents(
  * are genuine traffic from real devices, not simulated or fabricated.
  */
 /**
+ * When each visit was last seen, for the visits in a range.
+ *
+ * Separate from getLivePresence, which asks a different question: that one
+ * reads a rolling window to draw "who is on the site now", this one reads a
+ * date range so a visit listed for last Tuesday can still be judged active or
+ * abandoned against its own last heartbeat rather than against the clock.
+ *
+ * The heartbeat is what makes this worth fetching at all. A visit's last EVENT
+ * is not when it was last seen - somebody reading the upload screen for ten
+ * minutes records nothing - so judging them by events alone calls them gone
+ * while they are looking at it.
+ */
+export async function getVisitPresence(range: DateRange = {}): Promise<{
+  /**
+   * The clock the caller should judge these against, read here rather than in
+   * the page. Same shape as getLivePresence, and for the same reason: a
+   * component body may not call Date.now() under the React Compiler's purity
+   * rule, and the answer belongs with the rows it describes anyway.
+   */
+  now: number;
+  rows: { visit_id: string; last_seen_at: string }[];
+}> {
+  const supabase = await createServerSupabaseClient();
+  const bounds = rangeToInstants(range.from || range.to ? range : defaultVisitRange());
+  const now = Date.now();
+
+  const { data, error } = await supabase
+    .from("visit_presence")
+    .select("visit_id, last_seen_at")
+    .gte("last_seen_at", bounds.since ?? "1970-01-01T00:00:00Z")
+    .lte("last_seen_at", bounds.until ?? "2999-12-31T23:59:59Z");
+
+  if (error) throw new Error(`Could not load visit presence: ${error.message}`);
+  return { now, rows: (data ?? []) as { visit_id: string; last_seen_at: string }[] };
+}
+
+/**
  * The raw IP rows for a range, one per visit.
  *
  * Deliberately not joined to the funnel here. mergeValidationRows does that,

@@ -226,6 +226,11 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       setStep(restoredStep(saved.step, false, STEP_UPLOAD));
     }
     if (consumeReturnFromApp()) {
+      // The landing page has always recorded its own return; this one was
+      // detected for the banner and never counted, so the round trip the whole
+      // food-app detour exists to enable was invisible in the funnel. Same
+      // event name as the landing page's, because it is the same fact.
+      track("returned_from_app");
       setStep(STEP_UPLOAD);
       setReturnedFromApp(true);
     }
@@ -244,6 +249,9 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   useEffect(() => {
     const onVisible = () => {
       if (document.hidden || !consumeReturnFromApp()) return;
+      // consumeReturnFromApp disarms the flag as it reads it, so this and the
+      // restore path above cannot both fire for one departure.
+      track("returned_from_app");
       setStep(STEP_UPLOAD);
       setReturnedFromApp(true);
       window.scrollTo({ top: 0 });
