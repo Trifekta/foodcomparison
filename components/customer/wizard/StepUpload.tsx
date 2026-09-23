@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { StepActions } from "./StepActions";
@@ -77,6 +77,17 @@ interface StepUploadProps {
   onContinue: () => void;
 }
 
+function scrollToCartUpload(target: HTMLElement | null) {
+  if (!target) return;
+  try {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch {
+    // Older embedded WebViews may reject the options object.
+    const top = window.scrollY + target.getBoundingClientRect().top - 96;
+    window.scrollTo(0, Math.max(0, top));
+  }
+}
+
 /**
  * One screenshot, and a second one only where the app needs it.
  *
@@ -140,6 +151,19 @@ export function StepUpload({
   const [forkChoice, setForkChoice] = useState<"none" | "upload" | "app">(
     returnedFromApp ? "upload" : "none",
   );
+  const cartUploadRef = useRef<HTMLDivElement>(null);
+  const scrollRequested = useRef(false);
+
+  // The first tap reveals the card; wait until it exists before scrolling.
+  // Returning from a food app starts on this choice without requesting a scroll.
+  useEffect(() => {
+    if (forkChoice !== "upload" || !scrollRequested.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      scrollRequested.current = false;
+      scrollToCartUpload(cartUploadRef.current);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [forkChoice]);
 
   // The field is holding what we read, and what we read was the food without
   // its fees. Only while that number is still the one in the field - the
@@ -294,6 +318,11 @@ export function StepUpload({
               // capped per IP and that cap is shared across a venue's wifi.
               onClick={() => {
                 if (forkChoice !== "upload") track("fork_have_screenshot");
+                if (forkChoice === "upload") {
+                  scrollToCartUpload(cartUploadRef.current);
+                } else {
+                  scrollRequested.current = true;
+                }
                 setForkChoice("upload");
               }}
               className={`rounded-2xl border-2 p-4 text-left transition-colors ${
@@ -315,6 +344,7 @@ export function StepUpload({
               type="button"
               onClick={() => {
                 if (forkChoice !== "app") track("fork_need_to_take");
+                scrollRequested.current = false;
                 setForkChoice("app");
               }}
               className={`rounded-2xl border-2 p-4 text-left transition-colors ${
@@ -334,7 +364,7 @@ export function StepUpload({
           </div>
 
           {forkChoice === "upload" && (
-            <div className="mt-3">
+            <div ref={cartUploadRef} className="mt-3 scroll-mt-24">
               <ImageUpload
                 step={1}
                 label="Cart screenshot"
