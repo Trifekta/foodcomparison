@@ -233,6 +233,13 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       track("returned_from_app");
       setStep(STEP_UPLOAD);
       setReturnedFromApp(true);
+    } else {
+      // Only track wizard_started on the first visit to the upload screen, not
+      // when returning from a food app (which is tracked as returned_from_app).
+      // An advert can point straight here, and this screen is where campaign
+      // parameters are captured - but this only fires once per page load, not
+      // on every remount, so a return from the food app does not double-count.
+      track("wizard_started");
     }
     setRestored(true);
     /* eslint-enable react-hooks/set-state-in-effect */
