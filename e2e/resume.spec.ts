@@ -142,6 +142,65 @@ test.beforeEach(async ({ page, context }) => {
   await context.route("**/api/extract", (route) => route.fulfill({ json: { basket: BASKET } }));
 });
 
+test("Have a screenshot scrolls to the cart card without opening the file picker", async ({ page }) => {
+  await page.goto("/compare");
+  const choice = page.getByRole("button", { name: /Have a screenshot/ });
+  await expect(choice).toBeInViewport();
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  await page.evaluate(() => {
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (options?: boolean | ScrollIntoViewOptions) {
+      if (typeof options === "object") {
+        document.documentElement.dataset.uploadScrollBehavior = options.behavior;
+      }
+      original.call(this, options);
+    };
+  });
+
+  let filePickerOpened = false;
+  page.on("filechooser", () => { filePickerOpened = true; });
+  await choice.click();
+
+  const input = page.getByLabel("Cart screenshot", { exact: true });
+  await expect(input).toBeAttached();
+  const card = input.locator("xpath=ancestor::section[1]");
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await expect.poll(() => card.evaluate((element) => element.getBoundingClientRect().top))
+    .toBeLessThan((page.viewportSize()?.height ?? 0) / 2);
+  expect(await card.evaluate((element) => element.getBoundingClientRect().top)).toBeGreaterThan(48);
+  expect(await page.locator("html").getAttribute("data-upload-scroll-behavior")).toBe("smooth");
+  expect(await input.evaluate((element) => (element as HTMLInputElement).files?.length)).toBe(0);
+  expect(filePickerOpened).toBe(false);
+});
+
+test("cart scroll works when an embedded browser rejects scroll options", async ({ page }) => {
+  await page.goto("/compare");
+  await expect(page.getByRole("button", { name: /Have a screenshot/ })).toBeInViewport();
+  await page.evaluate(() => {
+    Element.prototype.scrollIntoView = function (options?: boolean | ScrollIntoViewOptions) {
+      if (typeof options === "object") throw new TypeError("Scroll options unavailable");
+    };
+  });
+
+  await page.getByRole("button", { name: /Have a screenshot/ }).click();
+  const card = page.getByLabel("Cart screenshot", { exact: true })
+    .locator("xpath=ancestor::section[1]");
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  expect(await card.evaluate((element) => element.getBoundingClientRect().top)).toBeGreaterThan(48);
+});
+
+test("Need to take one keeps the food-app path without scrolling", async ({ page }) => {
+  await page.goto("/compare");
+  const choice = page.getByRole("button", { name: /Need to take one/ });
+  await expect(choice).toBeInViewport();
+  const initialScroll = await page.evaluate(() => window.scrollY);
+  await choice.click();
+
+  await expect(page.getByRole("link", { name: /Open Talabat/ })).toBeVisible();
+  await expect(page.getByLabel("Cart screenshot", { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(initialScroll);
+});
+
 for (const [index, failure] of (["missing UUID", "throwing UUID", "preview creation", "preview cleanup"] as const).entries()) {
   test(`upload compatibility: ${failure} still allows submission`, async ({ page }) => {
     // Independent customers: do not exhaust the app's per-IP submission limit.
