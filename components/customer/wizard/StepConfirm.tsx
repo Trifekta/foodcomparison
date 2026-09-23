@@ -1,7 +1,10 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useObjectUrl } from "@/lib/customer/use-object-url";
+import { scrollToGuidedTarget } from "@/lib/customer/scroll-to-target";
+import { amountSchema } from "@/lib/validation/submission";
+import { isNormalisablePhone } from "@/lib/utils/phone";
 import {
   AlertCircle,
   ChevronRight,
@@ -138,6 +141,64 @@ export function StepConfirm({
   const phoneId = useId();
   const consentId = useId();
   const basketPanelId = useId();
+  const basketRef = useRef<HTMLElement>(null);
+  const areaRef = useRef<HTMLDivElement>(null);
+  const keetaRef = useRef<HTMLDivElement>(null);
+  const totalRef = useRef<HTMLDivElement>(null);
+  const contactRef = useRef<HTMLElement>(null);
+  const ctaRef = useRef<HTMLElement>(null);
+  const valuesRef = useRef(values);
+  const scrollTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    valuesRef.current = values;
+  }, [values]);
+
+  useEffect(() => () => {
+    if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current);
+  }, []);
+
+  function cancelGuidedScroll() {
+    if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = null;
+  }
+
+  function guideToNextAnswer(completed: Partial<WizardValues> = {}) {
+    cancelGuidedScroll();
+    // Let the chosen answer render and the mobile keyboard close first. Read
+    // current values when the timer runs, as screenshot extraction may also
+    // finish and fill the total during this brief pause.
+    scrollTimerRef.current = window.setTimeout(() => {
+      scrollTimerRef.current = null;
+      const active = document.activeElement;
+      if (active instanceof HTMLElement &&
+          (active.isContentEditable || active.matches("input:not([type='checkbox']):not([type='radio']), textarea, select"))) return;
+
+      const answers = { ...valuesRef.current, ...completed };
+      const target = !answers.areaId
+        ? areaRef.current
+        : !answers.newToKeeta
+          ? keetaRef.current
+          : !amountSchema.safeParse(answers.currentTotal).success
+            ? totalRef.current
+            : !isNormalisablePhone(answers.dialCode, answers.whatsappNumber)
+              ? contactRef.current
+              : answers.restaurantName.trim().length < 2
+                ? basketRef.current
+                : ctaRef.current;
+      scrollToGuidedTarget(target);
+    }, 180);
+  }
+
+  function finishTotal(value: string) {
+    if (amountSchema.safeParse(value).success) guideToNextAnswer({ currentTotal: value });
+  }
+
+  function finishWhatsapp(value: string) {
+    if (isNormalisablePhone(valuesRef.current.dialCode, value)) {
+      guideToNextAnswer({ whatsappNumber: value });
+    }
+  }
 
   const cartThumb = useObjectUrl(files.cart);
   const checkoutThumb = useObjectUrl(files.checkout);
@@ -250,7 +311,7 @@ export function StepConfirm({
 
       <div className="mt-4 space-y-4">
         {/* Order summary, with the basket folded in behind it */}
-        <section className="overflow-hidden rounded-3xl bg-white shadow-[0_2px_18px_rgba(23,23,28,0.06)] ring-1 ring-ink-100">
+        <section ref={basketRef} data-guided-scroll="basket" className="scroll-mt-24 overflow-hidden rounded-3xl bg-white shadow-[0_2px_18px_rgba(23,23,28,0.06)] ring-1 ring-ink-100">
           <button
             type="button"
             onClick={() => setBasketToggled(!basketOpen)}
@@ -352,7 +413,7 @@ export function StepConfirm({
 
         {/* Delivery area - the required lookup, first, and never buried under a
             variable-length field somebody can scroll straight past. */}
-        <div className="rounded-3xl bg-linear-to-b from-brand-100 to-beige p-3.5">
+        <div ref={areaRef} data-guided-scroll="area" className="scroll-mt-24 rounded-3xl bg-linear-to-b from-brand-100 to-beige p-3.5">
           <div className="mb-2.5 flex items-center gap-2.5">
             <span
               aria-hidden="true"
@@ -367,7 +428,11 @@ export function StepConfirm({
             hideLabel
             areas={areas}
             value={values.areaId}
-            onChange={onAreaChange}
+            onChange={(areaId) => {
+              onAreaChange(areaId);
+              if (areaId) guideToNextAnswer({ areaId });
+              else cancelGuidedScroll();
+            }}
             error={errors.areaId}
             /* Said out loud because people answer the question they think was
                asked. Somebody at work ordering dinner home reads "your area" as
@@ -385,7 +450,9 @@ export function StepConfirm({
             unanswered until they answer it: a pre-selected "no" is not an
             answer, and this feeds the new-customer discount check. */}
         <div
-          className="rounded-3xl bg-linear-to-b from-brand-100 to-beige p-3.5"
+          ref={keetaRef}
+          data-guided-scroll="keeta"
+          className="scroll-mt-24 rounded-3xl bg-linear-to-b from-brand-100 to-beige p-3.5"
           data-invalid={errors.newToKeeta ? "true" : undefined}
           tabIndex={-1}
         >
@@ -410,7 +477,10 @@ export function StepConfirm({
                 key={option}
                 type="button"
                 aria-pressed={values.newToKeeta === option}
-                onClick={() => onNewToKeetaChange(option)}
+                onClick={() => {
+                  onNewToKeetaChange(option);
+                  guideToNextAnswer({ newToKeeta: option });
+                }}
                 className={cn(
                   "min-h-11 flex-1 rounded-full text-sm font-bold capitalize transition-colors",
                   values.newToKeeta === option
@@ -428,13 +498,23 @@ export function StepConfirm({
         {/* The total. Directly editable, and honest about where it came from -
             this is the one number the entire product measures a saving
             against. */}
-        <div>
+        <div ref={totalRef} data-guided-scroll="total" className="scroll-mt-24">
           <div className="rounded-3xl bg-linear-to-b from-brand-100 to-beige p-3.5">
             <AmountInput
               label={totalLabel}
               scale="lg"
               value={values.currentTotal}
-              onChange={(event) => onCurrentTotalChange(event.target.value)}
+              onChange={(event) => {
+                cancelGuidedScroll();
+                onCurrentTotalChange(event.target.value);
+              }}
+              onBlur={(event) => finishTotal(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                }
+              }}
               error={errors.currentTotal}
             />
           </div>
@@ -478,7 +558,10 @@ export function StepConfirm({
               </p>
               <button
                 type="button"
-                onClick={onUseReadTotal}
+                onClick={() => {
+                  onUseReadTotal();
+                  if (readTotal) finishTotal(readTotal);
+                }}
                 className="min-h-9 shrink-0 rounded-full bg-white px-3.5 text-sm font-bold text-ink-900 ring-1 ring-emerald-200 hover:bg-emerald-50"
               >
                 Use {CURRENCY} {readTotal} instead
@@ -501,7 +584,7 @@ export function StepConfirm({
         </div>
 
         {/* Where to send it */}
-        <section className="rounded-3xl bg-white p-4 shadow-[0_2px_18px_rgba(23,23,28,0.06)] ring-1 ring-ink-100">
+        <section ref={contactRef} data-guided-scroll="contact" className="scroll-mt-24 rounded-3xl bg-white p-4 shadow-[0_2px_18px_rgba(23,23,28,0.06)] ring-1 ring-ink-100">
           <h2 className="text-[1.1rem] font-extrabold text-ink-900">
             Where should we send your result?
           </h2>
@@ -526,7 +609,10 @@ export function StepConfirm({
               <select
                 id={`${phoneId}-code`}
                 value={values.dialCode}
-                onChange={(event) => onDialCodeChange(event.target.value)}
+                onChange={(event) => {
+                  cancelGuidedScroll();
+                  onDialCodeChange(event.target.value);
+                }}
                 className="min-h-14 border-r border-ink-200 bg-ink-50 px-3 text-base font-bold text-ink-800"
               >
                 {DIAL_CODES.map((entry) => (
@@ -542,7 +628,17 @@ export function StepConfirm({
                 autoComplete="tel-national"
                 placeholder="50 123 4567"
                 value={values.whatsappNumber}
-                onChange={(event) => onWhatsappNumberChange(event.target.value)}
+                onChange={(event) => {
+                  cancelGuidedScroll();
+                  onWhatsappNumberChange(event.target.value);
+                }}
+                onBlur={(event) => finishWhatsapp(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  }
+                }}
                 aria-describedby={errors.whatsappNumber ? `${phoneId}-error` : undefined}
                 aria-invalid={errors.whatsappNumber ? true : undefined}
                 className="min-h-14 w-full bg-transparent px-3.5 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400 focus:outline-none"
@@ -597,7 +693,7 @@ export function StepConfirm({
 
       {/* The challenge: the most prominent element on the screen, and the
           sentence that makes somebody press the button. */}
-      <section className="mt-4 overflow-hidden rounded-3xl bg-linear-to-br from-brand-100 to-brand-200 p-4">
+      <section ref={ctaRef} data-guided-scroll="cta" className="scroll-mt-24 mt-4 overflow-hidden rounded-3xl bg-linear-to-br from-brand-100 to-brand-200 p-4">
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <h2 className="text-[1.4rem] font-extrabold leading-tight text-ink-900">
@@ -628,7 +724,10 @@ export function StepConfirm({
 
       <StepActions>
         <Button
-          onClick={onSubmit}
+          onClick={() => {
+            cancelGuidedScroll();
+            onSubmit();
+          }}
           loading={submitting}
           loadingLabel="Sending…"
           arrow

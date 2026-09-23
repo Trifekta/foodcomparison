@@ -15,6 +15,7 @@ import { FoodAppLinks } from "./FoodAppLinks";
 import { track } from "@/lib/analytics/track";
 import { captureAttribution } from "@/lib/analytics/attribution";
 import { RESULT_PROMISE } from "@/lib/constants";
+import { scrollToGuidedTarget } from "@/lib/customer/scroll-to-target";
 import type { ExtractionStatus, TotalKind } from "./types";
 
 interface StepUploadProps {
@@ -75,17 +76,6 @@ interface StepUploadProps {
   totalError?: string;
   error: string | null;
   onContinue: () => void;
-}
-
-function scrollToCartUpload(target: HTMLElement | null) {
-  if (!target) return;
-  try {
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch {
-    // Older embedded WebViews may reject the options object.
-    const top = window.scrollY + target.getBoundingClientRect().top - 96;
-    window.scrollTo(0, Math.max(0, top));
-  }
 }
 
 /**
@@ -160,7 +150,7 @@ export function StepUpload({
     if (forkChoice !== "upload" || !scrollRequested.current) return;
     const frame = window.requestAnimationFrame(() => {
       scrollRequested.current = false;
-      scrollToCartUpload(cartUploadRef.current);
+      scrollToGuidedTarget(cartUploadRef.current);
     });
     return () => window.cancelAnimationFrame(frame);
   }, [forkChoice]);
@@ -319,7 +309,7 @@ export function StepUpload({
               onClick={() => {
                 if (forkChoice !== "upload") track("fork_have_screenshot");
                 if (forkChoice === "upload") {
-                  scrollToCartUpload(cartUploadRef.current);
+                  scrollToGuidedTarget(cartUploadRef.current);
                 } else {
                   scrollRequested.current = true;
                 }

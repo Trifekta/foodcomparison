@@ -201,6 +201,122 @@ test("Need to take one keeps the food-app path without scrolling", async ({ page
   expect(await page.evaluate(() => window.scrollY)).toBe(initialScroll);
 });
 
+async function watchGuidedScroll(page: Page, rejectOptions = false) {
+  await page.evaluate((rejectOptions) => {
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (options?: boolean | ScrollIntoViewOptions) {
+      if (typeof options === "object" && rejectOptions) {
+        throw new TypeError("Scroll options unavailable");
+      }
+      const target = this.getAttribute("data-guided-scroll");
+      if (target) {
+        document.documentElement.dataset.lastGuidedScroll = target;
+        document.documentElement.dataset.guidedScrollCount = String(
+          Number(document.documentElement.dataset.guidedScrollCount ?? 0) + 1,
+        );
+        if (typeof options === "object") {
+          document.documentElement.dataset.guidedScrollBehavior = options.behavior;
+        }
+      }
+      original.call(this, options);
+    };
+  }, rejectOptions);
+}
+
+async function expectGuidedScroll(page: Page, target: string) {
+  await expect(page.locator("html")).toHaveAttribute("data-last-guided-scroll", target);
+  const card = page.locator(`[data-guided-scroll="${target}"]`);
+  await expect.poll(() => card.evaluate((element) => element.getBoundingClientRect().top))
+    .toBeGreaterThan(48);
+}
+
+test("Screen 2 guides completed answers and skips a total read from the screenshot", async ({ page }) => {
+  await uploadCart(page);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator('[data-guided-scroll="total"] input')).toHaveValue("67.70");
+  await watchGuidedScroll(page);
+
+  await page.getByRole("combobox", { name: "Your delivery area" }).fill("Barsha");
+  await page.getByRole("option", { name: /Al Barsha/ }).click();
+  await expectGuidedScroll(page, "keeta");
+  await page.getByRole("button", { name: "yes", exact: true }).click();
+  await expectGuidedScroll(page, "contact");
+
+  const phone = page.getByPlaceholder("50 123 4567");
+  await phone.fill("501234567");
+  const countWhileTyping = await page.locator("html").getAttribute("data-guided-scroll-count");
+  await page.waitForTimeout(250);
+  expect(await page.locator("html").getAttribute("data-guided-scroll-count")).toBe(countWhileTyping);
+  await expect(phone).toBeFocused();
+  await phone.press("Enter");
+  await expectGuidedScroll(page, "cta");
+  await expect(page.locator("html")).toHaveAttribute("data-guided-scroll-behavior", "smooth");
+  await expect(page.getByRole("button", { name: /Get a Keeta price/ })).toBeInViewport();
+  await expect(page).toHaveURL(/\/compare/);
+});
+
+test("Screen 2 guides through a missing total only after valid edits are finished", async ({ page, context }) => {
+  await context.route("**/api/extract", (route) => route.fulfill({
+    json: { basket: { ...BASKET, subtotal: "", delivery_fee: "", service_fee: "", final_total: "" } },
+  }));
+  await uploadCart(page);
+  await page.getByRole("button", { name: "Continue" }).click();
+  const total = page.locator('[data-guided-scroll="total"] input');
+  await expect(total).toHaveValue("");
+  await watchGuidedScroll(page);
+
+  // A later answer must lead back to the first required answer still missing.
+  await page.getByRole("button", { name: "no", exact: true }).click();
+  await expectGuidedScroll(page, "area");
+  await page.getByRole("combobox", { name: "Your delivery area" }).fill("Barsha");
+  await page.getByRole("option", { name: /Al Barsha/ }).click();
+  await expectGuidedScroll(page, "total");
+
+  await total.fill("72.50");
+  const countWhileTyping = await page.locator("html").getAttribute("data-guided-scroll-count");
+  await page.waitForTimeout(250);
+  expect(await page.locator("html").getAttribute("data-guided-scroll-count")).toBe(countWhileTyping);
+  await expect(total).toBeFocused();
+  await total.press("Enter");
+  await expectGuidedScroll(page, "contact");
+
+  const phone = page.getByPlaceholder("50 123 4567");
+  await phone.fill("50");
+  await phone.press("Enter");
+  const countAfterInvalidPhone = await page.locator("html").getAttribute("data-guided-scroll-count");
+  await page.waitForTimeout(250);
+  expect(await page.locator("html").getAttribute("data-guided-scroll-count")).toBe(countAfterInvalidPhone);
+  await phone.fill("501234567");
+  await phone.blur();
+  await expectGuidedScroll(page, "cta");
+});
+
+test("Screen 2 guided scroll falls back when an embedded browser rejects scroll options", async ({ page }) => {
+  await uploadCart(page);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await watchGuidedScroll(page, true);
+  await page.evaluate(() => {
+    const original = window.scrollTo;
+    Object.defineProperty(window, "scrollTo", {
+      configurable: true,
+      value: (x: number, y: number) => {
+        document.documentElement.dataset.guidedFallback = "used";
+        original.call(window, x, y);
+      },
+    });
+  });
+
+  await page.getByRole("combobox", { name: "Your delivery area" }).fill("Barsha");
+  await page.getByRole("option", { name: /Al Barsha/ }).click();
+  // The fallback uses window.scrollTo with a 96px offset instead of the
+  // unsupported scrollIntoView options object.
+  await expect(page.locator("html")).toHaveAttribute("data-guided-fallback", "used");
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await expect.poll(() => page.locator('[data-guided-scroll="keeta"]')
+    .evaluate((element) => element.getBoundingClientRect().top)).toBeGreaterThan(48);
+  await expect(page.getByRole("button", { name: /Get a Keeta price/ })).toBeInViewport();
+});
+
 for (const [index, failure] of (["missing UUID", "throwing UUID", "preview creation", "preview cleanup"] as const).entries()) {
   test(`upload compatibility: ${failure} still allows submission`, async ({ page }) => {
     // Independent customers: do not exhaust the app's per-IP submission limit.
