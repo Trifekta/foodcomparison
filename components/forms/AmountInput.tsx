@@ -22,6 +22,7 @@ interface AmountInputProps {
   hideLabel?: boolean;
   onChange?: React.ChangeEventHandler<HTMLInputElement>;
   onBlur?: React.FocusEventHandler<HTMLInputElement>;
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
 }
 
 /**
