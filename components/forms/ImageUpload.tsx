@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { useObjectUrl } from "@/lib/customer/use-object-url";
 import { Camera, Check, Loader2, Maximize2, RefreshCw, Trash2 } from "lucide-react";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/constants";
 import { validateImageClientSide } from "@/lib/validation/submission";
@@ -102,13 +103,7 @@ export function ImageUpload({
   const [dragging, setDragging] = useState(false);
   const [zoomed, setZoomed] = useState(false);
 
-  // Derived from the file rather than stored; the effect only releases the URL.
-  const previewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
-
-  useEffect(() => {
-    if (!previewUrl) return;
-    return () => URL.revokeObjectURL(previewUrl);
-  }, [previewUrl]);
+  const previewUrl = useObjectUrl(file);
 
   const accept = async (candidate: File | undefined | null) => {
     if (!candidate) return;
@@ -131,7 +126,7 @@ export function ImageUpload({
   };
 
   const message = error ?? localError;
-  const filled = Boolean(file && previewUrl);
+  const filled = Boolean(file);
   // Earned attention, not decoration - only while the caller has flagged it
   // and the slot is still empty. The moment it is filled, the point is made.
   // Drives the ring and pulse below, and also the hint and helper text color -
@@ -225,27 +220,33 @@ export function ImageUpload({
             sit. Tapping opens the whole thing, which is the only way to catch a
             screenshot that cut off the bottom of the order.
           */}
-          <button
-            type="button"
-            onClick={() => setZoomed(true)}
-            className="group relative block w-full cursor-zoom-in"
-            aria-label={`View your ${label.toLowerCase()} full size`}
-          >
-            {/* Local object URL: the Next image optimiser does not apply. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={previewUrl ?? ""}
-              alt={`Preview of your ${label.toLowerCase()}`}
-              className="h-36 w-full bg-ink-50 object-cover object-top"
-            />
-            <span
-              aria-hidden="true"
-              className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink-900/75 px-2.5 py-1 text-[0.7rem] font-bold text-white"
+          {previewUrl ? (
+            <button
+              type="button"
+              onClick={() => setZoomed(true)}
+              className="group relative block w-full cursor-zoom-in"
+              aria-label={`View your ${label.toLowerCase()} full size`}
             >
-              <Maximize2 className="h-3 w-3" strokeWidth={3} />
-              Tap to check
-            </span>
-          </button>
+              {/* Local object URL: the Next image optimiser does not apply. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewUrl ?? ""}
+                alt={`Preview of your ${label.toLowerCase()}`}
+                className="h-36 w-full bg-ink-50 object-cover object-top"
+              />
+              <span
+                aria-hidden="true"
+                className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink-900/75 px-2.5 py-1 text-[0.7rem] font-bold text-white"
+              >
+                <Maximize2 className="h-3 w-3" strokeWidth={3} />
+                Tap to check
+              </span>
+            </button>
+          ) : (
+            <p role="status" className="bg-ink-50 p-4 text-sm text-slate-600">
+              Screenshot selected. Preview unavailable; you can still continue.
+            </p>
+          )}
           <div className="flex items-center justify-end gap-1.5 bg-white px-2 py-1.5">
             {allowRemove ? (
               <button

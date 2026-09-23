@@ -11,6 +11,7 @@ import {
 } from "@/lib/constants";
 import { FieldError } from "@/components/ui/FieldError";
 import { cn } from "@/lib/utils/cn";
+import { createItemKey } from "@/lib/customer/item-key";
 import type { CartItemDraft, ExtractionStatus, ReadTotals } from "./types";
 
 interface BasketEditorProps {
@@ -68,7 +69,7 @@ export function BasketEditor({
 
   const addItem = () => {
     if (full) return;
-    const key = crypto.randomUUID();
+    const key = createItemKey(items);
     pendingFocus.current = key;
     onItemsChange([...items, { key, name: "", quantity: 1, linePrice: null, proposed: null }]);
   };

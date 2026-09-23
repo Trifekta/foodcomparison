@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
+import { useObjectUrl } from "@/lib/customer/use-object-url";
 import {
   AlertCircle,
   ChevronRight,
@@ -80,36 +81,6 @@ interface StepConfirmProps {
   onWhatsappNumberChange: (value: string) => void;
   onMarketingConsentChange: (value: boolean) => void;
   onSubmit: () => void;
-}
-
-/**
- * A preview URL for a picked file, released when it is replaced or the screen
- * goes away.
- *
- * The URL is created inside the effect that revokes it, so the two are always
- * the same one. Creating it in a memo beside the effect looks equivalent and is
- * not: this screen mounts with the files already chosen, so any remount that
- * does not re-run the memo - React's Strict Mode double-invoke among them -
- * revokes the URL the <img> is still pointing at, and the customer is shown a
- * broken thumbnail where their own screenshot should be.
- *
- * That makes the state write below deliberate rather than the render-loop
- * mistake the rule is there to catch: it happens once per file, and the file
- * comes from a tap.
- */
-function useObjectUrl(file: File | null): string | null {
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    const created = file ? URL.createObjectURL(file) : null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
-    setUrl(created);
-    return () => {
-      if (created) URL.revokeObjectURL(created);
-    };
-  }, [file]);
-
-  return url;
 }
 
 /**

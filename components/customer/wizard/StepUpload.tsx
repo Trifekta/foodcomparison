@@ -172,6 +172,8 @@ export function StepUpload({
     let cancelled = false;
     void import("@/lib/ocr/browser").then(({ warmOcr }) => {
       if (!cancelled) warmOcr("customer");
+    }).catch(() => {
+      // Warming the optional reader may fail in an embedded browser.
     });
     return () => {
       cancelled = true;

@@ -142,6 +142,47 @@ test.beforeEach(async ({ page, context }) => {
   await context.route("**/api/extract", (route) => route.fulfill({ json: { basket: BASKET } }));
 });
 
+for (const [index, failure] of (["missing UUID", "throwing UUID", "preview creation", "preview cleanup"] as const).entries()) {
+  test(`upload compatibility: ${failure} still allows submission`, async ({ page }) => {
+    // Independent customers: do not exhaust the app's per-IP submission limit.
+    await page.context().setExtraHTTPHeaders({ "x-forwarded-for": `192.0.2.${index + 1}` });
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.addInitScript((failure) => {
+      if (failure === "missing UUID" || failure === "throwing UUID") {
+        Object.defineProperty(crypto, "randomUUID", {
+          configurable: true,
+          value: failure === "missing UUID" ? undefined : () => { throw new Error("UUID unavailable"); },
+        });
+      } else {
+        Object.defineProperty(URL, failure === "preview creation" ? "createObjectURL" : "revokeObjectURL", {
+          configurable: true,
+          value: () => { throw new Error("Preview unavailable"); },
+        });
+      }
+    }, failure);
+    await uploadCart(page);
+    if (failure === "preview creation") {
+      await expect(page.getByText("Screenshot selected. Preview unavailable; you can still continue.")).toBeVisible();
+    } else {
+      await expect(page.getByRole("button", { name: /View your cart screenshot full size/ })).toBeVisible();
+    }
+    await goToConfirmAndChooseArea(page);
+    await page.getByRole("button", { name: /View or edit items/ }).click();
+    await expect(page.getByPlaceholder("Item name")).toHaveCount(2);
+    await page.getByRole("button", { name: "Add another item" }).click();
+    await expect(page.getByPlaceholder("Item name").nth(2)).toBeFocused();
+    await page.getByRole("button", { name: "Remove item 3", exact: true }).click();
+    await page.getByRole("button", { name: "yes", exact: true }).click();
+    await page.getByPlaceholder("50 123 4567").fill("501234567");
+    const submitted = page.waitForResponse((response) => response.url().endsWith("/api/submissions"));
+    await page.getByRole("button", { name: /Get a Keeta price/ }).click();
+    expect((await submitted).status()).toBe(201);
+    await expect(page).toHaveURL(/\/r\//);
+    expect(errors).toEqual([]);
+  });
+}
+
 test("1. upload -> reload -> the screenshot is still there", async ({ page }) => {
   await uploadCart(page);
   const before = draftObjects(await fakeState(page));

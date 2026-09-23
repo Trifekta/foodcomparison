@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm, useWatch, type PathValue } from "react-hook-form";
 import type { PublicArea } from "@/types/database";
 import type { StructuredBasket } from "@/lib/extraction/schema";
+import { createItemKey } from "@/lib/customer/item-key";
 import {
   ERROR_MESSAGES,
   amountSchema,
@@ -474,33 +475,33 @@ export function CompareWizard({
 
         const flagged = new Set(basket.uncertain_fields);
 
-        setItems((current) => {
-          if (current.length > 0 || basket.items.length === 0) return current;
-          applied = true;
-          return basket.items.map((item, index) => {
-            // The title, not the title plus its whole description.
-            //
-            // A combo's modifier list runs to nine items - "Meal, Margherita,
-            // Margherita, Margherita, Limo Combo, Pepsi (2.25 litres)..." - and
-            // joined onto the name it filled the row, got cut off mid-word, and
-            // left the customer confirming a basket they could not read. They
-            // are being asked "is this your order", and "Limo Combo" answers
-            // that; the rest is what is inside it, which they already know.
-            //
-            // Nothing is lost: the screenshot itself goes to the admin, who
-            // rebuilds the basket from the picture rather than from this list.
-            const name = itemTitle(item.name);
+        // Prepare inside this try/catch, not in a state updater that React can
+        // execute later during render, outside this error handler.
+        const proposedItems: CartItemDraft[] = basket.items.map((item, index) => {
+          // The title, not the title plus its whole description.
+          //
+          // A combo's modifier list runs to nine items - "Meal, Margherita,
+          // Margherita, Margherita, Limo Combo, Pepsi (2.25 litres)..." - and
+          // joined onto the name it filled the row, got cut off mid-word, and
+          // left the customer confirming a basket they could not read. They
+          // are being asked "is this your order", and "Limo Combo" answers
+          // that; the rest is what is inside it, which they already know.
+          //
+          // Nothing is lost: the screenshot itself goes to the admin, who
+          // rebuilds the basket from the picture rather than from this list.
+          const name = itemTitle(item.name);
 
-            return {
-              key: crypto.randomUUID(),
-              name,
-              quantity: item.quantity,
-              linePrice: item.line_total || null,
-              priceUncertain: flagged.has(`items[${index}].line_total`) && item.line_total !== "",
-              proposed: { name, quantity: item.quantity, linePrice: item.line_total || null },
-            };
-          });
+          return {
+            key: createItemKey(),
+            name,
+            quantity: item.quantity,
+            linePrice: item.line_total || null,
+            priceUncertain: flagged.has(`items[${index}].line_total`) && item.line_total !== "",
+            proposed: { name, quantity: item.quantity, linePrice: item.line_total || null },
+          };
         });
+        setItems((current) => current.length > 0 ? current : proposedItems);
+        applied = applied || proposedItems.length > 0;
 
         setStatus(slot, applied ? "applied" : "empty");
       } catch {

@@ -26,7 +26,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: `npx next dev --port ${APP_PORT}`,
+    command: `node scripts/copy-ocr-assets.mjs && npx next dev --port ${APP_PORT}`,
     // 400 (no slot named) once the route is compiled and the flag is on.
     url: `http://localhost:${APP_PORT}/api/drafts/image`,
     timeout: 240_000,
