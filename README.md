@@ -785,6 +785,48 @@ images will not break old submissions.
 
 ---
 
+## Resuming the wizard after a reload
+
+Phones — Instagram's and Facebook's in-app browsers above all — discard a
+backgrounded tab and rebuild it, which used to cost the customer their
+screenshots. With `DRAFT_RESUME` on, the wizard keeps a short-lived server-side
+draft and rebuilds the screenshots as real files on return, so every step,
+check and the submission itself behave exactly as if they had just been picked.
+
+- **Reconnecting.** The server mints a 256-bit token when the first screenshot
+  is chosen. The page writes it into its own URL fragment (`#resume=…`), which a
+  reload keeps and which is never sent to a server or in a Referer. An HttpOnly
+  cookie (scoped to `/api`) and sessionStorage are backups; any one is enough.
+- **Ownership.** The database holds only the token's SHA-256. Every image path
+  is derived from the draft's own row id, and a check constraint refuses any
+  other. The browser never names a path, and the submission endpoint never
+  reads one from a draft — it receives the screenshot like any other upload.
+- **Not stored:** the WhatsApp number. It is re-entered after a rebuilt tab.
+- **Meta Pixel:** on a page where drafts are active, the pixel's own history
+  tracking is off and a page load that already carries a token skips the pixel.
+- **Cleanup.** A successful submission deletes its draft and files at once.
+  Drafts expire 24 hours after their last change; the Worker's cron calls
+  `/api/cron/prune-drafts` hourly, which also removes any `drafts/` folder whose
+  row is gone.
+
+**Rolling it out**
+
+1. Run `supabase/migrations/0027_wizard_drafts.sql`. It only adds a table, so it
+   is safe before or after the code; with the flag off the code never touches it.
+2. Deploy with `DRAFT_RESUME=test`. Only pages opened with `?resume_test=1` use
+   drafts, so ad traffic is untouched.
+3. On a real phone, open `/compare?resume_test=1` from inside Instagram and
+   Facebook, upload, switch to a food app long enough for the tab to be
+   discarded, come back, and submit.
+4. Set `DRAFT_RESUME=on`.
+
+**Tests.** `npm test` covers the API and its security rules against a fake
+Supabase. `npm run test:e2e` runs the four recovery flows in Chromium against
+`next dev`, wiping localStorage and sessionStorage (and in most cases cookies)
+before every reload.
+
+---
+
 ## Design notes
 
 The customer screens follow the SnipSavor mockup: numbered upload slots with

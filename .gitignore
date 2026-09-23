@@ -24,3 +24,7 @@ public/tesseract
 # tesseract.js decompresses language data into the working directory when it
 # runs under Node (the evaluation script).
 *.traineddata
+
+# Playwright
+/test-results/
+/playwright-report/

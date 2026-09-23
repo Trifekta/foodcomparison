@@ -4,6 +4,7 @@ import { ERROR_MESSAGES } from "@/lib/validation/submission";
 import { checkRateLimit, clientKeyFromHeaders } from "@/lib/utils/rate-limit";
 import { MAX_IMAGE_BYTES } from "@/lib/constants";
 import { resultPath } from "@/lib/utils/reference";
+import { completeDraftAfterSubmission } from "@/lib/drafts/complete";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,8 +82,10 @@ export async function POST(request: Request) {
 
   // The path, not a full URL: the customer is already on this host, and a token
   // is not something to spell out in a response any more than it has to be.
-  return NextResponse.json(
+  const response = NextResponse.json(
     { referenceNumber: result.referenceNumber, resultPath: resultPath(result.resultToken) },
     { status: 201 },
   );
+  await completeDraftAfterSubmission(request, formData, response);
+  return response;
 }

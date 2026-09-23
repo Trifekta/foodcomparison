@@ -30,6 +30,12 @@ export * from "../.open-next/worker.js";
  */
 const CHASE_PATH = "/api/cron/chase-submissions";
 
+/**
+ * Expired wizard drafts and their screenshots. Hourly is plenty for a 24-hour
+ * lifetime, so it rides the first five-minute tick of each hour.
+ */
+const PRUNE_DRAFTS_PATH = "/api/cron/prune-drafts";
+
 interface CronEnv {
   CRON_SECRET?: string;
   NEXT_PUBLIC_APP_URL?: string;
@@ -45,6 +51,7 @@ interface CronEnv {
  */
 interface ScheduledEvent {
   cron: string;
+  scheduledTime: number;
 }
 
 interface WorkerContext {
@@ -71,17 +78,20 @@ const worker = {
     // rather than sent anywhere - but the real origin keeps logs readable.
     const base = env.NEXT_PUBLIC_APP_URL?.trim() || "https://snipsavor.trifekta.io";
 
-    const request = new Request(new URL(CHASE_PATH, base), {
-      method: "POST",
-      headers: { "x-cron-secret": env.CRON_SECRET },
-    });
+    const secret = env.CRON_SECRET;
+    const call = (path: string) =>
+      openNextWorker.fetch(
+        new Request(new URL(path, base), { method: "POST", headers: { "x-cron-secret": secret } }),
+        env,
+        ctx,
+      );
 
     // waitUntil, so the isolate is kept alive until the chase finishes rather
     // than being torn down when this function returns.
     ctx.waitUntil(
       (async () => {
         try {
-          const response = await openNextWorker.fetch(request, env, ctx);
+          const response = await call(CHASE_PATH);
           console.info("[cron] chase run", { cron: event.cron, status: response.status });
         } catch (error) {
           console.error("[cron] chase failed", {
@@ -91,6 +101,22 @@ const worker = {
         }
       })(),
     );
+
+    if (new Date(event.scheduledTime).getUTCMinutes() < 5) {
+      ctx.waitUntil(
+        (async () => {
+          try {
+            const response = await call(PRUNE_DRAFTS_PATH);
+            console.info("[cron] prune-drafts run", { cron: event.cron, status: response.status });
+          } catch (error) {
+            console.error("[cron] prune-drafts failed", {
+              cron: event.cron,
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+        })(),
+      );
+    }
   },
 };
 
