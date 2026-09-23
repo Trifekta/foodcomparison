@@ -38,6 +38,12 @@ export type CreateSubmissionResult =
   | { ok: true; referenceNumber: string; resultToken: string; id: string }
   | { ok: false; status: number; error: string; field?: string };
 
+export interface CreateSubmissionOptions {
+  draftCartImagePath?: string | null;
+  draftCheckoutImagePath?: string | null;
+  visitId?: string | null;
+}
+
 const GENERIC_FAILURE = "We couldn't submit your order. Please try again.";
 const MAX_REFERENCE_ATTEMPTS = 5;
 
@@ -139,7 +145,10 @@ function readAttribution(formData: FormData): Record<string, string | null> {
   };
 }
 
-export async function createSubmission(formData: FormData): Promise<CreateSubmissionResult> {
+export async function createSubmission(
+  formData: FormData,
+  options: CreateSubmissionOptions = {}
+): Promise<CreateSubmissionResult> {
   // ---- 1. Fields ----------------------------------------------------------
   const parsed = submissionFieldsSchema.safeParse({
     restaurantName: String(formData.get("restaurantName") ?? ""),
@@ -263,35 +272,110 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   const submissionId = crypto.randomUUID();
   const uploadedPaths: string[] = [];
 
-  const cartPath = `submissions/${submissionId}/cart.${cartImage.extension}`;
-  const cartUpload = await supabase.storage
-    .from(STORAGE_BUCKET)
-    .upload(cartPath, cartImage.bytes, { contentType: cartImage.mimeType, upsert: true });
+  // Check if we can reuse the draft cart image, otherwise upload the new one
+  let cartPath: string;
+  if (options.draftCartImagePath) {
+    // Copy draft file to submission folder using copy operation
+    // Draft paths are like "drafts/{visitId}/cart.jpg"
+    cartPath = `submissions/${submissionId}/cart.${options.draftCartImagePath.split(".").pop()}`;
+    const copyResult = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .copy(options.draftCartImagePath, cartPath);
 
-  if (cartUpload.error) {
-    console.error("[submissions] could not store the cart screenshot", {
-      bucket: STORAGE_BUCKET,
-      message: cartUpload.error.message,
-    });
-    return { ok: false, status: 500, error: "We couldn't upload your screenshot. Please try again." };
+    if (copyResult.error) {
+      console.error("[submissions] could not copy draft cart screenshot", {
+        bucket: STORAGE_BUCKET,
+        from: options.draftCartImagePath,
+        to: cartPath,
+        message: copyResult.error.message,
+      });
+      // Fall back to uploading the new file
+      cartPath = `submissions/${submissionId}/cart.${cartImage.extension}`;
+      const upload = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(cartPath, cartImage.bytes, { contentType: cartImage.mimeType, upsert: true });
+
+      if (upload.error) {
+        console.error("[submissions] could not store the cart screenshot", {
+          bucket: STORAGE_BUCKET,
+          message: upload.error.message,
+        });
+        return {
+          ok: false,
+          status: 500,
+          error: "We couldn't upload your screenshot. Please try again.",
+        };
+      }
+    }
+  } else {
+    // Normal upload path when no draft exists
+    cartPath = `submissions/${submissionId}/cart.${cartImage.extension}`;
+    const cartUpload = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(cartPath, cartImage.bytes, { contentType: cartImage.mimeType, upsert: true });
+
+    if (cartUpload.error) {
+      console.error("[submissions] could not store the cart screenshot", {
+        bucket: STORAGE_BUCKET,
+        message: cartUpload.error.message,
+      });
+      return {
+        ok: false,
+        status: 500,
+        error: "We couldn't upload your screenshot. Please try again.",
+      };
+    }
   }
   uploadedPaths.push(cartPath);
 
   let checkoutPath: string | null = null;
-  if (checkoutImage) {
-    const path = `submissions/${submissionId}/checkout.${checkoutImage.extension}`;
-    const upload = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(path, checkoutImage.bytes, {
-        contentType: checkoutImage.mimeType,
-        upsert: true,
-      });
+  if (checkoutImage || options.draftCheckoutImagePath) {
+    if (options.draftCheckoutImagePath) {
+      // Copy draft file to submission folder
+      checkoutPath = `submissions/${submissionId}/checkout.${options.draftCheckoutImagePath.split(".").pop()}`;
+      const copyResult = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .copy(options.draftCheckoutImagePath, checkoutPath);
 
-    // The checkout screenshot is optional: a failed upload must never cost the
-    // customer their submission, so we continue without it.
-    if (!upload.error) {
-      checkoutPath = path;
-      uploadedPaths.push(path);
+      if (copyResult.error) {
+        console.error("[submissions] could not copy draft checkout screenshot", {
+          bucket: STORAGE_BUCKET,
+          from: options.draftCheckoutImagePath,
+          message: copyResult.error.message,
+        });
+        // Fall back to new upload if available
+        if (checkoutImage) {
+          const path = `submissions/${submissionId}/checkout.${checkoutImage.extension}`;
+          const upload = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(path, checkoutImage.bytes, {
+              contentType: checkoutImage.mimeType,
+              upsert: true,
+            });
+
+          if (!upload.error) {
+            checkoutPath = path;
+            uploadedPaths.push(path);
+          }
+        }
+        checkoutPath = null;
+      } else {
+        uploadedPaths.push(checkoutPath);
+      }
+    } else if (checkoutImage) {
+      // Normal upload when no draft
+      const path = `submissions/${submissionId}/checkout.${checkoutImage.extension}`;
+      const upload = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(path, checkoutImage.bytes, {
+          contentType: checkoutImage.mimeType,
+          upsert: true,
+        });
+
+      if (!upload.error) {
+        checkoutPath = path;
+        uploadedPaths.push(path);
+      }
     }
   }
 
@@ -334,6 +418,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       email: null,
       marketing_consent: fields.marketingConsent,
       restaurant_name: sanitiseText(fields.restaurantName, MAX_RESTAURANT_NAME_LENGTH),
+      visit_id: options.visitId ?? null,
       ...attribution,
     });
 
@@ -346,6 +431,23 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
 
     // 23505 = unique violation; retry with a different reference suffix.
     if (error.code !== "23505") break;
+  }
+
+  // Mark draft as submitted if one was used (prevents cleanup from deleting it)
+  if (inserted && options.visitId) {
+    const { error: draftError } = await supabase
+      .from("draft_submissions")
+      .update({ submitted_at: new Date().toISOString() })
+      .eq("visit_id", options.visitId)
+      .is("submitted_at", null);
+
+    if (draftError) {
+      console.error("[submissions] could not mark draft as submitted", {
+        visitId: options.visitId,
+        message: draftError.message,
+      });
+      // Not a fatal error - the draft will just be cleaned up in 24 hours
+    }
   }
 
   if (!inserted) {

@@ -12,7 +12,7 @@ import {
   submissionFieldsSchema,
 } from "@/lib/validation/submission";
 import { rememberLastOrder } from "@/lib/utils/last-order";
-import { track } from "@/lib/analytics/track";
+import { track, visitId } from "@/lib/analytics/track";
 import { attributionFormFields, currentAttribution } from "@/lib/analytics/attribution";
 import { compressForUpload } from "@/lib/images/compress";
 import { itemTitle } from "@/lib/extraction/normalise";
@@ -24,6 +24,11 @@ import {
   restoredStep,
   saveWizardSession,
 } from "@/lib/customer/wizard-session";
+import {
+  restoreDraft,
+  uploadDraftFile,
+  saveDraft,
+} from "@/lib/customer/draft-client";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
 import { StepConfirm } from "./StepConfirm";
@@ -143,6 +148,11 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
   // Items are an array of objects, so they live here rather than in
   // react-hook-form, whose values all travel as single FormData entries.
   const [items, setItems] = useState<CartItemDraft[]>([]);
+  // Draft file paths from temporary storage, used if user doesn't upload new files
+  const [draftPaths, setDraftPaths] = useState<{
+    cart: string | null;
+    checkout: string | null;
+  }>({ cart: null, checkout: null });
   // Both screenshots are read, and each is tracked on its own: they are chosen
   // at different moments and can finish in either order.
   const [cartStatus, setCartStatus] = useState<ExtractionStatus>("idle");
@@ -241,6 +251,24 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       // on every remount, so a return from the food app does not double-count.
       track("wizard_started");
     }
+    // Restore draft from server if available. Runs after sessionStorage
+    // restore so both local and server state are recovered.
+    void (async () => {
+      const draft = await restoreDraft();
+      if (draft) {
+        // Restore form state from draft
+        reset(draft.state as any);
+        setDraftPaths({
+          cart: draft.cartImagePath,
+          checkout: draft.checkoutImagePath,
+        });
+        // Restore step, but put them back on upload if they don't have files
+        // (files don't serialize across page reloads)
+        const restoredStepValue = restoredStep(draft.step, false, STEP_UPLOAD);
+        setStep(restoredStepValue);
+      }
+    })();
+
     setRestored(true);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [reset]);
@@ -272,6 +300,27 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
     if (!restored) return;
     saveWizardSession({ step, values, items, autofilled });
   }, [restored, step, values, items, autofilled]);
+
+  // Save draft to server when form state changes (debounced)
+  useEffect(() => {
+    if (!restored) return;
+
+    // Don't save if we don't have a visit ID yet
+    if (step === STEP_UPLOAD) {
+      const timer = setTimeout(() => {
+        void saveDraft({
+          step,
+          state: values,
+          cartImagePath: draftPaths.cart,
+          checkoutImagePath: draftPaths.checkout,
+        });
+      }, 2000); // Debounce form changes
+
+      return () => clearTimeout(timer);
+    }
+
+    return undefined;
+  }, [restored, step, values, draftPaths]);
 
   const setStatus = (slot: ReadSlot, status: ExtractionStatus) => {
     if (slot === "cart") setCartStatus(status);
@@ -628,6 +677,12 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
       const body = new FormData();
       body.append("cartImage", cartImage);
       if (checkoutImage) body.append("checkoutImage", checkoutImage);
+      // Include draft paths so server can use existing files if no new ones uploaded
+      if (draftPaths.cart) body.append("draftCartImagePath", draftPaths.cart);
+      if (draftPaths.checkout) body.append("draftCheckoutImagePath", draftPaths.checkout);
+      // Include visit ID for draft linkage
+      const vid = visitId();
+      if (vid) body.append("visitId", vid);
       for (const [key, value] of Object.entries(parsed.data)) {
         body.append(key, typeof value === "boolean" ? String(value) : value);
       }
@@ -737,9 +792,37 @@ export function CompareWizard({ areas }: { areas: PublicArea[] }) {
           onCartPicked={(file) => {
             // The greeting has done its job the moment they act on it.
             setReturnedFromApp(false);
+            // Upload to temporary draft storage and save draft state
+            void (async () => {
+              const upload = await uploadDraftFile(file, "cart");
+              if ("path" in upload) {
+                setDraftPaths((current) => ({ ...current, cart: upload.path }));
+                await saveDraft({
+                  step: STEP_UPLOAD,
+                  state: getValues(),
+                  cartImagePath: upload.path,
+                  checkoutImagePath: draftPaths.checkout,
+                });
+              }
+            })();
             startRead(file, "cart");
           }}
-          onCheckoutPicked={(file) => startRead(file, "checkout")}
+          onCheckoutPicked={(file) => {
+            // Upload to temporary draft storage
+            void (async () => {
+              const upload = await uploadDraftFile(file, "checkout");
+              if ("path" in upload) {
+                setDraftPaths((current) => ({ ...current, checkout: upload.path }));
+                await saveDraft({
+                  step,
+                  state: getValues(),
+                  cartImagePath: draftPaths.cart,
+                  checkoutImagePath: upload.path,
+                });
+              }
+            })();
+            startRead(file, "checkout");
+          }}
           manualTotal={values.currentTotal}
           totalKind={offer.kind}
           checkoutStatus={checkoutStatus}
