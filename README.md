@@ -322,20 +322,29 @@ The Worker name in `wrangler.jsonc` **must match the Worker in your Cloudflare
 account**. It is currently `foodcomparison`. If you rename the Worker, change
 that `name` too, or the deploy is rejected.
 
-**1. Workers Builds settings** (Workers & Pages → your Worker → Settings →
-Build):
+**1. Deploys run from GitHub Actions** — the `deploy` job in
+`.github/workflows/ci.yml`. A merge to the default branch runs lint, typecheck,
+the tests and the Next build, and ships only if all four pass. `cf:build` runs
+`opennextjs-cloudflare build`, which runs `next build` itself and then bundles
+the Worker into `.open-next/`; `npx wrangler deploy` uploads it.
 
-| Setting | Value |
-| --- | --- |
-| Build command | `npm run cf:build` |
-| Deploy command | `npx wrangler deploy` |
+This replaces the **Cloudflare Workers Builds git integration**, which failed on
+every pull request from the day it was connected — always in under a second,
+which is to say it never got as far as running a build. Disconnect it in the
+Cloudflare dashboard, or every merge builds twice and one of the two results is
+noise.
 
-`cf:build` runs `opennextjs-cloudflare build`, which runs `next build` itself
-and then bundles the Worker into `.open-next/`. Leaving the build command as
-plain `npm run build` also works but builds Next.js twice.
+Two credentials, under **Settings → Secrets and variables → Actions →
+Secrets**:
 
-**2. Build variables** — Settings → Build → Variables. These are inlined into
-the bundle at build time, so they **must** be set here, not only as secrets:
+```
+CLOUDFLARE_API_TOKEN    a token with the "Edit Cloudflare Workers" template
+CLOUDFLARE_ACCOUNT_ID
+```
+
+**2. Build variables** — the same screen, under **Variables**, not Secrets.
+`next build` inlines these into the browser bundle, so they are public by
+construction and the workflow reads them from `vars`:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
@@ -343,17 +352,23 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY
 NEXT_PUBLIC_APP_URL
 ```
 
-**3. Secrets** — Settings → Variables and Secrets, added as **Secret**, not
-plain text. These are read at runtime, and the OpenNext adapter copies Worker
+> **A build without these succeeds.** `lib/env.ts` defaults each one to `""`, so
+> `next build` passes, `wrangler deploy` passes, the Worker starts, and the site
+> cannot reach Supabase. The deploy job checks all five names before it builds
+> and refuses rather than ship that.
+
+**3. Runtime secrets** — on the Worker itself (Cloudflare dashboard → your
+Worker → Settings → Variables and Secrets), added as **Secret**, not plain
+text. These are read at runtime, and the OpenNext adapter copies Worker
 bindings into `process.env` on each request.
 
-> **Two panels share this name and only one of them is read while the site is
-> running.** Build variables are consumed by `next build` — `NEXT_PUBLIC_` values
-> are baked into the bundle there and fixed for the life of that deployment.
-> Everything below is looked up on every request and must be set on the **Worker
-> itself**, not in the build panel. Putting one in the wrong place fails
-> silently in every direction: the build passes, the deploy passes, the site
-> works, and the one feature that needed it is quietly switched off.
+> **Two different places, and only one of them is read while the site is
+> running.** The build variables above live in GitHub and are baked into the
+> bundle by `next build`, fixed for the life of that deployment. Everything
+> below is looked up on every request and must be set on the **Worker itself**.
+> Putting one in the wrong place fails silently in every direction: the build
+> passes, the deploy passes, the site works, and the one feature that needed it
+> is quietly switched off.
 >
 > `/admin/diagnostics` → **What this Worker can see** answers this directly,
 > one line per name. It reads no values, only whether the name is visible.
