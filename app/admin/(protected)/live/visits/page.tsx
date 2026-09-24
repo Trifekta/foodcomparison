@@ -33,6 +33,14 @@ export const dynamic = "force-dynamic";
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 /**
+ * "Still here" used to cover the whole fifteen-minute inactivity window,
+ * which made somebody last seen twelve minutes ago look live. The heartbeat
+ * runs every twenty seconds while the tab is visible, so one minute is a
+ * conservative "active now" window; anything older is only recently active.
+ */
+const ACTIVE_NOW_MS = 60_000;
+
+/**
  * Historical per-visit table split from the Live page.
  *
  * This is a separate route so the 15-second auto-refresh on the Live page
@@ -87,8 +95,21 @@ export default async function VisitsPage({ searchParams }: { searchParams: Searc
   const seenByVisit = new Map(presence.rows.map((row) => [row.visit_id, row.last_seen_at]));
   const journeys = new Map<string, { outcome: VisitOutcome; steps: string[] }>();
   for (const visit of visits) {
-    const outcome = visitOutcome(visit, seenByVisit.get(visit.visitId) ?? null, presence.now);
-    journeys.set(visit.visitId, { outcome, steps: describeJourney(visit, outcome) });
+    const lastSeenAt = seenByVisit.get(visit.visitId) ?? null;
+    const outcome = visitOutcome(visit, lastSeenAt, presence.now);
+    const steps = describeJourney(visit, outcome);
+
+    // `active` deliberately remains the same underlying outcome for the whole
+    // fifteen-minute grace period. Only the wording changes: a heartbeat from
+    // the last minute is genuinely current; an older one merely says the
+    // visitor was around recently. This keeps abandonment logic unchanged.
+    if (outcome === "active" && steps.length > 0) {
+      const seen = Date.parse(lastSeenAt ?? visit.lastSeen);
+      const quietFor = Number.isFinite(seen) ? presence.now - seen : Infinity;
+      steps[steps.length - 1] = quietFor <= ACTIVE_NOW_MS ? "Active now" : "Recently active";
+    }
+
+    journeys.set(visit.visitId, { outcome, steps });
   }
 
   // Grouped over the filtered list, so the count on screen always describes
