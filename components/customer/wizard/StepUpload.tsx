@@ -337,10 +337,10 @@ export function StepUpload({
             >
               <Camera aria-hidden="true" className="h-6 w-6 text-brand-600" />
               <h2 className="mt-2 text-[1rem] font-extrabold text-ink-900">
-                Have a screenshot?
+                Already have a screenshot?
               </h2>
               <p className="mt-1 text-[0.85rem] leading-snug text-slate-600">
-                Upload it now
+                Upload your cart screenshot →
               </p>
             </button>
 
@@ -359,10 +359,10 @@ export function StepUpload({
             >
               <Smartphone aria-hidden="true" className="h-6 w-6 text-brand-600" />
               <h2 className="mt-2 text-[1rem] font-extrabold text-ink-900">
-                Need to take one?
+                No screenshot yet?
               </h2>
               <p className="mt-1 text-[0.85rem] leading-snug text-slate-600">
-                Choose your food app
+                Open your food app and take one →
               </p>
             </button>
           </div>
