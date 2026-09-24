@@ -540,6 +540,59 @@ test("4. a restored draft submits without the screenshot being picked again", as
   }
 });
 
+test("an Instagram submission opens the same result URL in a fresh browser", async ({ page, browser }) => {
+  await page.context().setExtraHTTPHeaders({ "x-forwarded-for": "192.0.2.50" });
+  await page.addInitScript(() => {
+    const userAgent = navigator.userAgent;
+    Object.defineProperty(navigator, "userAgent", {
+      configurable: true,
+      get: () => `${userAgent} Instagram 300.0.0.0.0`,
+    });
+    Reflect.deleteProperty(window, "PushManager");
+  });
+
+  await uploadCart(page);
+  await goToConfirmAndChooseArea(page);
+  await page.getByRole("button", { name: "yes", exact: true }).click();
+  await page.getByPlaceholder("50 123 4567").fill("501234567");
+
+  const submitted = page.waitForResponse((response) => response.url().endsWith("/api/submissions"));
+  await page.getByRole("button", { name: /Get a Keeta price/ }).click();
+  const response = await submitted;
+  expect(response.status()).toBe(201);
+  const { referenceNumber, resultPath } = (await response.json()) as {
+    referenceNumber: string;
+    resultPath: string;
+  };
+  expect(resultPath).toMatch(/^\/r\/[0-9a-f]{32}$/);
+  await expect(page).toHaveURL(new RegExp(`${resultPath}$`));
+
+  const resultUrl = page.url();
+  expect(new URL(resultUrl).search).toBe("");
+  expect(new URL(resultUrl).hash).toBe("");
+  await expect(page.getByText(referenceNumber, { exact: true })).toBeVisible();
+  await expect(page.getByText("Open in Chrome")).toBeVisible();
+
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.getByRole("button", { name: "Copy this result link" }).click();
+  await expect(page.getByRole("button", { name: "Result link copied" })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(resultUrl);
+
+  // A separate context has none of Instagram's cookies or browser storage.
+  const freshContext = await browser.newContext();
+  try {
+    expect(await freshContext.cookies()).toEqual([]);
+    const fresh = await freshContext.newPage();
+    const navigation = await fresh.goto(resultUrl);
+    expect(navigation?.status()).toBe(200);
+    await expect(fresh).toHaveURL(resultUrl);
+    await expect(fresh.getByText(referenceNumber, { exact: true })).toBeVisible();
+    expect(await fresh.evaluate(() => localStorage.getItem("snipsavor.last-order"))).toBeNull();
+  } finally {
+    await freshContext.close();
+  }
+});
+
 test("a tab that lost its URL fragment still resumes from the cookie", async ({ page }) => {
   await uploadCart(page);
   await goToConfirmAndChooseArea(page);
