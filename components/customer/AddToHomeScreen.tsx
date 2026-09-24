@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Share, Plus, MoreHorizontal, Compass, X } from "lucide-react";
+import { Share, Plus, MoreHorizontal, Compass, Copy as CopyIcon, X } from "lucide-react";
 import { dismissHomeScreenHint, homeScreenRoute, type HomeScreenRoute } from "@/lib/pwa/install";
 import { pushSupported } from "@/lib/push/client";
 import { BRAND_NAME } from "@/lib/constants";
@@ -69,14 +69,50 @@ function copyFor(route: Exclude<HomeScreenRoute, null>): Copy {
   }
 }
 
+async function copyCurrentResultLink(): Promise<boolean> {
+  const url = window.location.href;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(url);
+      return true;
+    }
+  } catch {
+    // Some embedded browsers expose the Clipboard API but refuse to use it.
+  }
+
+  // Older in-app browsers may only support the selection-based copy command.
+  let field: HTMLTextAreaElement | null = null;
+  try {
+    field = document.createElement("textarea");
+    field.value = url;
+    field.readOnly = true;
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.appendChild(field);
+    field.select();
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    field?.remove();
+  }
+}
+
 export function AddToHomeScreen() {
   // Null until mounted, so the server and the first client paint agree.
   const [route, setRoute] = useState<HomeScreenRoute>(null);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
 
   useEffect(() => {
     const timer = setTimeout(() => setRoute(homeScreenRoute(pushSupported())), 0);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (copyState !== "copied") return;
+    const timer = setTimeout(() => setCopyState("idle"), 2500);
+    return () => clearTimeout(timer);
+  }, [copyState]);
 
   if (!route) return null;
   const { heading, body, steps } = copyFor(route);
@@ -119,6 +155,23 @@ export function AddToHomeScreen() {
           </li>
         ))}
       </ol>
+
+      {route === "ios-in-app" || route === "android-in-app" ? (
+        <div className="mt-3 text-[0.8rem] text-slate-500">
+          <button
+            type="button"
+            onClick={async () => setCopyState((await copyCurrentResultLink()) ? "copied" : "failed")}
+            aria-live="polite"
+            className="inline-flex min-h-11 items-center gap-1.5 font-semibold underline underline-offset-2 hover:text-ink-800"
+          >
+            <CopyIcon aria-hidden="true" className="h-3.5 w-3.5" />
+            {copyState === "copied" ? "Result link copied" : "Copy this result link"}
+          </button>
+          {copyState === "failed" ? (
+            <p role="status">Couldn&apos;t copy the link. Try your browser&apos;s menu.</p>
+          ) : null}
+        </div>
+      ) : null}
 
       <p className="mt-2.5 text-[0.8rem] text-slate-500">
         Your result stays on this page either way — keep it open and it updates itself.
