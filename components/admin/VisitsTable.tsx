@@ -8,6 +8,7 @@ import {
 } from "@/lib/calculations/visits";
 import { formatDubaiTime } from "@/lib/utils/text";
 import { AdLabelCell } from "@/components/admin/AdLabelCell";
+import { DeleteVisitButton } from "@/components/admin/DeleteVisitButton";
 import type { AdLabelIndex } from "@/lib/analytics/ad-labels";
 
 /**
@@ -199,6 +200,9 @@ export function VisitsTable({
                         <SameVisitor group={group} />
                       ) : null;
                     })()}
+                    <div className="mt-2">
+                      <DeleteVisitButton visitId={visit.visitId} reference={visit.reference} />
+                    </div>
                   </td>
                   <td className="px-4 py-2.5 tabular-nums text-ink-600">
                     {formatDubaiTime(visit.firstSeen)}
