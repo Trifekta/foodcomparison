@@ -117,23 +117,27 @@ describe("contact validation", () => {
   });
 
   it("has no email channel to fall back to", () => {
-    // Email was removed; a number is the only way a result goes out, so a
-    // submission carrying an address and no number is not a submission.
+    // An extra email field does not opt into another notification channel.
     const result = contactStepSchema.safeParse({
       dialCode: "+971",
       whatsappNumber: "",
       email: "customer@example.com",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).not.toHaveProperty("email");
   });
 
-  it("tells the customer where to send the result when nothing is given", () => {
-    const result = contactStepSchema.safeParse({
-      dialCode: "+971",
-      whatsappNumber: "",
-    });
-    expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.issues[0].message).toBe(ERROR_MESSAGES.contactMissing);
+  it.each(["", "   "])("accepts an empty phone (%j) in both schemas", (whatsappNumber) => {
+    expect(contactStepSchema.safeParse({ dialCode: "+971", whatsappNumber }).success).toBe(true);
+    expect(submissionFieldsSchema.safeParse(baseSubmission({ whatsappNumber })).success).toBe(true);
+  });
+
+  it.each(["50", "abc"])("validates an entered phone (%j)", (whatsappNumber) => {
+    for (const schema of [contactStepSchema, submissionFieldsSchema]) {
+      const result = schema.safeParse(baseSubmission({ whatsappNumber }));
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.issues[0].message).toBe(ERROR_MESSAGES.invalidPhone);
+    }
   });
 });
 

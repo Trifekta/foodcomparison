@@ -583,19 +583,32 @@ export function StepConfirm({
           </p>
         </div>
 
-        {/* Where to send it */}
+        <button
+          type="button"
+          onClick={() => {
+            cancelGuidedScroll();
+            scrollToGuidedTarget(contactRef.current);
+          }}
+          className="min-h-11 text-sm font-bold text-ink-800 underline underline-offset-4"
+        >
+          How will I get my result?
+        </button>
+
+        {/* Optional result notifications */}
         <section ref={contactRef} data-guided-scroll="contact" className="scroll-mt-24 rounded-3xl bg-white p-4 shadow-[0_2px_18px_rgba(23,23,28,0.06)] ring-1 ring-ink-100">
-          <h2 className="text-[1.1rem] font-extrabold text-ink-900">
-            Where should we send your result?
-          </h2>
-          <p className="mt-1 text-[0.88rem] leading-snug text-slate-600">
-            We reply about this request only. Nothing is ordered.
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-[1.1rem] font-extrabold text-ink-900">
+              <label htmlFor={phoneId}>WhatsApp number</label>
+            </h2>
+            <span className="rounded-full bg-chip-green-bg px-2.5 py-1 text-xs font-bold text-chip-green-fg">
+              Recommended
+            </span>
+          </div>
+          <p id={`${phoneId}-hint`} className="mt-1 text-[0.88rem] leading-snug text-slate-600">
+            Get your comparison result on WhatsApp so you don&apos;t need to keep this page open.
           </p>
 
           <div className="mt-3">
-            <label htmlFor={phoneId} className="mb-2 block text-[0.9rem] font-bold text-ink-900">
-              WhatsApp number
-            </label>
             <div
               className={cn(
                 "flex items-stretch overflow-hidden rounded-2xl border bg-white",
@@ -639,9 +652,9 @@ export function StepConfirm({
                     event.currentTarget.blur();
                   }
                 }}
-                aria-describedby={errors.whatsappNumber ? `${phoneId}-error` : undefined}
+                aria-describedby={`${phoneId}-hint${errors.whatsappNumber ? ` ${phoneId}-error` : ""}`}
                 aria-invalid={errors.whatsappNumber ? true : undefined}
-                className="min-h-14 w-full bg-transparent px-3.5 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400 focus:outline-none"
+                className="min-h-14 min-w-0 w-full bg-transparent px-3.5 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400 focus:outline-none"
               />
             </div>
             <FieldError id={`${phoneId}-error`} message={errors.whatsappNumber} />

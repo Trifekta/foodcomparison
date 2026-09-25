@@ -226,9 +226,11 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   // WhatsApp is the only channel a result goes out on. The column and its
   // check constraint still permit 'email' because rows taken that way exist and
   // have to stay valid; nothing new is ever written with it.
-  let whatsappNumber: string;
+  let whatsappNumber: string | null = null;
   try {
-    whatsappNumber = normalisePhone(fields.dialCode, fields.whatsappNumber).e164;
+    if (fields.whatsappNumber.trim()) {
+      whatsappNumber = normalisePhone(fields.dialCode, fields.whatsappNumber).e164;
+    }
   } catch {
     return {
       ok: false,
