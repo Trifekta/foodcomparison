@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/Button";
 import { StepActions } from "./StepActions";
 import { ImageUpload } from "@/components/forms/ImageUpload";
 import { AmountInput } from "@/components/forms/AmountInput";
-import { FoodPhoto } from "@/components/customer/FoodPhoto";
-import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
+import { Sparks } from "@/components/customer/Motifs";
 import { ArrowRight, Camera, Smartphone } from "lucide-react";
 import { LastOrderBanner } from "@/components/customer/LastOrderBanner";
 import { ScrollDepth } from "@/components/customer/ScrollDepth";
 import { FoodAppLinks } from "./FoodAppLinks";
+import { UploadPromoSlot } from "./UploadPromoSlot";
+import type { PromotionConfig } from "@/lib/customer/promotion";
 import { track } from "@/lib/analytics/track";
 import { captureAttribution } from "@/lib/analytics/attribution";
 import { FOOD_APPS } from "@/lib/customer/food-apps";
@@ -20,6 +21,7 @@ import type { ExtractionStatus, TotalKind } from "./types";
 import { breakdownLabels, calculateManualTotal, type Breakdown, type ManualTotalState } from "@/lib/calculations/manual-total";
 
 interface StepUploadProps {
+  promotion: PromotionConfig | null;
   cartFile: File | null;
   checkoutFile: File | null;
   /** The first screenshot is still being read, so we cannot say yet. */
@@ -105,6 +107,7 @@ interface StepUploadProps {
  * more uploads than a bad screenshot does.
  */
 export function StepUpload({
+  promotion,
   cartFile,
   checkoutFile,
   cartReading,
@@ -242,32 +245,7 @@ export function StepUpload({
           like. */}
       <ScrollDepth />
 
-      {/* Keep the promise visible, but compress it on small phones so the
-          upload box remains in the initial viewport. */}
-      <div className="relative rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4 max-[389px]:py-0">
-        <div className="relative z-10 max-w-[44%]">
-          <ScriptNote underline className="text-[1.35rem] text-ink-900 max-[389px]:text-[1.05rem]">
-            Same Food
-            <br />
-            Lower Prices
-          </ScriptNote>
-          <p className="mt-2 text-[0.82rem] font-semibold leading-snug text-slate-600 max-[389px]:mt-1 max-[389px]:text-[0.7rem]">
-            Upload. Compare.
-            <br />
-            Save more.
-          </p>
-        </div>
-        <FoodPhoto
-          name="spread"
-          eager
-          className="pointer-events-none absolute right-0 top-1/2 w-[62%] -translate-y-1/2 select-none max-[389px]:w-[56%]"
-        />
-        <ScriptBubble className="absolute -right-1 -top-2 z-10 text-[0.64rem] leading-tight max-[389px]:text-[0.5rem]">
-          Good
-          <br />
-          Deals Ahead <span aria-hidden="true">&hearts;</span>
-        </ScriptBubble>
-      </div>
+      <UploadPromoSlot promotion={promotion} />
 
       {/* Back from a food app, screenshot in hand. Stays put until they pick
           one rather than fading on a timer: it is not a notification, it is
@@ -314,9 +292,6 @@ export function StepUpload({
 
       {!cartFile && (
         <div className="mt-5">
-          <h2 className="mb-3 text-lg font-extrabold text-ink-900">
-            Choose one to get started <span className="text-brand-500">↓</span>
-          </h2>
           <button
             type="button"
             onClick={chooseUpload}

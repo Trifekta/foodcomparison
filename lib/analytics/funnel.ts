@@ -61,6 +61,7 @@ export function isFunnelEvent(value: string): value is FunnelEvent {
  * that walks FUNNEL_STEPS steps straight past them.
  */
 export const SIDE_EVENTS = [
+  { event: "promo_banner_viewed", label: "Viewed the upload promotion" },
   { event: "app_opened", label: "Went to a food app" },
   // The landing page's own four tiles, deliberately NOT app_opened.
   //
