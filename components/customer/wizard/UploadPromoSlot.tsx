@@ -78,12 +78,29 @@ export function UploadPromoSlot({ promotion }: { promotion: PromotionConfig | nu
 
   return (
     <div ref={bannerRef} className="rounded-3xl border border-brand-300 bg-brand-100 px-4 py-2 text-ink-900">
-      <p className="inline-flex rounded-full border border-chip-green-fg/20 bg-chip-green-bg px-2 py-0.5 text-[0.62rem] font-extrabold uppercase leading-none tracking-[0.08em] text-ink-900">{promotion.label}</p>
-      <strong className="mt-0.5 block text-[1.9rem] font-extrabold leading-none tracking-tight">{promotion.headline}</strong>
-      <p className="mt-0.5 text-[0.78rem] font-semibold leading-snug text-ink-800">{promotion.supportingLine}</p>
-      <p className="mt-1 text-[0.8rem] font-semibold leading-snug">{promotion.message}</p>
-      <p className="text-[0.8rem] leading-snug text-slate-700">{promotion.supportingText}</p>
-      <p className="mt-0.5 text-[0.67rem] leading-tight text-slate-600">{promotion.disclaimer}</p>
+      <div className="relative min-h-[92px]">
+        <div className="relative z-10 max-w-[53%]">
+          <p className="flex w-fit rounded-full border border-chip-green-fg/20 bg-chip-green-bg px-2 py-0.5 text-[0.62rem] font-extrabold uppercase leading-none tracking-[0.08em] text-ink-900">{promotion.label}</p>
+          <strong className="mt-0.5 block text-[1.9rem] font-extrabold leading-none tracking-tight">{promotion.headline}</strong>
+          <p className="mt-0.5 text-[0.78rem] font-semibold leading-snug text-ink-800">{promotion.supportingLine}</p>
+        </div>
+        {/* Supplied food art is decorative; the offer and action remain text. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/food/promo-burger-fries-drink.webp"
+          alt=""
+          aria-hidden="true"
+          width={480}
+          height={287}
+          loading="eager"
+          decoding="async"
+          draggable={false}
+          className="pointer-events-none absolute right-0 top-0 h-[92px] w-[47%] select-none object-contain object-right-bottom"
+        />
+      </div>
+      <p className="relative mt-0.5 text-[0.8rem] font-semibold leading-snug">{promotion.message}</p>
+      <p className="relative text-[0.8rem] leading-snug text-slate-700">{promotion.supportingText}</p>
+      <p className="relative mt-0.5 text-[0.67rem] leading-tight text-slate-600">{promotion.disclaimer}</p>
     </div>
   );
 }
