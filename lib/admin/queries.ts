@@ -711,7 +711,7 @@ export async function getVisitorIps(range: DateRange = {}): Promise<VisitIpRow[]
 
   const { data, error } = await supabase
     .from("visitor_ips")
-    .select("visit_id, client_ip, created_at, submissions(reference_number)")
+    .select("visit_id, client_ip, user_agent, created_at, submissions(reference_number)")
     .gte("created_at", bounds.since ?? "1970-01-01T00:00:00Z")
     .lte("created_at", bounds.until ?? "2999-12-31T23:59:59Z")
     .order("created_at", { ascending: false });
