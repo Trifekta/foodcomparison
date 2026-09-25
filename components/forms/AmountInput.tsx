@@ -12,8 +12,9 @@ interface AmountInputProps {
   placeholder?: string;
   value?: string;
   name?: string;
+  readOnly?: boolean;
   /** "lg" renders the headline-sized field used on the customer total screen. */
-  scale?: "md" | "lg";
+  scale?: "sm" | "md" | "lg";
   /**
    * Keep the label for screen readers but take it off the screen, for a field
    * whose surrounding card already names it - otherwise the same three words
@@ -38,6 +39,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
   const large = scale === "lg";
+  const compact = scale === "sm";
 
   return (
     <div>
@@ -45,6 +47,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
         htmlFor={id}
         className={cn(
           "mb-2 block text-[0.95rem] font-bold text-ink-900",
+          compact && "text-[0.82rem]",
           hideLabel && "sr-only",
         )}
       >
@@ -66,7 +69,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
         <span
           className={cn(
             "shrink-0 font-bold text-ink-400",
-            large ? "pl-5 pr-2.5 text-xl" : "pl-4 pr-2 text-base",
+            large ? "pl-5 pr-2.5 text-xl" : compact ? "pl-2 pr-1 text-xs" : "pl-4 pr-2 text-base",
           )}
           aria-hidden="true"
         >
@@ -82,9 +85,9 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
           aria-describedby={cn(hint ? hintId : "", error ? errorId : "").trim() || undefined}
           aria-invalid={error ? true : undefined}
           className={cn(
-            "w-full rounded-r-2xl bg-transparent font-extrabold tracking-tight text-ink-900 placeholder:font-medium placeholder:text-ink-300",
+            "min-w-0 w-full rounded-r-2xl bg-transparent font-extrabold tracking-tight text-ink-900 placeholder:font-medium placeholder:text-ink-300",
             "focus:outline-none",
-            large ? "min-h-18 pr-5 text-3xl" : "min-h-14 pr-4 text-lg",
+            large ? "min-h-18 pr-5 text-3xl" : compact ? "min-h-14 pr-2 text-base" : "min-h-14 pr-4 text-lg",
           )}
           {...rest}
         />

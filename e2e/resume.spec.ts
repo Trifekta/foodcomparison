@@ -203,6 +203,78 @@ test("the cart upload is visible without scrolling on a narrow phone", async ({ 
   expect(uploadBottom).toBeLessThan(continueTop);
 });
 
+for (const settled of [false, true]) {
+  test(`checkout emphasizes before downscaling and OCR, then ${settled ? "becomes optional" : "stays recommended"}`, async ({ page, context }) => {
+    const problems: string[] = [];
+    page.on("pageerror", (error) => problems.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error" && /hydration|unmounted|update.*component/i.test(message.text())) problems.push(message.text());
+    });
+    let releaseRead!: () => void;
+    const readGate = new Promise<void>((resolve) => { releaseRead = resolve; });
+    let reads = 0;
+    await context.route("**/api/extract", async (route) => {
+      reads += 1;
+      await readGate;
+      await route.fulfill({ json: { basket: settled ? BASKET : { ...BASKET, final_total: "", delivery_fee: "", service_fee: "" } } });
+    });
+    await page.goto("/compare");
+    await page.getByRole("button", { name: /Already have a screenshot/ }).click();
+    await page.evaluate(() => {
+      const original = window.createImageBitmap.bind(window);
+      let first = true;
+      window.createImageBitmap = async (image: ImageBitmapSource) => {
+        if (first) {
+          first = false;
+          await new Promise<void>((resolve) => window.addEventListener("release-test-downscale", () => resolve(), { once: true }));
+        }
+        return original(image);
+      };
+    });
+    await page.getByLabel("Cart screenshot", { exact: true }).setInputFiles({ name: "cart.png", mimeType: "image/png", buffer: CART_PNG });
+    const checkout = page.locator('[data-guided-scroll="checkout"]');
+    await expect(checkout.locator("section").first()).toHaveClass(/ring-flame-300/);
+    await expect(checkout.getByText("Recommended", { exact: true })).toBeVisible();
+    await expect(checkout.getByText("Add your checkout screenshot for the most accurate comparison.")).toBeVisible();
+    await expect(checkout.locator(".animate-ping")).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeDisabled();
+    await page.evaluate(() => window.dispatchEvent(new Event("release-test-downscale")));
+    await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeEnabled();
+    await expect(checkout.locator("section").first()).toHaveClass(/ring-flame-300/);
+    releaseRead();
+    if (settled) {
+      await expect(checkout.getByText("Optional", { exact: true })).toBeVisible();
+      await expect(checkout.locator("section").first()).not.toHaveClass(/ring-flame-300/);
+    } else {
+      await expect(checkout.getByText("Your cart screenshot doesn't show the final total — add the checkout screen for an exact comparison.")).toBeVisible();
+      await expect(checkout.locator("section").first()).toHaveClass(/ring-flame-300/);
+    }
+    expect(reads).toBe(1);
+    await page.getByLabel("Checkout total", { exact: true }).setInputFiles({ name: "checkout.png", mimeType: "image/png", buffer: CHECKOUT_PNG });
+    await expect(checkout.locator("section").first()).not.toHaveClass(/ring-flame-300/);
+    await expect(checkout.getByRole("button", { name: "Remove", exact: true })).toBeVisible();
+    await checkout.getByRole("button", { name: "Remove", exact: true }).click();
+    if (!settled) await expect(checkout.locator("section").first()).toHaveClass(/ring-flame-300/);
+    else await expect(checkout.getByText("Optional", { exact: true })).toBeVisible();
+    // Replacing the cart discards its old settled evidence immediately.
+    let releaseReplacement!: () => void;
+    const replacementGate = new Promise<void>((resolve) => { releaseReplacement = resolve; });
+    await context.route("**/api/extract", async (route) => {
+      await replacementGate;
+      await route.fulfill({ json: { basket: BASKET } });
+    });
+    await page.getByLabel("Cart screenshot", { exact: true }).setInputFiles({ name: "replacement.png", mimeType: "image/png", buffer: CHECKOUT_PNG });
+    await expect(checkout.locator("section").first()).toHaveClass(/ring-flame-300/);
+    releaseReplacement();
+    await expect(checkout.getByText("Optional", { exact: true })).toBeVisible();
+    expect(problems).toEqual([]);
+    // Invalid replacement clears the accepted cart through the existing path.
+    await page.getByLabel("Cart screenshot", { exact: true }).setInputFiles({ name: "bad.txt", mimeType: "text/plain", buffer: Buffer.from("invalid") });
+    await expect(checkout).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeDisabled();
+  });
+}
+
 test("the first cart upload guides the customer to the second screenshot card", async ({ page }) => {
   await page.goto("/compare");
   await page.getByRole("button", { name: /Already have a screenshot/ }).click();
@@ -318,6 +390,63 @@ async function expectGuidedScroll(page: Page, target: string) {
   await expect.poll(() => card.evaluate((element) => element.getBoundingClientRect().top))
     .toBeGreaterThan(48);
 }
+
+for (const width of [320, 393]) {
+  test(`manual checkout breakdown calculates and carries forward at ${width}px`, async ({ page, context }) => {
+    await page.setViewportSize({ width, height: 750 });
+    await context.route("**/api/extract", (route) => route.fulfill({ json: { basket: {
+      ...BASKET, delivery_fee: "", service_fee: "", final_total: "",
+    } } }));
+    await uploadCart(page);
+    await expect(page.getByLabel("Food subtotal", { exact: true })).toHaveValue("58.00");
+    const subtotal = await page.getByLabel("Food subtotal", { exact: true }).boundingBox();
+    const delivery = await page.getByLabel("Delivery fee", { exact: true }).boundingBox();
+    expect(subtotal!.y).toBe(delivery!.y);
+    expect(delivery!.x).toBeGreaterThan(subtotal!.x + subtotal!.width);
+    await page.getByLabel("Delivery fee", { exact: true }).fill("7");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(page.getByLabel("Service fee", { exact: true })).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByLabel("Final total (AED)", { exact: true })).toHaveValue("");
+    await page.getByLabel("Service fee", { exact: true }).fill("2.70");
+    await page.getByLabel("Discount (AED)", { exact: true }).fill("5");
+    await expect(page.getByLabel("Final total (AED)", { exact: true })).toHaveValue("62.70");
+    await expect(page.getByLabel("Final total (AED)", { exact: true })).toHaveAttribute("readonly", "");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.getByLabel("Food subtotal", { exact: true }).scrollIntoViewIfNeeded();
+    await page.getByRole("heading", { name: "Don't have a checkout screenshot?", exact: true }).locator("..").screenshot({ path: `test-results/manual-breakdown-${width}.png` });
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(page.locator('[data-guided-scroll="total"] input')).toHaveValue("62.70");
+    await page.getByRole("combobox", { name: "Your delivery area" }).fill("Barsha");
+    await page.getByRole("option", { name: /Al Barsha/ }).click();
+    await page.getByRole("button", { name: "no", exact: true }).click();
+    const submitted = page.waitForResponse((response) => response.url().endsWith("/api/submissions"));
+    await page.getByRole("button", { name: /Get a Keeta price/ }).click();
+    expect((await submitted).status()).toBe(201);
+    await expect(page).toHaveURL(/\/r\//);
+    expect(Number((await fakeState(page)).tables.submissions[0].current_total)).toBe(62.70);
+  });
+}
+
+test("manual checkout permits direct entry and does not mistake zero fees for a subtotal", async ({ page, context }) => {
+  await context.route("**/api/extract", (route) => route.fulfill({ json: { basket: {
+    ...BASKET, delivery_fee: "", service_fee: "", final_total: "",
+  } } }));
+  await uploadCart(page);
+  await page.getByRole("button", { name: "I already know my final total" }).click();
+  await page.getByLabel("Your final total", { exact: true }).fill("71.20");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.locator('[data-guided-scroll="total"] input')).toHaveValue("71.20");
+  await page.getByRole("button", { name: "Go back", exact: true }).click();
+  await expect(page.getByLabel("Your final total", { exact: true })).toHaveValue("71.20");
+  await page.getByRole("button", { name: "Calculate from subtotal and fees" }).click();
+  for (const label of ["Delivery fee", "Service fee", "Discount (AED)"]) {
+    await page.getByLabel(label, { exact: true }).fill("0");
+  }
+  await expect(page.getByLabel("Final total (AED)", { exact: true })).toHaveValue("58.00");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.locator('[data-guided-scroll="total"] input')).toHaveValue("58.00");
+  await expect(page.getByText("Your order subtotal", { exact: true })).toHaveCount(0);
+});
 
 for (const width of [320, 393]) {
   test(`Screen 2 result help scrolls without focusing the phone at ${width}px`, async ({ page }) => {

@@ -247,7 +247,7 @@ export function StepConfirm({
    * predictable direction. The customer is the only person who can close that
    * gap, and they can only do it if they are told it is open.
    */
-  const isSubtotal = totalKind === "subtotal" && values.currentTotal === readTotal;
+  const isSubtotal = prefilledFromScreenshot && totalKind === "subtotal" && values.currentTotal === readTotal;
 
   const totalLabel = isSubtotal
     ? "Your order subtotal"

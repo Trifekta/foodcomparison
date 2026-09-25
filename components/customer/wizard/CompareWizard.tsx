@@ -31,6 +31,7 @@ import { draftValuesFrom, type DraftProgress } from "@/lib/drafts/progress";
 import type { ResumeMode } from "@/lib/drafts/client";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
+import type { ManualTotalState } from "@/lib/calculations/manual-total";
 import { StepConfirm } from "./StepConfirm";
 import {
   WIZARD_DEFAULTS,
@@ -163,6 +164,7 @@ export function CompareWizard({
   const values = useWatch({ control, defaultValue: WIZARD_DEFAULTS }) as WizardValues;
 
   const [step, setStep] = useState<number>(STEP_UPLOAD);
+  const [manualTotalState, setManualTotalState] = useState<ManualTotalState>({ mode: null, parts: null });
   const [files, setFiles] = useState<WizardFiles>({ cart: null, checkout: null });
   // Items are an array of objects, so they live here rather than in
   // react-hook-form, whose values all travel as single FormData entries.
@@ -385,6 +387,7 @@ export function CompareWizard({
   const trustedTotal = trustedFinalTotal(readTotals);
 
   useEffect(() => {
+    if (manualTotalState.mode !== null && !files.checkout) return;
     const decision = shouldAutofillTotal({
       readFinalTotal: offer.value,
       typed: getValues("currentTotal"),
@@ -403,7 +406,7 @@ export function CompareWizard({
     // already filled and declines.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
     setAutofilled(offer.value);
-  }, [offer.value, autofilled, getValues, setValue, clearErrors]);
+  }, [offer.value, autofilled, getValues, setValue, clearErrors, manualTotalState, files.checkout]);
 
   const setField = <K extends keyof WizardValues & string>(
     name: K,
@@ -899,9 +902,12 @@ export function CompareWizard({
           }}
           onCheckoutPicked={(file) => startRead(file, "checkout")}
           manualTotal={values.currentTotal}
+          manualState={manualTotalState}
+          onManualStateChange={setManualTotalState}
+          readSubtotal={readTotals?.subtotal ?? ""}
           totalKind={offer.kind}
           checkoutStatus={checkoutStatus}
-          prefilledFromScreenshot={offer.value !== "" && values.currentTotal === offer.value}
+          prefilledFromScreenshot={manualTotalState.mode !== "breakdown" && offer.value !== "" && values.currentTotal === offer.value}
           onManualTotalChange={(value) => setField("currentTotal", value)}
           totalError={errors.currentTotal?.message}
           error={cartError}
@@ -925,7 +931,7 @@ export function CompareWizard({
           readTotal={offer.value || null}
           totalKind={offer.kind}
           totalFromCheckout={totalsFromCheckout && checkoutTotals.finalTotal !== ""}
-          prefilledFromScreenshot={offer.value !== "" && values.currentTotal === offer.value}
+          prefilledFromScreenshot={manualTotalState.mode !== "breakdown" && offer.value !== "" && values.currentTotal === offer.value}
           waitingOnRead={cartReading && !readWaitExpired}
           submitting={submitting}
           submitError={submitError}
@@ -939,9 +945,13 @@ export function CompareWizard({
           onRestaurantNameChange={(value) => setField("restaurantName", value)}
           onItemsChange={setItems}
           onAreaChange={(areaId) => setField("areaId", areaId)}
-          onCurrentTotalChange={(value) => setField("currentTotal", value)}
+          onCurrentTotalChange={(value) => {
+            setManualTotalState((current) => ({ ...current, mode: "direct" }));
+            setField("currentTotal", value);
+          }}
           onNewToKeetaChange={(value) => setField("newToKeeta", value)}
           onUseReadTotal={() => {
+            setManualTotalState({ mode: null, parts: null });
             if (offer.value) setField("currentTotal", offer.value);
           }}
           onDialCodeChange={(code) => setField("dialCode", code)}

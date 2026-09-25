@@ -17,6 +17,7 @@ import { captureAttribution } from "@/lib/analytics/attribution";
 import { FOOD_APPS } from "@/lib/customer/food-apps";
 import { scrollToGuidedTarget } from "@/lib/customer/scroll-to-target";
 import type { ExtractionStatus, TotalKind } from "./types";
+import { breakdownLabels, calculateManualTotal, type Breakdown, type ManualTotalState } from "@/lib/calculations/manual-total";
 
 interface StepUploadProps {
   cartFile: File | null;
@@ -58,6 +59,9 @@ interface StepUploadProps {
    * typed here is still there, and still changeable, one screen later.
    */
   manualTotal: string;
+  manualState: ManualTotalState;
+  onManualStateChange: (state: ManualTotalState) => void;
+  readSubtotal: string;
   /** What the read offered, so this card never calls a subtotal a final total. */
   totalKind: TotalKind;
   /**
@@ -90,21 +94,10 @@ interface StepUploadProps {
  * one and comparing against an item subtotal is the worse mistake in the other
  * direction.
  *
- * So the second slot moves in two ways, but only one of them touches what it
- * says. It starts Recommended, because until the first screenshot has been
- * read the odds are simply unknown. The moment that read comes back carrying a
- * total and its fees, the slot drops to Optional and says so: nothing further
- * is needed, and continuing to press for a screen they have already
- * effectively sent is how a person decides this is too much work.
- *
- * But if that same read comes back and the total is not on it - an item list
- * with no payment summary under it, the Deliveroo shape - the slot stays
- * exactly Recommended in what it says, and gets visually louder in how it
- * says it: a ring, a small pulse. Not a fourth tier next to Required, because
- * it still is not required - nothing here has ever gated Continue, and a
- * stronger badge would claim otherwise. The pill's job is to state the rule;
- * the emphasis's job is only to earn a second look once we know, rather than
- * guess, that this slot is what completes the comparison.
+ * The checkout slot is emphasized and Recommended as soon as a valid cart
+ * is picked, before downscaling or reading finishes. It stays emphasized
+ * unless it is filled or the cart read confirms a settled total; a settled
+ * cart downgrades it to the quiet Optional state.
  *
  * Each slot carries an (i) to a drawing of a good screenshot. Behind an icon
  * rather than on the page: this is where somebody weighs the wait against the
@@ -124,6 +117,9 @@ export function StepUpload({
   onCartPicked,
   onCheckoutPicked,
   manualTotal,
+  manualState,
+  onManualStateChange,
+  readSubtotal,
   totalKind,
   checkoutStatus,
   prefilledFromScreenshot,
@@ -138,6 +134,11 @@ export function StepUpload({
   // read's own latency fix (onFilePicked, ahead of that same downscale) exists
   // for. The banner should disappear on the same signal, not lag behind it.
   const [uploadStarted, setUploadStarted] = useState(false);
+  const [cartPicked, setCartPicked] = useState(false);
+  const [checkoutPicked, setCheckoutPicked] = useState(false);
+  const hasCartScreenshot = cartFile !== null || cartPicked;
+  const emphasizeCheckout = hasCartScreenshot && checkoutFile === null && !checkoutPicked && !cartSettlesTheBill;
+  const [showBreakdownErrors, setShowBreakdownErrors] = useState(false);
   const [forkChoice, setForkChoice] = useState<"none" | "upload" | "app">(
     returnedFromApp ? "upload" : "none",
   );
@@ -162,17 +163,17 @@ export function StepUpload({
     setForkChoice("upload");
   };
 
-  // The first accepted cart file replaces the fork card with the full upload
-  // flow. Guide that deliberate upload to its next card once the card exists;
-  // a restored draft or a later cart replacement must not move the page.
+  // Reveal and guide to checkout at file-pick time, before downscaling finishes.
+  // Keep the active cart picker mounted until its processed file arrives.
+  // A restored draft or a later cart replacement must not move the page.
   useEffect(() => {
-    if (!cartFile || !checkoutScrollRequested.current) return;
+    if (!hasCartScreenshot || !checkoutScrollRequested.current) return;
     const frame = window.requestAnimationFrame(() => {
       checkoutScrollRequested.current = false;
       scrollToGuidedTarget(checkoutUploadRef.current);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [cartFile]);
+  }, [hasCartScreenshot]);
 
   // The field is holding what we read, and what we read was the food without
   // its fees. Only while that number is still the one in the field - the
@@ -197,6 +198,18 @@ export function StepUpload({
   const askingForOne =
     !cartSettlesTheBill && !settledFill && !subtotalOnly && checkoutFile === null;
   const fieldLabel = subtotalOnly ? "Your order subtotal" : "Your final total";
+  const canCalculate = checkoutFile === null && ((!cartSettlesTheBill && !settledFill) ||
+    (manualState.mode === "breakdown" && manualState.parts !== null));
+  const breakdownMode = canCalculate && (manualState.mode === "breakdown" ||
+    (manualState.mode === null && (!manualTotal || subtotalOnly)));
+  const parts = manualState.parts ?? { subtotal: readSubtotal, delivery: "", service: "", discount: "" };
+  const calculation = calculateManualTotal(parts);
+
+  function changePart(key: keyof Breakdown, value: string) {
+    const next = { ...parts, [key]: value };
+    onManualStateChange({ mode: "breakdown", parts: next });
+    onManualTotalChange(calculateManualTotal(next).total);
+  }
 
   // Start fetching the reading engine now, while they are in their gallery
   // choosing a photo. Waiting until they have chosen puts several megabytes
@@ -340,12 +353,14 @@ export function StepUpload({
                 onOpenPicker={chooseUpload}
                 file={cartFile}
                 onChange={(file, original) => {
-                  if (file) checkoutScrollRequested.current = true;
+                  setCartPicked(false);
                   onCartChange(file, original);
                 }}
                 onFilePicked={(file) => {
                   chooseUpload();
                   setUploadStarted(true);
+                  checkoutScrollRequested.current = true;
+                  setCartPicked(true);
                   track("cart_uploaded");
                   onCartPicked(file);
                 }}
@@ -391,9 +406,9 @@ export function StepUpload({
       )}
 
       {/* Full upload flow once a cart screenshot exists. */}
-      {cartFile && (
+      {hasCartScreenshot && (
         <div className="mt-4 space-y-3">
-          <ImageUpload
+          {cartFile ? <ImageUpload
             step={1}
             label="Cart screenshot"
             hint="Restaurant and selected items"
@@ -402,14 +417,18 @@ export function StepUpload({
             art="cartDoc"
             example="cart"
             file={cartFile}
-            onChange={onCartChange}
+            onChange={(file, original) => {
+              setCartPicked(false);
+              onCartChange(file, original);
+            }}
             onFilePicked={(file) => {
               setUploadStarted(true);
+              setCartPicked(true);
               track("cart_uploaded");
               onCartPicked(file);
             }}
             error={error}
-          />
+          /> : null}
 
           <div ref={checkoutUploadRef} data-guided-scroll="checkout" className="scroll-mt-24">
             <ImageUpload
@@ -423,10 +442,10 @@ export function StepUpload({
                       ? "We read your total from this one"
                       : "No total found on this one"
                   : cartSettlesTheBill
-                    ? "Already covered by your first screenshot"
+                    ? "We found your final total already — the checkout screenshot is optional."
                     : cartConfirmedShort
                       ? "Your total wasn't on the first screenshot"
-                      : "Fees, discounts and final total"
+                      : "Add your checkout screenshot for the most accurate comparison."
               }
               helper={
                 checkoutAnswered
@@ -437,21 +456,23 @@ export function StepUpload({
                     ? "Reading it now — your total will fill in below."
                     : cartSettlesTheBill
                       ? "Your first screenshot already showed the fees and total, so you can skip this."
-                      : cartConfirmedShort
-                        ? "We read your cart screenshot but didn't find a total on it — add this one so we compare the right number."
-                        : cartReading
-                          ? "Checking your first screenshot — add this if your total is on a different screen."
-                          : "From the same app as your cart — this shows your discounts, fees and final total."
+                      : cartConfirmedShort && !cartReading
+                        ? "Your cart screenshot doesn't show the final total — add the checkout screen for an exact comparison."
+                        : "It shows discounts, delivery fees and your final total."
               }
               requirement={cartSettlesTheBill ? "optional" : "recommended"}
-              emphasize={cartConfirmedShort && checkoutFile === null}
+              emphasize={emphasizeCheckout}
               art="receipt"
               example="checkout"
               allowRemove
               file={checkoutFile}
-              onChange={onCheckoutChange}
+              onChange={(file, original) => {
+                setCheckoutPicked(false);
+                onCheckoutChange(file, original);
+              }}
               onFilePicked={(file) => {
                 setUploadStarted(true);
+                setCheckoutPicked(true);
                 track("checkout_uploaded");
                 onCheckoutPicked(file);
               }}
@@ -467,10 +488,12 @@ export function StepUpload({
 
           <div className="rounded-3xl bg-cream p-3.5 ring-1 ring-sand">
             <h3 className="text-[1rem] font-extrabold text-ink-900">
-              {askingForOne ? "Don't have a checkout screenshot?" : fieldLabel}
+              {canCalculate ? "Don't have a checkout screenshot?" : askingForOne ? "Don't have a checkout screenshot?" : fieldLabel}
             </h3>
             <p className="mt-0.5 mb-3 text-[0.88rem] leading-snug text-slate-600">
-              {cartSettlesTheBill
+              {breakdownMode
+                ? "Enter your order breakdown. Enter 0 for fees or discounts that don't apply."
+                : cartSettlesTheBill
                 ? "This is what we read off your cart screenshot — after discounts, fees and delivery."
                 : settledFill
                   ? "This is what we read off your screenshots — after discounts, fees and delivery."
@@ -480,15 +503,46 @@ export function StepUpload({
                       ? "We couldn't read a total off your screenshots — type the final payable amount here."
                       : "Enter your final payable amount instead — after discounts, fees and delivery."}
             </p>
-            <AmountInput
+            {breakdownMode ? (
+              <>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+                  {(Object.keys(breakdownLabels) as (keyof Breakdown)[]).map((key) => (
+                    <AmountInput
+                      key={key}
+                      scale="sm"
+                      label={breakdownLabels[key]}
+                      value={parts[key]}
+                      placeholder={key === "subtotal" ? "58.00" : "0.00"}
+                      onChange={(event) => changePart(key, event.target.value)}
+                      error={showBreakdownErrors ? calculation.errors[key] : undefined}
+                    />
+                  ))}
+                </div>
+                <div className="mt-4 rounded-2xl bg-brand-100 p-3">
+                  <AmountInput label="Final total (AED)" value={calculation.total} readOnly placeholder="—" error={showBreakdownErrors ? calculation.totalError : undefined} />
+                  <p className="mt-2 text-xs text-slate-600">Subtotal + delivery + service fee − discount</p>
+                </div>
+              </>
+            ) : <AmountInput
               label={fieldLabel}
               hideLabel={!askingForOne}
               value={manualTotal}
               onChange={(event) => onManualTotalChange(event.target.value)}
               error={totalError}
-            />
+            />}
+            {canCalculate ? (
+              <button type="button" className="mt-2 min-h-11 text-sm font-bold text-ink-800 underline underline-offset-4" onClick={() => {
+                setShowBreakdownErrors(false);
+                onManualStateChange({ ...manualState, mode: breakdownMode ? "direct" : "breakdown" });
+                onManualTotalChange(breakdownMode ? calculation.total : calculateManualTotal(parts).total);
+              }}>
+                {breakdownMode ? "I already know my final total" : "Calculate from subtotal and fees"}
+              </button>
+            ) : null}
             <p className="mt-3 text-[0.82rem] leading-snug text-slate-500">
-              {cartSettlesTheBill || settledFill
+              {breakdownMode
+                ? "Enter the discount as an AED amount. Your final total updates automatically."
+                : cartSettlesTheBill || settledFill
                 ? "Change it only if it looks wrong."
                 : subtotalOnly
                   ? "Add the checkout screenshot above and we'll read your real total — or type it here yourself."
@@ -506,7 +560,13 @@ export function StepUpload({
 
       <div className={!cartFile ? "[&>div]:static" : undefined}>
         <StepActions>
-          <Button onClick={onContinue} disabled={!cartFile} arrow>
+          <Button onClick={() => {
+            if (breakdownMode && manualState.parts !== null && !calculation.total) {
+              setShowBreakdownErrors(true);
+              return;
+            }
+            onContinue();
+          }} disabled={!cartFile} arrow>
             Continue
           </Button>
           {!cartFile ? (
