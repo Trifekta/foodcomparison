@@ -14,7 +14,7 @@ export interface PromotionConfig {
 }
 
 export const uploadPromotion: PromotionConfig = {
-  enabled: true,
+  enabled: false,
   label: "🔥 KEETA WEEK",
   headline: "50% OFF",
   supportingLine: "at select restaurants today",
