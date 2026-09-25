@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
-import { ScriptBubble, ScriptNote } from "@/components/customer/Motifs";
+import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
 import { track, visitId } from "@/lib/analytics/track";
 import type { PromotionConfig } from "@/lib/customer/promotion";
 
@@ -80,10 +80,11 @@ export function UploadPromoSlot({ promotion }: { promotion: PromotionConfig | nu
     <div ref={bannerRef} className="rounded-3xl border border-brand-300 bg-brand-100 px-4 py-2 text-ink-900">
       <div className="relative min-h-[92px]">
         <div className="relative z-10 max-w-[53%]">
-          <p className="flex w-fit rounded-full border border-chip-green-fg/20 bg-chip-green-bg px-2 py-0.5 text-[0.62rem] font-extrabold uppercase leading-none tracking-[0.08em] text-ink-900">{promotion.label}</p>
-          <strong className="mt-0.5 block text-[1.9rem] font-extrabold leading-none tracking-tight">{promotion.headline}</strong>
+          <p className="flex w-fit rounded-full border border-brand-500 bg-brand-300 px-2.5 py-0.5 text-[0.68rem] font-extrabold uppercase leading-none tracking-[0.06em] text-ink-900">{promotion.label}</p>
+          <strong className="relative mt-0.5 block w-fit text-[1.9rem] font-extrabold leading-none tracking-tight before:absolute before:inset-x-0 before:bottom-0 before:h-[5px] before:rounded-full before:bg-brand-300"><span className="relative">{promotion.headline}</span></strong>
           <p className="mt-0.5 text-[0.78rem] font-semibold leading-snug text-ink-800">{promotion.supportingLine}</p>
         </div>
+        <span aria-hidden="true" className="pointer-events-none absolute right-0 top-2 h-[72px] w-[48%] max-w-[160px] rounded-[50%] bg-white/70" />
         {/* Supplied food art is decorative; the offer and action remain text. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -95,8 +96,9 @@ export function UploadPromoSlot({ promotion }: { promotion: PromotionConfig | nu
           loading="eager"
           decoding="async"
           draggable={false}
-          className="pointer-events-none absolute right-0 top-0 h-[92px] w-[47%] select-none object-contain object-right-bottom"
+          className="pointer-events-none absolute right-0 -top-1 h-[92px] w-[52%] select-none object-contain object-right-bottom"
         />
+        <Sparks className="pointer-events-none absolute right-[48%] top-0 h-4 w-4" />
       </div>
       <p className="relative mt-0.5 text-[0.8rem] font-semibold leading-snug">{promotion.message}</p>
       <p className="relative text-[0.8rem] leading-snug text-slate-700">{promotion.supportingText}</p>
