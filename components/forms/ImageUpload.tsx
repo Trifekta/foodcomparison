@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { useObjectUrl } from "@/lib/customer/use-object-url";
 import { Camera, Check, Loader2, Maximize2, RefreshCw, Trash2 } from "lucide-react";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/constants";
@@ -49,6 +49,9 @@ interface ImageUploadProps {
    * parallel with the downscale rather than after it.
    */
   onFilePicked?: (file: File) => void;
+  /** First-screen cart slot: show the picker itself without the numbered card. */
+  direct?: boolean;
+  onOpenPicker?: () => void;
   error?: string | null;
   /**
    * Drives the pill. Required is red and Optional green, as in the designs;
@@ -88,6 +91,8 @@ export function ImageUpload({
   file,
   onChange,
   onFilePicked,
+  direct = false,
+  onOpenPicker,
   error,
   requirement,
   allowRemove = false,
@@ -127,6 +132,8 @@ export function ImageUpload({
 
   const message = error ?? localError;
   const filled = Boolean(file);
+  const simple = direct && !filled;
+  const UploadControl = simple ? "label" : "button";
   // Earned attention, not decoration - only while the caller has flagged it
   // and the slot is still empty. The moment it is filled, the point is made.
   // Drives the ring and pulse below, and also the hint and helper text color -
@@ -137,11 +144,12 @@ export function ImageUpload({
   return (
     <section
       className={cn(
-        "rounded-3xl bg-white p-4 shadow-[0_2px_14px_rgba(23,23,28,0.05)] ring-1 transition-shadow",
+        "rounded-3xl bg-white shadow-[0_2px_14px_rgba(23,23,28,0.05)] ring-1 transition-shadow",
+        simple ? "p-2" : "p-4",
         emphasize ? "ring-2 ring-flame-300 shadow-[0_2px_18px_rgba(245,109,24,0.18)]" : "ring-ink-100",
       )}
     >
-      <div className="flex items-start gap-3">
+      {!simple ? <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
           className={cn(
@@ -196,7 +204,7 @@ export function ImageUpload({
             is wide enough that an inline icon wrapped onto its own line and sat
             there orphaned under the label. */}
         {example ? <ScreenshotExampleButton example={example} forLabel={label} /> : null}
-      </div>
+      </div> : null}
 
       <input
         ref={inputRef}
@@ -204,8 +212,11 @@ export function ImageUpload({
         type="file"
         accept={ACCEPTED_IMAGE_TYPES.join(",")}
         className="sr-only"
+        aria-label={simple ? label : undefined}
         aria-describedby={message ? errorId : undefined}
         aria-invalid={message ? true : undefined}
+        disabled={processing}
+        onClick={simple ? onOpenPicker : undefined}
         onChange={(event) => {
           void accept(event.target.files?.[0]);
           // Allow re-selecting the same file after a validation failure.
@@ -277,7 +288,7 @@ export function ImageUpload({
         </div>
       ) : (
         <div
-          className="mt-3"
+          className={simple ? "" : "mt-3"}
           onDragOver={(event) => {
             event.preventDefault();
             setDragging(true);
@@ -286,15 +297,33 @@ export function ImageUpload({
           onDrop={(event) => {
             event.preventDefault();
             setDragging(false);
+            if (event.dataTransfer.files?.[0]) onOpenPicker?.();
             void accept(event.dataTransfer.files?.[0]);
           }}
         >
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={processing}
+          <UploadControl
+            {...(simple
+              ? {
+                  htmlFor: inputId,
+                  role: "button" as const,
+                  tabIndex: 0,
+                  onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    inputRef.current?.click();
+                  },
+                }
+              : {
+                  type: "button" as const,
+                  onClick: () => {
+                    onOpenPicker?.();
+                    inputRef.current?.click();
+                  },
+                  disabled: processing,
+                })}
             className={cn(
               "flex min-h-[9.5rem] w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed px-4 py-5 text-center transition-colors",
+              simple && "min-h-[9rem] rounded-[1.35rem] max-[389px]:min-h-[8.25rem] max-[389px]:py-3",
               dragging ? "border-brand-500 bg-brand-50" : "border-ink-200 hover:border-brand-400 hover:bg-brand-50/40",
             )}
           >
@@ -305,23 +334,30 @@ export function ImageUpload({
               </>
             ) : (
               <>
-                <span aria-hidden="true" className="relative mb-1.5 block h-[5.25rem] w-28">
-                  <FoodPhoto name={art} className="absolute inset-0 h-full w-full object-contain" />
-                  <span className="absolute -bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-brand-400 shadow-sm">
-                    <Camera className="h-4.5 w-4.5 text-ink-900" strokeWidth={2.2} />
+                {simple ? (
+                  <span aria-hidden="true" className="relative mb-1.5 flex h-16 w-16 items-center justify-center rounded-full bg-brand-100">
+                    <Camera className="h-8 w-8 text-ink-900" strokeWidth={2.2} />
+                    <Sparks className="absolute -right-6 -top-1 h-5 w-5" />
                   </span>
-                  <Sparks className="absolute -left-3 top-3 h-5 w-5" />
-                  <Sparks className="absolute -right-2 top-1 h-5 w-5 -scale-x-100" />
-                </span>
+                ) : (
+                  <span aria-hidden="true" className="relative mb-1.5 block h-[5.25rem] w-28">
+                    <FoodPhoto name={art} className="absolute inset-0 h-full w-full object-contain" />
+                    <span className="absolute -bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-brand-400 shadow-sm">
+                      <Camera className="h-4.5 w-4.5 text-ink-900" strokeWidth={2.2} />
+                    </span>
+                    <Sparks className="absolute -left-3 top-3 h-5 w-5" />
+                    <Sparks className="absolute -right-2 top-1 h-5 w-5 -scale-x-100" />
+                  </span>
+                )}
                 <span className="text-[0.95rem] font-extrabold text-ink-900">Tap to upload</span>
                 <span className="text-xs text-slate-400">JPG, PNG or WEBP · up to 10 MB</span>
               </>
             )}
-          </button>
+          </UploadControl>
         </div>
       )}
 
-      {helper ? (
+      {helper && !simple ? (
         <p
           className={cn(
             "mt-2 px-0.5 text-xs leading-snug",
