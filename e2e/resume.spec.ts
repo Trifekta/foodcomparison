@@ -319,6 +319,57 @@ async function expectGuidedScroll(page: Page, target: string) {
     .toBeGreaterThan(48);
 }
 
+for (const width of [320, 393]) {
+  test(`Screen 2 result help scrolls without focusing the phone at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 700 });
+    await uploadCart(page);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await watchGuidedScroll(page);
+    await page.getByRole("button", { name: "How will I get my result?" }).click();
+    await expectGuidedScroll(page, "contact");
+    await expect(page.locator("html")).toHaveAttribute("data-guided-scroll-behavior", "smooth");
+    const section = page.locator('[data-guided-scroll="contact"]');
+    await expect(section.getByRole("heading", { name: "WhatsApp number" })).toBeInViewport();
+    await expect(section.getByText("Recommended", { exact: true })).toBeInViewport();
+    const phone = page.getByRole("textbox", { name: "WhatsApp number" });
+    await expect(phone).not.toBeFocused();
+    await expect(phone).toBeInViewport();
+    const inputBox = await phone.boundingBox();
+    const submitBox = await page.getByRole("button", { name: /Get a Keeta price/ }).boundingBox();
+    expect(inputBox!.y + inputBox!.height).toBeLessThan(submitBox!.y);
+    expect(await page.evaluate(() => window.scrollX)).toBe(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}
+
+test("Screen 2 submits with an empty phone after clearing an invalid entry", async ({ page }) => {
+  await uploadCart(page);
+  await goToConfirmAndChooseArea(page);
+  await page.getByRole("button", { name: "no", exact: true }).click();
+  const phone = page.getByRole("textbox", { name: "WhatsApp number" });
+  await phone.fill("50");
+  await page.getByRole("button", { name: /Get a Keeta price/ }).click();
+  await expect(page.getByText("Enter a valid mobile number.", { exact: true })).toBeVisible();
+  await phone.fill("");
+  const submitted = page.waitForResponse((response) => response.url().endsWith("/api/submissions"));
+  await page.getByRole("button", { name: /Get a Keeta price/ }).click();
+  expect((await submitted).status()).toBe(201);
+  await expect(page).toHaveURL(/\/r\//);
+  expect((await fakeState(page)).tables.submissions[0].whatsapp_number).toBeNull();
+});
+
+test("Screen 2 submits with the phone left untouched", async ({ page }) => {
+  await uploadCart(page);
+  await goToConfirmAndChooseArea(page);
+  await page.getByRole("button", { name: "yes", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "WhatsApp number" })).toHaveValue("");
+  const submitted = page.waitForResponse((response) => response.url().endsWith("/api/submissions"));
+  await page.getByRole("button", { name: /Get a Keeta price/ }).click();
+  expect((await submitted).status()).toBe(201);
+  await expect(page).toHaveURL(/\/r\//);
+  expect((await fakeState(page)).tables.submissions[0].whatsapp_number).toBeNull();
+});
+
 test("Screen 2 guides completed answers and skips a total read from the screenshot", async ({ page }) => {
   await uploadCart(page);
   await page.getByRole("button", { name: "Continue" }).click();

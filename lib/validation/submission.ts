@@ -114,16 +114,9 @@ type BaseValues = {
 
 type ContactValues = Pick<BaseValues, "dialCode" | "whatsappNumber">;
 
-/** A reachable WhatsApp number, which is now the only way a result goes out. */
+/** WhatsApp is optional; validate the format only when a number is supplied. */
 function checkContactRules(value: ContactValues, ctx: z.RefinementCtx): void {
-  if (!value.whatsappNumber.trim()) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["whatsappNumber"],
-      message: ERROR_MESSAGES.contactMissing,
-    });
-    return;
-  }
+  if (!value.whatsappNumber.trim()) return;
 
   if (!isNormalisablePhone(value.dialCode, value.whatsappNumber)) {
     ctx.addIssue({

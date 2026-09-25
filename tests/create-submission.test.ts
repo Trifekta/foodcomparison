@@ -103,6 +103,30 @@ beforeEach(() => {
 });
 
 describe("createSubmission", () => {
+  it.each(["", "   "])("stores null for a blank optional phone (%j)", async (whatsappNumber) => {
+    expect((await createSubmission(formData({ whatsappNumber }))).ok).toBe(true);
+    expect(submissionRow().whatsapp_number).toBeNull();
+  });
+
+  it("accepts an omitted phone field", async () => {
+    const body = formData();
+    body.delete("whatsappNumber");
+    expect((await createSubmission(body)).ok).toBe(true);
+    expect(submissionRow().whatsapp_number).toBeNull();
+  });
+
+  it("normalises a supplied phone", async () => {
+    expect((await createSubmission(formData())).ok).toBe(true);
+    expect(submissionRow().whatsapp_number).toBe("+971501234567");
+  });
+
+  it("rejects an invalid supplied phone before writing", async () => {
+    const result = await createSubmission(formData({ whatsappNumber: "50" }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.field).toBe("whatsappNumber");
+    expect(inserts).toHaveLength(0);
+  });
+
   it("stores the restaurant the customer named", async () => {
     const result = await createSubmission(formData({ restaurantName: "  Al Safadi  " }));
     expect(result.ok).toBe(true);
