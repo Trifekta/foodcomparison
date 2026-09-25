@@ -8,13 +8,13 @@ import { ImageUpload } from "@/components/forms/ImageUpload";
 import { AmountInput } from "@/components/forms/AmountInput";
 import { FoodPhoto } from "@/components/customer/FoodPhoto";
 import { ScriptBubble, ScriptNote, Sparks } from "@/components/customer/Motifs";
-import { Camera, Smartphone } from "lucide-react";
+import { ArrowRight, Camera, Smartphone } from "lucide-react";
 import { LastOrderBanner } from "@/components/customer/LastOrderBanner";
 import { ScrollDepth } from "@/components/customer/ScrollDepth";
 import { FoodAppLinks } from "./FoodAppLinks";
 import { track } from "@/lib/analytics/track";
 import { captureAttribution } from "@/lib/analytics/attribution";
-import { RESULT_PROMISE } from "@/lib/constants";
+import { FOOD_APPS } from "@/lib/customer/food-apps";
 import { scrollToGuidedTarget } from "@/lib/customer/scroll-to-target";
 import type { ExtractionStatus, TotalKind } from "./types";
 
@@ -141,21 +141,26 @@ export function StepUpload({
   const [forkChoice, setForkChoice] = useState<"none" | "upload" | "app">(
     returnedFromApp ? "upload" : "none",
   );
-  const cartUploadRef = useRef<HTMLDivElement>(null);
+  const forkChoiceRef = useRef(forkChoice);
   const checkoutUploadRef = useRef<HTMLDivElement>(null);
-  const scrollRequested = useRef(false);
   const checkoutScrollRequested = useRef(false);
 
-  // The first tap reveals the card; wait until it exists before scrolling.
-  // Returning from a food app starts on this choice without requesting a scroll.
+  const forkTargetRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    if (forkChoice !== "upload" || !scrollRequested.current) return;
-    const frame = window.requestAnimationFrame(() => {
-      scrollRequested.current = false;
-      scrollToGuidedTarget(cartUploadRef.current);
-    });
+    if (forkChoice === "none" || cartFile) return;
+    const frame = window.requestAnimationFrame(() => scrollToGuidedTarget(forkTargetRef.current));
     return () => window.cancelAnimationFrame(frame);
-  }, [forkChoice]);
+  }, [forkChoice, cartFile]);
+
+  // The picker is revealed by a deliberate choice. Preserve the old fork event when
+  // someone opens it, and also when a file is supplied by drag-and-drop or a
+  // restored browser's file input, without counting the same choice twice.
+  const chooseUpload = () => {
+    if (forkChoiceRef.current !== "upload") track("fork_have_screenshot");
+    forkChoiceRef.current = "upload";
+    setForkChoice("upload");
+  };
 
   // The first accepted cart file replaces the fork card with the full upload
   // flow. Guide that deliberate upload to its next card once the card exists;
@@ -224,22 +229,16 @@ export function StepUpload({
           like. */}
       <ScrollDepth />
 
-      {/* Hero banner. The spread bleeds past the top edge, as in the reference.
-
-          Hidden below 390px, where it is the difference between seeing the
-          upload button on arrival and having to scroll for it. It restates the
-          landing page's promise to somebody who has already accepted it and is
-          here to act on it - 150px of reassurance charged to the one control
-          this screen exists for. On a roomier phone it costs nothing and
-          stays. */}
-      <div className="relative rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4 max-[389px]:hidden">
+      {/* Keep the promise visible, but compress it on small phones so the
+          upload box remains in the initial viewport. */}
+      <div className="relative rounded-3xl bg-linear-to-r from-brand-100 to-beige px-4 py-4 max-[389px]:py-0">
         <div className="relative z-10 max-w-[44%]">
-          <ScriptNote underline className="text-[1.35rem] text-ink-900">
+          <ScriptNote underline className="text-[1.35rem] text-ink-900 max-[389px]:text-[1.05rem]">
             Same Food
             <br />
             Lower Prices
           </ScriptNote>
-          <p className="mt-2 text-[0.82rem] font-semibold leading-snug text-slate-600">
+          <p className="mt-2 text-[0.82rem] font-semibold leading-snug text-slate-600 max-[389px]:mt-1 max-[389px]:text-[0.7rem]">
             Upload. Compare.
             <br />
             Save more.
@@ -248,9 +247,9 @@ export function StepUpload({
         <FoodPhoto
           name="spread"
           eager
-          className="pointer-events-none absolute right-0 top-1/2 w-[62%] -translate-y-1/2 select-none"
+          className="pointer-events-none absolute right-0 top-1/2 w-[62%] -translate-y-1/2 select-none max-[389px]:w-[56%]"
         />
-        <ScriptBubble className="absolute -right-1 -top-2 z-10 text-[0.64rem] leading-tight">
+        <ScriptBubble className="absolute -right-1 -top-2 z-10 text-[0.64rem] leading-tight max-[389px]:text-[0.5rem]">
           Good
           <br />
           Deals Ahead <span aria-hidden="true">&hearts;</span>
@@ -273,15 +272,7 @@ export function StepUpload({
         </div>
       ) : null}
 
-      {/* Above everything, because somebody who already has an order in flight
-          is not here to start another one - until they pick a screenshot,
-          which says the opposite: whatever this banner is offering to resume,
-          they have just demonstrated they are not resuming it. Suppressed on
-          the way back from a food app: that round trip is a statement of intent
-          about this order, so offering to reopen an older one is noise. */}
-      {uploadStarted || returnedFromApp ? null : <LastOrderBanner />}
-
-      <h1 className="relative mt-4 inline-flex items-start text-[1.9rem] font-extrabold leading-tight text-ink-900">
+      <h1 className="relative mt-4 inline-flex items-start text-[1.9rem] font-extrabold leading-tight text-ink-900 max-[389px]:mt-3">
         Upload your order
         <Sparks className="ml-1 h-5 w-5 shrink-0" />
       </h1>
@@ -290,85 +281,53 @@ export function StepUpload({
           ? "Your screenshot shows the total already — you're set. Add the checkout screen only if you want to."
           : cartConfirmedShort
             ? "Your cart screenshot doesn't show a total — add the checkout screen below for an exact comparison."
-            : (
-                // Bold on purpose: a real customer uploaded a screenshot of Keeta
-                // itself, believing that was the point - nothing before this line
-                // ever named the app being compared against, so the one sentence
-                // that fixes that needs to be impossible to skim past.
-                <strong className="font-bold text-ink-900">
-                  Upload your cart from Talabat, Careem, Deliveroo, or Noon Food — we&apos;ll
-                  check if it&apos;s cheaper on Keeta.
-                </strong>
-              )}
+            : "Upload your cart from Talabat, Careem, Deliveroo, Noon Food, or Smiles — we’ll check if it’s cheaper on Keeta."}
       </p>
 
-      {/* Repeated from the landing page on purpose. This is the screen where
-          somebody weighs the wait against the effort of finding a screenshot,
-          and the answer to "how long will this take" belongs next to that
-          decision, not one screen behind it. */}
-      <p className="mt-2.5 inline-block rounded-full bg-brand-100 px-3.5 py-1.5 text-[0.85rem] font-bold text-ink-800">
-        Your result, usually {RESULT_PROMISE}
-      </p>
+      {/* The supplied marks identify the apps this screenshot may come from;
+          they are labels here, not links that could take a ready customer away. */}
+      {!cartFile && (
+        <ul aria-label="Supported food apps" className="mt-3 grid grid-cols-5 gap-1.5 text-center max-[389px]:mt-2">
+          {FOOD_APPS.map(({ name, logo }) => (
+            <li key={name} className="min-w-0">
+              {/* Supplied app artwork, shown without recreating either mark. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logo} alt="" width={52} height={52} className="mx-auto h-11 w-11 rounded-xl object-cover min-[390px]:h-12 min-[390px]:w-12" />
+              <span className="mt-1 block text-[0.68rem] leading-tight text-ink-800">{name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      {/* Two-path fork for visitors without a screenshot. Once a cart file
-          exists the fork disappears and the full upload flow takes over. */}
       {!cartFile && (
         <div className="mt-5">
-          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
-            <button
-              type="button"
-              // Recorded only when the answer changes, so tapping the same
-              // card twice is one answer rather than two - /api/events is
-              // capped per IP and that cap is shared across a venue's wifi.
-              onClick={() => {
-                if (forkChoice !== "upload") track("fork_have_screenshot");
-                if (forkChoice === "upload") {
-                  scrollToGuidedTarget(cartUploadRef.current);
-                } else {
-                  scrollRequested.current = true;
-                }
-                setForkChoice("upload");
-              }}
-              className={`rounded-2xl border-2 p-4 text-left transition-colors ${
-                forkChoice === "upload"
-                  ? "border-brand-500 bg-brand-50"
-                  : "border-ink-200 bg-white hover:border-brand-300"
-              }`}
-            >
-              <Camera aria-hidden="true" className="h-6 w-6 text-brand-600" />
-              <h2 className="mt-2 text-[1rem] font-extrabold text-ink-900">
-                Already have a screenshot?
-              </h2>
-              <p className="mt-1 text-[0.85rem] leading-snug text-slate-600">
-                Upload your cart screenshot →
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (forkChoice !== "app") track("fork_need_to_take");
-                scrollRequested.current = false;
-                setForkChoice("app");
-              }}
-              className={`rounded-2xl border-2 p-4 text-left transition-colors ${
-                forkChoice === "app"
-                  ? "border-brand-500 bg-brand-50"
-                  : "border-ink-200 bg-white hover:border-brand-300"
-              }`}
-            >
-              <Smartphone aria-hidden="true" className="h-6 w-6 text-brand-600" />
-              <h2 className="mt-2 text-[1rem] font-extrabold text-ink-900">
-                No screenshot yet?
-              </h2>
-              <p className="mt-1 text-[0.85rem] leading-snug text-slate-600">
-                Open your food app and take one →
-              </p>
-            </button>
-          </div>
-
+          <h2 className="mb-3 text-lg font-extrabold text-ink-900">
+            Choose one to get started <span className="text-brand-500">↓</span>
+          </h2>
+          <button
+            type="button"
+            onClick={chooseUpload}
+            aria-expanded={forkChoice === "upload"}
+            aria-controls="upload-choice"
+            className="w-full rounded-3xl border border-ink-200 bg-white p-3 text-left transition-colors hover:border-brand-400 focus-visible:outline-2 focus-visible:outline-brand-500"
+          >
+            <span className="flex items-center gap-3">
+              <span aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-cream">
+                <Camera className="h-7 w-7" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-base font-extrabold text-ink-900">Already have a screenshot?</span>
+                <span className="mt-1 block text-sm text-slate-600">Upload your cart screenshot now.</span>
+              </span>
+            </span>
+            <span className="mt-3 flex min-h-12 items-center gap-3 rounded-2xl bg-brand-400 px-4 py-3 font-extrabold text-ink-900">
+              <Camera aria-hidden="true" className="h-5 w-5 shrink-0" />
+              Tap here to upload
+              <ArrowRight aria-hidden="true" className="ml-auto h-5 w-5 shrink-0" />
+            </span>
+          </button>
           {forkChoice === "upload" && (
-            <div ref={cartUploadRef} className="mt-3 scroll-mt-24">
+            <div id="upload-choice" ref={forkTargetRef} data-guided-scroll="upload" className="mt-3 scroll-mt-24">
               <ImageUpload
                 step={1}
                 label="Cart screenshot"
@@ -377,23 +336,51 @@ export function StepUpload({
                 requirement="required"
                 art="cartDoc"
                 example="cart"
+                direct
+                onOpenPicker={chooseUpload}
                 file={cartFile}
                 onChange={(file, original) => {
                   if (file) checkoutScrollRequested.current = true;
                   onCartChange(file, original);
                 }}
                 onFilePicked={(file) => {
+                  chooseUpload();
                   setUploadStarted(true);
                   track("cart_uploaded");
                   onCartPicked(file);
                 }}
                 error={error}
               />
+
             </div>
           )}
 
+          <button
+            type="button"
+            onClick={() => {
+              if (forkChoiceRef.current !== "app") track("fork_need_to_take");
+              forkChoiceRef.current = "app";
+              setForkChoice("app");
+            }}
+            aria-expanded={forkChoice === "app"}
+            aria-controls="food-app-choice"
+            className={`mt-3 flex w-full items-center gap-3 rounded-2xl border bg-white p-3 text-left transition-colors ${
+              forkChoice === "app" ? "border-brand-500" : "border-ink-200 hover:border-brand-300"
+            }`}
+          >
+            <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cream">
+              <Smartphone className="h-6 w-6 text-brand-600" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[0.95rem] font-extrabold text-ink-900">No screenshot yet?</span>
+              <span className="mt-0.5 block text-[0.82rem] leading-snug text-slate-600">
+                Tap to choose your food app ↓
+              </span>
+            </span>
+          </button>
+
           {forkChoice === "app" && (
-            <div className="mt-3 space-y-3">
+            <div id="food-app-choice" ref={forkTargetRef} data-guided-scroll="food-apps" className="mt-3 scroll-mt-24 space-y-3 rounded-3xl border border-brand-400 bg-cream/40 p-3">
               <p className="text-[0.88rem] leading-snug text-slate-600">
                 No Keeta screenshot needed — we check Keeta for you.
               </p>
@@ -513,16 +500,22 @@ export function StepUpload({
         </div>
       )}
 
-      <StepActions>
-        <Button onClick={onContinue} disabled={!cartFile} arrow>
-          Continue
-        </Button>
-        {!cartFile ? (
-          <p className="mt-2.5 text-center text-sm text-slate-500">
-            Add your cart screenshot to continue.
-          </p>
-        ) : null}
-      </StepActions>
+      {/* Returning customers can still reopen an earlier order, after the
+          upload action rather than ahead of the first screen's main task. */}
+      {uploadStarted || returnedFromApp ? null : <LastOrderBanner />}
+
+      <div className={!cartFile ? "[&>div]:static" : undefined}>
+        <StepActions>
+          <Button onClick={onContinue} disabled={!cartFile} arrow>
+            Continue
+          </Button>
+          {!cartFile ? (
+            <p className="mt-2.5 text-center text-sm text-slate-500">
+              Add your cart screenshot to continue.
+            </p>
+          ) : null}
+        </StepActions>
+      </div>
 
       {/* The way back to an order this browser did not send - a different
           phone, or one that cleared its storage. It used to sit above the

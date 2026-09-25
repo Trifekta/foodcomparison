@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Smartphone } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { track } from "@/lib/analytics/track";
 import { FOOD_APPS, type FoodApp } from "@/lib/customer/food-apps";
 import { markLeavingForApp } from "@/lib/customer/wizard-session";
@@ -43,7 +43,7 @@ function AppMark({ app }: { app: FoodApp }) {
   return (
     <span
       aria-hidden="true"
-      className={`flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-lg text-[0.95rem] font-black ${app.tile} ${app.ink}`}
+      className={`flex h-6 w-6 min-[390px]:h-8 min-[390px]:w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg text-[0.95rem] font-black ${app.tile} ${app.ink}`}
     >
       {missing ? (
         app.mark
@@ -52,8 +52,8 @@ function AppMark({ app }: { app: FoodApp }) {
         <img
           src={app.logo}
           alt=""
-          width={24}
-          height={24}
+          width={32}
+          height={32}
           loading="lazy"
           decoding="async"
           draggable={false}
@@ -81,10 +81,9 @@ function AppMark({ app }: { app: FoodApp }) {
  */
 export function FoodAppLinks() {
   return (
-    <section className="rounded-2xl border border-brand-200 bg-beige p-4">
-      <h2 className="flex items-center gap-1.5 text-[0.95rem] font-bold text-ink-900">
-        <Smartphone aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-500" />
-        No screenshot yet?
+    <section className="rounded-2xl border border-brand-200 bg-beige p-3">
+      <h2 className="flex items-center gap-1.5 text-base font-extrabold text-ink-900">
+        Choose your food app
       </h2>
 
       <ol className="mt-2.5 space-y-1.5">
@@ -92,9 +91,9 @@ export function FoodAppLinks() {
           <li key={step} className="flex gap-2">
             <span
               aria-hidden="true"
-              className="text-[0.85rem] font-bold tabular-nums text-ink-500"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-400 text-sm font-bold text-ink-900"
             >
-              {index + 1}.
+              {index + 1}
             </span>
             <span className="text-[0.85rem] leading-snug text-slate-600">{step}</span>
           </li>
@@ -115,15 +114,11 @@ export function FoodAppLinks() {
               markLeavingForApp();
               track("app_opened");
             }}
-            className="flex min-h-12 items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-2 py-2 text-left text-[0.8rem] font-semibold text-ink-900 hover:bg-ink-50"
+            className="last:odd:col-span-2 flex min-h-14 items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-2 py-2 text-left text-[0.8rem] font-semibold text-ink-900 hover:bg-ink-50"
           >
             <AppMark app={app} />
-            {/* One line each. Wrapping put the four labels on four different
-                break points and the grid read as unfinished; the chevron the
-                design had here is what paid for the width - "Open Noon Food"
-                was being clipped with it in place, and a tile this size beside
-                a verb is already plainly a link. */}
-            <span className="min-w-0 flex-1 whitespace-nowrap leading-tight">Open {app.name}</span>
+            <span className="min-w-0 flex-1 leading-tight">Open <span className="inline-block">{app.name}</span></span>
+            <ChevronRight aria-hidden="true" className="hidden h-4 w-4 shrink-0 min-[390px]:block" />
           </a>
         ))}
       </div>

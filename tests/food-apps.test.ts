@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { FOOD_APPS } from "@/lib/customer/food-apps";
 
 /**
- * The four tiles that send a customer away to build a cart.
+ * The five tiles that send a customer away to build a cart.
  *
  * Every entry here is a link off our own site with a brand's name and colour
  * on it, which is the shape of a phishing tile; and every entry is also the
@@ -15,12 +15,23 @@ import { FOOD_APPS } from "@/lib/customer/food-apps";
  */
 
 describe("the apps a cart can come from", () => {
-  it("covers the four apps the upload step names", () => {
+  it("covers the five apps the upload step names", () => {
     expect(FOOD_APPS.map((app) => app.name)).toEqual([
       "Talabat",
       "Careem",
       "Deliveroo",
       "Noon Food",
+      "Smiles",
+    ]);
+  });
+
+  it("preserves all destinations, including the Smiles universal link", () => {
+    expect(FOOD_APPS.map(({ href }) => href)).toEqual([
+      "https://www.talabat.com/uae",
+      "https://www.careem.com/en-AE/food/",
+      "https://deliveroo.onelink.me/9Aoc/NewHomepageCardAEEN",
+      "https://food.noon.com/uae-en/",
+      "https://smilesuae.go.link/dBzkD",
     ]);
   });
 

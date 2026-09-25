@@ -1,5 +1,5 @@
 /**
- * The four apps a cart can come from, and how to get to one.
+ * The five apps a cart can come from, and how to get to one.
  *
  * Plain https links, opened in a new tab. That is not a fallback for deep
  * linking - on a phone it IS the deep link: Android App Links and iOS Universal
@@ -76,5 +76,13 @@ export const FOOD_APPS: readonly FoodApp[] = [
     mark: "n",
     tile: "bg-[#FBDF01]",
     ink: "text-ink-900",
+  },
+  {
+    name: "Smiles",
+    href: "https://smilesuae.go.link/dBzkD",
+    logo: "/brands/smiles.png",
+    mark: "S",
+    tile: "bg-[#C52A87]",
+    ink: "text-white",
   },
 ] as const;

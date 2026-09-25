@@ -44,6 +44,7 @@ const BASKET = {
 
 const CART_PNG = makePng(360, 720, 7);
 const CHECKOUT_PNG = makePng(360, 640, 11);
+let nextTestAddress = 20;
 
 interface FakeState {
   tables: Record<string, Record<string, unknown>[]>;
@@ -84,11 +85,9 @@ function waitForProgressSave(page: Page, predicate: (body: string) => boolean = 
 /** Upload a cart screenshot and wait until the draft holds it and the URL carries the token. */
 async function uploadCart(page: Page) {
   await page.goto("/compare");
-  // Retried: in dev mode a click can land before React has hydrated the page.
-  await expect(async () => {
-    await page.getByRole("button", { name: /Have a screenshot/ }).click();
-    await expect(page.getByLabel("Cart screenshot", { exact: true })).toBeAttached({ timeout: 1_000 });
-  }).toPass();
+  await page.getByRole("button", { name: /Already have a screenshot/ }).click();
+  await expect(page.getByLabel("Cart screenshot", { exact: true })).toBeAttached();
+  await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
 
   const stored = page.waitForResponse(
     (response) =>
@@ -137,61 +136,76 @@ async function rebuildTab(page: Page, { dropCookies = false } = {}): Promise<Pag
 }
 
 test.beforeEach(async ({ page, context }) => {
+  // The local app rate-limits drafts by IP; each browser scenario is a new
+  // customer even though Playwright runs them all against one local server.
+  await context.setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${nextTestAddress++}` });
   await page.request.post(`${FAKE_SUPABASE_URL}/__fake/reset`);
   await page.request.post(`${FAKE_SUPABASE_URL}/__fake/seed`, { data: { table: "areas", rows: [AREA] } });
   await context.route("**/api/extract", (route) => route.fulfill({ json: { basket: BASKET } }));
 });
 
-test("Have a screenshot scrolls to the cart card without opening the file picker", async ({ page }) => {
-  await page.goto("/compare");
-  const choice = page.getByRole("button", { name: /Have a screenshot/ });
-  await expect(choice).toBeInViewport();
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
-  await page.evaluate(() => {
-    const original = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (options?: boolean | ScrollIntoViewOptions) {
-      if (typeof options === "object") {
-        document.documentElement.dataset.uploadScrollBehavior = options.behavior;
-      }
-      original.call(this, options);
+test("the first screen reveals the cart picker on demand and enables Continue after upload", async ({ page }) => {
+  // Embedded browsers can reject a script-initiated file input click. The
+  // visible first-screen control must use native label activation instead.
+  await page.addInitScript(() => {
+    const nativeClick = HTMLInputElement.prototype.click;
+    HTMLInputElement.prototype.click = function () {
+      if (this.type === "file") throw new Error("Scripted file picker blocked");
+      nativeClick.call(this);
     };
   });
-
-  let filePickerOpened = false;
-  page.on("filechooser", () => { filePickerOpened = true; });
-  await choice.click();
-
+  const events: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname !== "/api/events") return;
+    const event = (request.postDataJSON() as { event?: string } | null)?.event;
+    if (event) events.push(event);
+  });
+  await page.goto("/compare");
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  await expect(page.getByLabel("Cart screenshot", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: /Already have a screenshot/ }).click();
+  const picker = page.getByRole("button", { name: /Tap to upload/ });
+  await expect(picker).toBeInViewport();
+  await expect(picker).toContainText("JPG, PNG or WEBP · up to 10 MB");
+  await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
+  const progressSegments = page.getByRole("progressbar", { name: "Progress" }).locator("span");
+  await expect(progressSegments).toHaveCount(2);
+  await expect(progressSegments.first()).toHaveClass(/bg-brand-400/);
+  await expect(progressSegments.last()).toHaveClass(/bg-ink-200/);
+  await expect(page.getByText("Step 1 of 4")).toHaveCount(0);
+  await expect(page.getByText(/Your result, usually/)).toHaveCount(0);
+  const appIcons = page.getByRole("list", { name: "Supported food apps" }).locator("img");
+  await expect(appIcons).toHaveCount(5);
+  await expect(appIcons.first()).toHaveAttribute("src", "/brands/talabat.png");
+  await expect(appIcons.last()).toHaveAttribute("src", "/brands/smiles.png");
+  await expect.poll(() => appIcons.evaluateAll((images) => images.every(
+    (image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0,
+  ))).toBe(true);
   const input = page.getByLabel("Cart screenshot", { exact: true });
   await expect(input).toBeAttached();
-  const card = input.locator("xpath=ancestor::section[1]");
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-  await expect.poll(() => card.evaluate((element) => element.getBoundingClientRect().top))
-    .toBeLessThan((page.viewportSize()?.height ?? 0) / 2);
-  expect(await card.evaluate((element) => element.getBoundingClientRect().top)).toBeGreaterThan(48);
-  expect(await page.locator("html").getAttribute("data-upload-scroll-behavior")).toBe("smooth");
-  expect(await input.evaluate((element) => (element as HTMLInputElement).files?.length)).toBe(0);
-  expect(filePickerOpened).toBe(false);
+  const chooser = page.waitForEvent("filechooser");
+  await picker.click();
+  await (await chooser).setFiles({ name: "cart.png", mimeType: "image/png", buffer: CART_PNG });
+  await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
+  await expect.poll(() => events.includes("fork_have_screenshot")).toBe(true);
+  await expect.poll(() => events.includes("cart_uploaded")).toBe(true);
 });
 
-test("cart scroll works when an embedded browser rejects scroll options", async ({ page }) => {
+test("the cart upload is visible without scrolling on a narrow phone", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
   await page.goto("/compare");
-  await expect(page.getByRole("button", { name: /Have a screenshot/ })).toBeInViewport();
-  await page.evaluate(() => {
-    Element.prototype.scrollIntoView = function (options?: boolean | ScrollIntoViewOptions) {
-      if (typeof options === "object") throw new TypeError("Scroll options unavailable");
-    };
-  });
-
-  await page.getByRole("button", { name: /Have a screenshot/ }).click();
-  const card = page.getByLabel("Cart screenshot", { exact: true })
-    .locator("xpath=ancestor::section[1]");
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-  expect(await card.evaluate((element) => element.getBoundingClientRect().top)).toBeGreaterThan(48);
+  const upload = page.getByRole("button", { name: /Already have a screenshot/ });
+  const continueButton = page.getByRole("button", { name: "Continue" });
+  await expect(upload).toBeInViewport();
+  await expect(continueButton).toBeDisabled();
+  const uploadBottom = await upload.evaluate((element) => element.getBoundingClientRect().bottom);
+  const continueTop = await continueButton.evaluate((element) => element.getBoundingClientRect().top);
+  expect(uploadBottom).toBeLessThan(continueTop);
 });
 
 test("the first cart upload guides the customer to the second screenshot card", async ({ page }) => {
   await page.goto("/compare");
-  await page.getByRole("button", { name: /Have a screenshot/ }).click();
+  await page.getByRole("button", { name: /Already have a screenshot/ }).click();
   const cartInput = page.getByLabel("Cart screenshot", { exact: true });
   await expect(cartInput).toBeAttached();
   await page.evaluate(() => {
@@ -216,7 +230,7 @@ test("the first cart upload guides the customer to the second screenshot card", 
 
 test("the second screenshot guide works in an embedded browser without scroll options", async ({ page }) => {
   await page.goto("/compare");
-  await page.getByRole("button", { name: /Have a screenshot/ }).click();
+  await page.getByRole("button", { name: /Already have a screenshot/ }).click();
   const cartInput = page.getByLabel("Cart screenshot", { exact: true });
   await expect(cartInput).toBeAttached();
   await page.evaluate(() => {
@@ -239,16 +253,41 @@ test("the second screenshot guide works in an embedded browser without scroll op
     .evaluate((element) => element.getBoundingClientRect().top)).toBeGreaterThan(48);
 });
 
-test("Need to take one keeps the food-app path without scrolling", async ({ page }) => {
+test("No screenshot yet keeps the food-app path and its analytics", async ({ page }) => {
+  const events: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname !== "/api/events") return;
+    const event = (request.postDataJSON() as { event?: string } | null)?.event;
+    if (event) events.push(event);
+  });
   await page.goto("/compare");
-  const choice = page.getByRole("button", { name: /Need to take one/ });
-  await expect(choice).toBeInViewport();
-  const initialScroll = await page.evaluate(() => window.scrollY);
+  const choice = page.getByRole("button", { name: /No screenshot yet/ });
+  await expect(choice).toBeVisible();
+  await watchGuidedScroll(page);
   await choice.click();
 
-  await expect(page.getByRole("link", { name: /Open Talabat/ })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-last-guided-scroll", "food-apps");
+  await expect(page.getByRole("heading", { name: "Choose your food app" })).toBeInViewport();
+  await expect(page.locator('#food-app-choice a')).toHaveCount(5);
+  await expect(page.getByRole("link", { name: "Open Smiles" })).toHaveAttribute("href", "https://smilesuae.go.link/dBzkD");
   await expect(page.getByLabel("Cart screenshot", { exact: true })).toHaveCount(0);
-  expect(await page.evaluate(() => window.scrollY)).toBe(initialScroll);
+  expect(events).not.toContain("app_opened");
+  await page.context().route("https://smilesuae.go.link/**", route => route.fulfill({ body: "Smiles" }));
+  const popupPromise = page.waitForEvent("popup");
+  await page.getByRole("link", { name: "Open Smiles" }).click();
+  const popup = await popupPromise;
+  await expect.poll(() => events.includes("app_opened")).toBe(true);
+  await popup.close();
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect(page.getByText(/Welcome back.*upload your screenshot/)).toBeVisible();
+  await expect.poll(() => events.includes("returned_from_app")).toBe(true);
+  await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
+  await expect.poll(() => events.includes("fork_need_to_take")).toBe(true);
 });
 
 async function watchGuidedScroll(page: Page, rejectOptions = false) {
@@ -613,6 +652,32 @@ test("a tab that lost its URL fragment still resumes from the cookie", async ({ 
 test("a first visit with nothing to resume never waits on the draft API", async ({ page }) => {
   const requests = recordRequests(page);
   await page.goto("/compare");
-  await expect(page.getByRole("button", { name: /Have a screenshot/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Already have a screenshot/ })).toBeVisible();
   expect(requests.some((request) => new URL(request.url).pathname.startsWith("/api/drafts"))).toBe(false);
 });
+
+for (const width of [320, 375, 390, 1024]) {
+  test(`food-app choices fit a ${width}px viewport with safe scrolling`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/compare");
+    await watchGuidedScroll(page, width === 320);
+    if (width === 320) await page.evaluate(() => {
+      const original = window.scrollTo;
+      window.scrollTo = ((x: number, y: number) => {
+        document.documentElement.dataset.guidedFallback = "used";
+        original.call(window, x, y);
+      }) as typeof window.scrollTo;
+    });
+    await page.getByRole("button", { name: /No screenshot yet/ }).click();
+    await expect(page.getByRole("heading", { name: "Choose your food app" })).toBeInViewport();
+    if (width === 320) await expect(page.locator("html")).toHaveAttribute("data-guided-fallback", "used");
+    await expect(page.getByRole("link", { name: "Open Smiles" })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const first = await page.getByRole("link", { name: "Open Talabat" }).boundingBox();
+    const last = await page.getByRole("link", { name: "Open Smiles" }).boundingBox();
+    expect(last!.width).toBeGreaterThan(first!.width * 1.9);
+    expect(first!.height).toBeGreaterThanOrEqual(48);
+    await expect.poll(() => page.locator('#food-app-choice').evaluate(element => Math.round(element.getBoundingClientRect().top))).toBe(96);
+    await page.screenshot({ path: `test-results/food-apps-${width}.png` });
+  });
+}
