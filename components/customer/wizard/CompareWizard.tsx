@@ -31,6 +31,7 @@ import { draftValuesFrom, type DraftProgress } from "@/lib/drafts/progress";
 import type { ResumeMode } from "@/lib/drafts/client";
 import { WizardShell } from "./WizardShell";
 import { StepUpload } from "./StepUpload";
+import type { PromotionConfig } from "@/lib/customer/promotion";
 import type { ManualTotalState } from "@/lib/calculations/manual-total";
 import { StepConfirm } from "./StepConfirm";
 import {
@@ -136,15 +137,40 @@ function finishedRead(status: ExtractionStatus, totals: ReadTotals | null) {
 
 export function CompareWizard({
   areas,
+  promotion,
   resumeMode = "off",
 }: {
   areas: PublicArea[];
+  promotion: PromotionConfig | null;
   resumeMode?: ResumeMode;
 }) {
   const router = useRouter();
   // The server-side draft, when DRAFT_RESUME allows it on this page. With the
   // flag off every method is a no-op and the wizard is exactly what it was.
   const [draft] = useState(() => new DraftSession(resumeMode));
+  // Keep expiry active across wizard steps. Returning to upload after the
+  // deadline should already have the original illustration, with no flash.
+  const [activePromotion, setActivePromotion] = useState(promotion);
+  useEffect(() => {
+    if (!activePromotion) return;
+    let timer: number;
+    const check = () => {
+      window.clearTimeout(timer);
+      const remaining = Date.parse(activePromotion.expiresAt) - Date.now();
+      if (remaining <= 0) {
+        setActivePromotion(null);
+      } else {
+        // Short rechecks cover long-lived tabs and suspended mobile browsers.
+        timer = window.setTimeout(check, Math.min(remaining, 60_000));
+      }
+    };
+    timer = window.setTimeout(check, 0);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [activePromotion]);
   // Waiting on the draft before showing a step, so a restored screenshot does
   // not appear a moment after an empty upload card.
   const [resuming, setResuming] = useState(false);
@@ -872,6 +898,7 @@ export function CompareWizard({
 
       {!resuming && step === STEP_UPLOAD ? (
         <StepUpload
+          promotion={activePromotion}
           cartFile={files.cart}
           checkoutFile={files.checkout}
           cartReading={cartReading}

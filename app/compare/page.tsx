@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CompareWizard } from "@/components/customer/wizard/CompareWizard";
 import { getPublicAreas } from "@/lib/areas";
 import { getDraftResumeMode } from "@/lib/env";
+import { currentUploadPromotion } from "@/lib/customer/promotion";
 
 export function generateMetadata(): Metadata {
   const resume = getDraftResumeMode();
@@ -19,5 +20,6 @@ export const dynamic = "force-dynamic";
 
 export default async function ComparePage() {
   const areas = await getPublicAreas();
-  return <CompareWizard areas={areas} resumeMode={getDraftResumeMode()} />;
+  const promotion = currentUploadPromotion();
+  return <CompareWizard areas={areas} promotion={promotion} resumeMode={getDraftResumeMode()} />;
 }
