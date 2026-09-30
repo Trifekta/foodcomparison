@@ -61,6 +61,53 @@
   // costs no CPU time - only the P-256 encryption of each payload does.
   "limits": {
     "cpu_ms": 10000
+  },
+
+  // STAGING - a separate Worker, never a version of the production one.
+  //
+  // The top level above IS production, and stays exactly as it was: a plain
+  // `wrangler deploy` (the production Workers Builds deploy command) still
+  // deploys `foodcomparison` and nothing else. Staging is only ever reached with
+  // `--env staging`, which deploys `foodcomparison-staging` - its own Worker,
+  // with its own secrets, its own build variables and its own workers.dev URL.
+  //
+  // Build it with `npm run cf:build:staging`, never plain `cf:build`: that script
+  // refuses production Supabase values and a production NEXT_PUBLIC_APP_URL, and
+  // switches the Meta Pixel off. SNIPSAVOR_ENV below is what makes the Worker
+  // check the same thing again at runtime (lib/env.ts). Full setup:
+  // docs/staging/README.md.
+  //
+  // Everything that matters is repeated rather than inherited, so reading this
+  // block is enough to know what staging runs with. Wrangler never inherits
+  // `vars` from the top level in any case.
+  //
+  // Side effect on production: a plain `wrangler deploy` now warns that no
+  // target environment was given. It still deploys the top level (production),
+  // exactly as before; `wrangler deploy --env=""` says so explicitly.
+  "env": {
+    "staging": {
+      "name": "foodcomparison-staging",
+      "workers_dev": true,
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
+      "observability": {
+        "enabled": true
+      },
+      // keep_vars is top-level only; the setting above applies here too.
+      "triggers": {
+        "crons": ["*/5 * * * *"]
+      },
+      "limits": {
+        "cpu_ms": 10000
+      },
+      "vars": {
+        // Turns on the runtime isolation check. Plain and committed on purpose:
+        // it is a statement about which Worker this is, not a secret.
+        "SNIPSAVOR_ENV": "staging"
+      }
+    }
   }
 
   // Deliberately no WORKER_SELF_REFERENCE service binding. OpenNext only needs

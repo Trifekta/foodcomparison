@@ -7,6 +7,8 @@
  */
 
 import { isValidVersion, type MinimumVersions } from "@/lib/api/v1/client";
+import environments from "@/deploy/environments.json";
+import { checkStagingValues } from "@/lib/deploy/staging-isolation.mjs";
 
 function required(name: string, value: string | undefined): string {
   if (!value) {
@@ -41,7 +43,51 @@ export function absoluteUrl(path: string): string | null {
 }
 
 export function getSupabaseUrl(): string {
+  assertStagingIsolation();
   return required("NEXT_PUBLIC_SUPABASE_URL", publicEnv.supabaseUrl);
+}
+
+/**
+ * Which deployment this Worker says it is. Only the staging Worker sets
+ * SNIPSAVOR_ENV (wrangler.jsonc, env.staging.vars); production leaves it unset,
+ * and everything below is then a no-op.
+ */
+export function isStagingDeployment(): boolean {
+  return process.env.SNIPSAVOR_ENV?.trim().toLowerCase() === "staging";
+}
+
+let stagingIsolationConfirmed = false;
+
+/**
+ * On the staging Worker, refuse to reach any Supabase that is not staging's.
+ *
+ * The staging build already checks this (scripts/build-staging.mjs), but a
+ * bundle can reach the staging Worker without that script - a local
+ * `npm run cf:build` followed by `wrangler deploy --env staging`, say, which
+ * would bake in whatever .env.local held. The Worker then knows it is staging
+ * (SNIPSAVOR_ENV comes from wrangler.jsonc, not from the build) and compares
+ * the Supabase URL, keys and app URL it was given against
+ * deploy/environments.json. Every client is made through getSupabaseUrl(), so
+ * failing here means no query, upload or sign-in leaves the Worker - the site
+ * stops working rather than writing to production.
+ */
+function assertStagingIsolation(): void {
+  if (stagingIsolationConfirmed || !isStagingDeployment()) return;
+
+  const problems = checkStagingValues(
+    {
+      supabaseUrl: publicEnv.supabaseUrl,
+      supabaseAnonKey: publicEnv.supabaseAnonKey,
+      appUrl: publicEnv.appUrl,
+      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    },
+    environments,
+  );
+
+  if (problems.length > 0) {
+    throw new Error(`Staging isolation check failed; not connecting to Supabase. ${problems.join(" ")}`);
+  }
+  stagingIsolationConfirmed = true;
 }
 
 export function getSupabaseAnonKey(): string {

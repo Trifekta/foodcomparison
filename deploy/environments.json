@@ -1,0 +1,13 @@
+{
+  "_comment": "Public identifiers only - never keys or secrets. The staging build and the staging Worker refuse to run until every value below is filled in, and refuse any value that matches production. See docs/staging/README.md.",
+  "production": {
+    "workerName": "foodcomparison",
+    "supabaseProjectRef": "",
+    "appOrigin": ""
+  },
+  "staging": {
+    "workerName": "foodcomparison-staging",
+    "supabaseProjectRef": "",
+    "appOrigin": ""
+  }
+}

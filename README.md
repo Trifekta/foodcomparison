@@ -453,6 +453,15 @@ npx wrangler deploy --dry-run   # validates config and bindings, deploys nothing
 Local Worker runs read secrets from a `.dev.vars` file (git-ignored) in the same
 `KEY=value` format as `.env.local`.
 
+#### Staging
+
+Staging is a separate Worker, `foodcomparison-staging` (`env.staging` in
+`wrangler.jsonc`), with its own Supabase project. Build it only with
+`npm run cf:build:staging`, which refuses production Supabase values and a
+production `NEXT_PUBLIC_APP_URL`. Setup, every variable and the isolation rules
+are in [`docs/staging/README.md`](docs/staging/README.md). The production
+commands above are unchanged.
+
 #### Notes specific to Workers
 
 - **`esbuild` is a deliberate direct devDependency — do not remove it.** Nothing
