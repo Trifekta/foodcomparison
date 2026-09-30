@@ -1261,6 +1261,38 @@ that is a much easier thing to forward than a dashboard behind a login.
 
 ---
 
+## Mobile API (`/api/v1`)
+
+A versioned surface for the Android and iOS apps (see
+`docs/mobile/flutter-migration-plan.md`). It wraps the same functions the
+website uses - `createSubmission()`, `getPublicResult()`, `getPublicAreas()` -
+so there is no second copy of any rule. The website's own routes are unchanged.
+
+| Route | What |
+| --- | --- |
+| `GET /api/v1/config` | Areas, promotion, limits, food-app links, and whether this build must update |
+| `POST /api/v1/submissions` | Same form fields as `/api/submissions`; returns `referenceNumber`, `resultToken`, `resultUrl` |
+| `GET /api/v1/results/:token` | The public result, plus absolute `resultUrl` and `switchUrl` |
+
+- **Every call sends `X-SnipSavor-Client: <web|android|ios>/<major.minor.patch>`.**
+  Missing or malformed is `400 client_required`.
+- **Envelope:** `{ "data": ... }` or
+  `{ "error": { "code", "message", "field"? } }`. Codes are listed in
+  `lib/api/v1/response.ts` and are only ever added, never renamed.
+- **Forcing an update:** set `MOBILE_MIN_VERSION_ANDROID` / `MOBILE_MIN_VERSION_IOS`.
+  Older builds get `426 upgrade_required` everywhere except `/api/v1/config`,
+  which answers `updateRequired: true` so the app can say why.
+- **Platform tracking:** run `supabase/migrations/0030_client_platform.sql`
+  **before shipping an app build**. It adds `client_platform` / `app_version` to
+  `submissions` and `funnel_events`. The website never writes them, so it works
+  with or without the migration; app submissions fail without it, and
+  `/admin` names the file when it is missing. `/api/events` tags a step only
+  when the header is present.
+- Rate limits are shared with the website's routes - a second door is not a
+  second allowance.
+
+---
+
 ## What comes next
 
 The seams are in place; none of them are wired to anything yet, and none of them

@@ -6,6 +6,8 @@
  * except the two NEXT_PUBLIC_ values.
  */
 
+import { isValidVersion, type MinimumVersions } from "@/lib/api/v1/client";
+
 function required(name: string, value: string | undefined): string {
   if (!value) {
     throw new Error(
@@ -94,6 +96,27 @@ export type DraftResumeMode = "off" | "test" | "on";
 export function getDraftResumeMode(): DraftResumeMode {
   const raw = process.env.DRAFT_RESUME?.trim().toLowerCase();
   return raw === "on" || raw === "test" ? raw : "off";
+}
+
+/**
+ * The oldest app build each platform may still use (MOBILE_MIN_VERSION_ANDROID,
+ * MOBILE_MIN_VERSION_IOS), as major.minor.patch.
+ *
+ * Unset means every build is allowed. A malformed value is treated the same
+ * way rather than as "block everything": a typo in a dashboard variable must
+ * not lock every installed app out at once. Read per request, so raising it
+ * needs no deploy.
+ */
+export function getMinimumAppVersions(): MinimumVersions {
+  const read = (value: string | undefined) => {
+    const trimmed = value?.trim() ?? "";
+    return isValidVersion(trimmed) ? trimmed : "0.0.0";
+  };
+
+  return {
+    android: read(process.env.MOBILE_MIN_VERSION_ANDROID),
+    ios: read(process.env.MOBILE_MIN_VERSION_IOS),
+  };
 }
 
 export interface WebPushConfig {

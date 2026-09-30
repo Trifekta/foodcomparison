@@ -24,6 +24,8 @@ export interface ImageValidationSuccess {
 export interface ImageValidationFailure {
   ok: false;
   error: string;
+  /** Machine-readable reason, for API clients that word the error themselves. */
+  code: "image_empty" | "image_too_large" | "image_unsupported";
 }
 
 export type ImageValidationResult = ImageValidationSuccess | ImageValidationFailure;
@@ -67,18 +69,22 @@ export async function validateImageFile(
   label: string,
 ): Promise<ImageValidationResult> {
   if (file.size === 0) {
-    return { ok: false, error: `Your ${label} looks empty. Please upload it again.` };
+    return {
+      ok: false,
+      error: `Your ${label} looks empty. Please upload it again.`,
+      code: "image_empty",
+    };
   }
 
   if (file.size > MAX_IMAGE_BYTES) {
-    return { ok: false, error: "This image is larger than 10 MB." };
+    return { ok: false, error: "This image is larger than 10 MB.", code: "image_too_large" };
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const detected = detectImageType(bytes);
 
   if (!detected) {
-    return { ok: false, error: "Please upload a JPG, PNG or WEBP image." };
+    return { ok: false, error: "Please upload a JPG, PNG or WEBP image.", code: "image_unsupported" };
   }
 
   // The declared type must not contradict the real one.
@@ -86,7 +92,7 @@ export async function validateImageFile(
     file.type &&
     !(ACCEPTED_IMAGE_TYPES as readonly string[]).includes(file.type)
   ) {
-    return { ok: false, error: "Please upload a JPG, PNG or WEBP image." };
+    return { ok: false, error: "Please upload a JPG, PNG or WEBP image.", code: "image_unsupported" };
   }
 
   return {

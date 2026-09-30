@@ -4,6 +4,7 @@ import { isTrackedEvent, isValidVisitId } from "@/lib/analytics/funnel";
 import { isValidResultToken } from "@/lib/utils/reference";
 import { checkRateLimit, clientKeyFromHeaders } from "@/lib/utils/rate-limit";
 import { RATE_LIMIT_WINDOW_MS } from "@/lib/constants";
+import { clientColumns, readClient } from "@/lib/api/v1/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -114,10 +115,21 @@ export async function POST(request: Request) {
     const areaId =
       typeof body.areaId === "string" && UUID_PATTERN.test(body.areaId) ? body.areaId : null;
 
+    // Tagged only when a client names itself, which the website never does -
+    // so a website event's insert is exactly what it was before 0030, and still
+    // succeeds on a database that has not had that migration. The apps always
+    // send the header, and their events land under their own platform rather
+    // than in the web's funnel.
+    const client = readClient(request.headers);
+
     await Promise.all([
-      supabase
-        .from("funnel_events")
-        .insert({ event, visit_id: visitId, submission_id: submissionId, area_id: areaId }),
+      supabase.from("funnel_events").insert({
+        event,
+        visit_id: visitId,
+        submission_id: submissionId,
+        area_id: areaId,
+        ...(client ? clientColumns(client) : {}),
+      }),
       // A real step updates presence too, so a visit's current step is never
       // more stale than its last heartbeat even if that beat is seconds away.
       supabase.from("visit_presence").upsert(

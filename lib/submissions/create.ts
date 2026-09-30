@@ -24,6 +24,7 @@ import { pushToAdmins } from "@/lib/push/send";
 import { normalisePhone } from "@/lib/utils/phone";
 import { sanitiseText } from "@/lib/utils/text";
 import { formatMinorToDecimalString, parseAmountToMinor } from "@/lib/calculations/money";
+import { clientColumns, type ClientInfo } from "@/lib/api/v1/client";
 
 /**
  * Creates a submission from the public wizard.
@@ -34,9 +35,35 @@ import { formatMinorToDecimalString, parseAmountToMinor } from "@/lib/calculatio
  * trusted from the browser.
  */
 
+/**
+ * Why a submission was refused, for clients that choose their own words.
+ *
+ * The website shows `error` as it is and ignores this; the /api/v1 routes pass
+ * it on as the response's error code (see lib/api/v1/response.ts).
+ */
+export type SubmissionErrorCode =
+  | "invalid_field"
+  | "invalid_items"
+  | "cart_image_missing"
+  | "image_empty"
+  | "image_too_large"
+  | "image_unsupported"
+  | "area_unavailable"
+  | "upload_failed"
+  | "server_error";
+
 export type CreateSubmissionResult =
   | { ok: true; referenceNumber: string; resultToken: string; id: string }
-  | { ok: false; status: number; error: string; field?: string };
+  | { ok: false; status: number; error: string; code: SubmissionErrorCode; field?: string };
+
+export interface CreateSubmissionOptions {
+  /**
+   * The client that sent it, when it said. Only the /api/v1 routes pass this;
+   * the website does not, so its insert never names the 0030 columns and keeps
+   * working on a database that has not had that migration.
+   */
+  client?: ClientInfo;
+}
 
 const GENERIC_FAILURE = "We couldn't submit your order. Please try again.";
 const MAX_REFERENCE_ATTEMPTS = 5;
@@ -139,7 +166,10 @@ function readAttribution(formData: FormData): Record<string, string | null> {
   };
 }
 
-export async function createSubmission(formData: FormData): Promise<CreateSubmissionResult> {
+export async function createSubmission(
+  formData: FormData,
+  options: CreateSubmissionOptions = {},
+): Promise<CreateSubmissionResult> {
   // ---- 1. Fields ----------------------------------------------------------
   const parsed = submissionFieldsSchema.safeParse({
     restaurantName: String(formData.get("restaurantName") ?? ""),
@@ -156,6 +186,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     return {
       ok: false,
       status: 400,
+      code: "invalid_field",
       error: issue?.message ?? "Please check your answers and try again.",
       field: issue?.path[0] ? String(issue.path[0]) : undefined,
     };
@@ -183,7 +214,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
 
   const items = parseItems(formData.get("items"));
   if (!items.ok) {
-    return { ok: false, status: 400, error: items.error, field: "items" };
+    return { ok: false, status: 400, code: "invalid_items", error: items.error, field: "items" };
   }
 
   // ---- 2. Images (magic-byte checked, never trusted by extension) ---------
@@ -192,6 +223,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     return {
       ok: false,
       status: 400,
+      code: "cart_image_missing",
       error: "Please upload a screenshot of your cart.",
       field: "cartImage",
     };
@@ -199,7 +231,13 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
 
   const cartImage = await validateImageFile(cartFile, "cart screenshot");
   if (!cartImage.ok) {
-    return { ok: false, status: 400, error: cartImage.error, field: "cartImage" };
+    return {
+      ok: false,
+      status: 400,
+      code: cartImage.code,
+      error: cartImage.error,
+      field: "cartImage",
+    };
   }
 
   const checkoutCandidate = formData.get("checkoutImage");
@@ -207,7 +245,13 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
   if (checkoutCandidate instanceof File && checkoutCandidate.size > 0) {
     const validated = await validateImageFile(checkoutCandidate, "checkout screenshot");
     if (!validated.ok) {
-      return { ok: false, status: 400, error: validated.error, field: "checkoutImage" };
+      return {
+        ok: false,
+        status: 400,
+        code: validated.code,
+        error: validated.error,
+        field: "checkoutImage",
+      };
     }
     checkoutImage = validated;
   }
@@ -218,6 +262,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     return {
       ok: false,
       status: 400,
+      code: "invalid_field",
       error: "Enter the final amount you would pay.",
       field: "currentTotal",
     };
@@ -235,6 +280,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     return {
       ok: false,
       status: 400,
+      code: "invalid_field",
       error: "Enter a valid mobile number.",
       field: "whatsappNumber",
     };
@@ -251,10 +297,16 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
 
   if (areaError) {
     console.error("[submissions] could not read the area", describeDbError(areaError));
-    return { ok: false, status: 500, error: GENERIC_FAILURE };
+    return { ok: false, status: 500, code: "server_error", error: GENERIC_FAILURE };
   }
   if (!area?.active) {
-    return { ok: false, status: 400, error: "Please select your delivery area.", field: "areaId" };
+    return {
+      ok: false,
+      status: 400,
+      code: "area_unavailable",
+      error: "Please select your delivery area.",
+      field: "areaId",
+    };
   }
 
   // ---- 4. Upload first, using an id we mint ourselves ---------------------
@@ -275,7 +327,12 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       bucket: STORAGE_BUCKET,
       message: cartUpload.error.message,
     });
-    return { ok: false, status: 500, error: "We couldn't upload your screenshot. Please try again." };
+    return {
+      ok: false,
+      status: 500,
+      code: "upload_failed",
+      error: "We couldn't upload your screenshot. Please try again.",
+    };
   }
   uploadedPaths.push(cartPath);
 
@@ -337,6 +394,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
       marketing_consent: fields.marketingConsent,
       restaurant_name: sanitiseText(fields.restaurantName, MAX_RESTAURANT_NAME_LENGTH),
       ...attribution,
+      ...(options.client ? clientColumns(options.client) : {}),
     });
 
     if (!error) {
@@ -361,7 +419,7 @@ export async function createSubmission(formData: FormData): Promise<CreateSubmis
     });
 
     await supabase.storage.from(STORAGE_BUCKET).remove(uploadedPaths);
-    return { ok: false, status: 500, error: GENERIC_FAILURE };
+    return { ok: false, status: 500, code: "server_error", error: GENERIC_FAILURE };
   }
 
   // Items are a convenience for the admin, not part of the comparison itself.

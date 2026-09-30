@@ -70,6 +70,13 @@ const PROBES: MigrationProbe[] = [
     column: "new_to_keeta",
     breaks: "submitting an order, and the new-customer-discount note on the result",
   },
+  {
+    // The website never writes it, so the site keeps taking orders without it.
+    // What fails is every submission from the mobile apps.
+    file: "0030_client_platform.sql",
+    column: "client_platform",
+    breaks: "every submission from the Android and iOS apps (the website is unaffected)",
+  },
 ];
 
 /**
@@ -117,6 +124,12 @@ const OTHER_PROBES: { file: string; table: string; column: string; breaks: strin
     // Nothing breaks while DRAFT_RESUME is off; with it on, the wizard simply
     // cannot resume and behaves as it did before drafts existed.
     breaks: "resuming the wizard after a reload, once DRAFT_RESUME is set to test or on",
+  },
+  {
+    file: "0030_client_platform.sql",
+    table: "funnel_events",
+    column: "client_platform",
+    breaks: "counting funnel steps from the Android and iOS apps (the website is unaffected)",
   },
 ];
 
